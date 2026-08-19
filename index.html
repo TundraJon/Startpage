@@ -3,46 +3,187 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TundraJon</title>
-<style>
-  :root {
-    color-scheme: light dark;
-    --bg: #f5f5f5;
-    --fg: #1a1a1a;
-    --accent: #1A5276;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #14181c; --fg: #e8e8e8; --accent: #5dade2; }
-  }
-  body {
-    margin: 0;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--bg);
-    color: var(--fg);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    text-align: center;
-  }
-  main {
-    padding: 2rem;
-  }
-  h1 {
-    font-size: 2rem;
-    margin-bottom: 0.5rem;
-    color: var(--accent);
-  }
-  p {
-    font-size: 1.1rem;
-    opacity: 0.8;
-  }
-</style>
+<title>Home</title>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<main>
-  <h1>It's live.</h1>
-  <p>Personal homepage — coming soon.</p>
+
+<header class="site-header">
+  <button id="theme-toggle" class="theme-toggle" aria-label="Toggle dark mode">
+    <span class="theme-toggle-thumb">🌙</span>
+  </button>
+  <h1 class="site-title">Home</h1>
+  <div class="header-icons">
+    <button id="help-btn" class="icon-btn" aria-label="Help">?</button>
+    <button id="profile-btn" class="icon-btn profile-btn" aria-label="Profile">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+        <circle cx="12" cy="8" r="4"/>
+        <path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8v1H4v-1z"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<form class="search-row" id="search-form" action="https://www.google.com/search" method="get" target="_blank">
+  <select id="search-engine" class="search-engine" aria-label="Search engine">
+    <option value="https://www.google.com/search">Google</option>
+    <option value="https://www.bing.com/search">Bing</option>
+  </select>
+  <input type="search" name="q" class="search-input" placeholder="Search the web" autocomplete="off" required>
+  <button type="submit" class="search-submit" aria-label="Search">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <circle cx="11" cy="11" r="7"/>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+  </button>
+</form>
+
+<main id="categories">
+
+  <section class="category category--home" data-category-id="home">
+    <div class="category-header category-header--home">
+      <h2 class="category-name">Home</h2>
+    </div>
+    <div class="tile-grid">
+
+      <div class="widget clock-widget" id="clock-widget">
+        <a href="https://www.timeanddate.com" target="_blank" rel="noopener" class="clock-face">
+          <span class="clock-ampm" id="clock-ampm"></span>
+          <span class="clock-hour" id="clock-hour">--</span>
+          <span class="clock-minute" id="clock-minute">--</span>
+        </a>
+      </div>
+
+      <div class="widget weather-widget" id="weather-widget">
+        <div class="weather-top">
+          <div class="weather-extras">
+            <span>💨8mph</span>
+            <span>👁️10mi</span>
+            <span>☁️20%</span>
+          </div>
+          <div class="weather-location">Groveland, FL · EDT</div>
+        </div>
+        <div class="weather-middle">
+          <span class="weather-temp">88°</span>
+          <span class="weather-emoji">☀️</span>
+        </div>
+        <div class="weather-bottom">
+          <span class="weather-hilo">￪91°/￬72° 🌡️92°</span>
+          <span class="weather-desc">Sunny</span>
+        </div>
+        <div class="weather-footer">
+          <span>💦55%</span>
+          <span>💧68°</span>
+          <span>🌕Full</span>
+          <span>🌞6</span>
+        </div>
+      </div>
+
+      <a class="tile" href="https://mail.google.com" target="_blank" rel="noopener">
+        <img src="https://www.google.com/s2/favicons?sz=64&domain=mail.google.com" alt="" loading="lazy">
+        <span>Gmail</span>
+      </a>
+      <a class="tile" href="https://translate.google.com" target="_blank" rel="noopener">
+        <img src="https://www.google.com/s2/favicons?sz=64&domain=translate.google.com" alt="" loading="lazy">
+        <span>Translate</span>
+      </a>
+      <a class="tile" href="https://maps.google.com" target="_blank" rel="noopener">
+        <img src="https://www.google.com/s2/favicons?sz=64&domain=maps.google.com" alt="" loading="lazy">
+        <span>Maps</span>
+      </a>
+      <a class="tile" href="https://informeddelivery.usps.com" target="_blank" rel="noopener">
+        <img src="https://www.google.com/s2/favicons?sz=64&domain=usps.com" alt="" loading="lazy">
+        <span>USPS</span>
+      </a>
+
+    </div>
+  </section>
+
+  <section class="category" data-category-id="news" style="--stripe-color:#3B82C4">
+    <button class="category-header" aria-expanded="false">
+      <span class="category-name">News</span>
+      <span class="chevron">▾</span>
+    </button>
+    <div class="tile-grid" hidden>
+      <a class="tile" href="https://news.google.com" target="_blank" rel="noopener">
+        <img src="https://www.google.com/s2/favicons?sz=64&domain=news.google.com" alt="" loading="lazy">
+        <span>Google News</span>
+      </a>
+      <a class="tile" href="https://www.orlandosentinel.com" target="_blank" rel="noopener">
+        <img src="https://www.google.com/s2/favicons?sz=64&domain=orlandosentinel.com" alt="" loading="lazy">
+        <span>Sentinel</span>
+      </a>
+      <a class="tile" href="https://www.weather.gov" target="_blank" rel="noopener">
+        <img src="https://www.google.com/s2/favicons?sz=64&domain=weather.gov" alt="" loading="lazy">
+        <span>NWS</span>
+      </a>
+      <a class="tile" href="https://www.reddit.com/r/florida" target="_blank" rel="noopener">
+        <img src="https://www.google.com/s2/favicons?sz=64&domain=reddit.com" alt="" loading="lazy">
+        <span>r/florida</span>
+      </a>
+    </div>
+  </section>
+
+  <section class="category" data-category-id="shopping" style="--stripe-color:#2E8B57">
+    <button class="category-header" aria-expanded="false">
+      <span class="category-name">Shopping</span>
+      <span class="chevron">▾</span>
+    </button>
+    <div class="tile-grid" hidden>
+      <a class="tile" href="https://www.amazon.com" target="_blank" rel="noopener">
+        <img src="https://www.google.com/s2/favicons?sz=64&domain=amazon.com" alt="" loading="lazy">
+        <span>Amazon</span>
+      </a>
+      <a class="tile" href="https://www.target.com" target="_blank" rel="noopener">
+        <img src="https://www.google.com/s2/favicons?sz=64&domain=target.com" alt="" loading="lazy">
+        <span>Target</span>
+      </a>
+      <a class="tile" href="https://www.walmart.com" target="_blank" rel="noopener">
+        <img src="https://www.google.com/s2/favicons?sz=64&domain=walmart.com" alt="" loading="lazy">
+        <span>Walmart</span>
+      </a>
+      <a class="tile" href="https://www.homedepot.com" target="_blank" rel="noopener">
+        <img src="https://www.google.com/s2/favicons?sz=64&domain=homedepot.com" alt="" loading="lazy">
+        <span>Home Depot</span>
+      </a>
+    </div>
+  </section>
+
+  <section class="category" data-category-id="entertainment" style="--stripe-color:#8E44AD">
+    <button class="category-header" aria-expanded="false">
+      <span class="category-name">Entertainment</span>
+      <span class="chevron">▾</span>
+    </button>
+    <div class="tile-grid" hidden>
+      <a class="tile" href="https://www.youtube.com" target="_blank" rel="noopener">
+        <img src="https://www.google.com/s2/favicons?sz=64&domain=youtube.com" alt="" loading="lazy">
+        <span>YouTube</span>
+      </a>
+      <a class="tile" href="https://www.netflix.com" target="_blank" rel="noopener">
+        <img src="https://www.google.com/s2/favicons?sz=64&domain=netflix.com" alt="" loading="lazy">
+        <span>Netflix</span>
+      </a>
+      <a class="tile" href="https://www.spotify.com" target="_blank" rel="noopener">
+        <img src="https://www.google.com/s2/favicons?sz=64&domain=spotify.com" alt="" loading="lazy">
+        <span>Spotify</span>
+      </a>
+      <a class="tile" href="https://www.disneyplus.com" target="_blank" rel="noopener">
+        <img src="https://www.google.com/s2/favicons?sz=64&domain=disneyplus.com" alt="" loading="lazy">
+        <span>Disney+</span>
+      </a>
+    </div>
+  </section>
+
 </main>
+
+<div class="help-overlay" id="help-overlay" hidden>
+  <div class="help-panel">
+    <button class="help-close" id="help-close" aria-label="Close help">&times;</button>
+    <h2>Quick tour</h2>
+    <p>This help walkthrough is coming soon — it'll walk you through adding categories, tiles, and personalizing your homepage.</p>
+  </div>
+</div>
+
+<script src="script.js"></script>
 </body>
 </html>
