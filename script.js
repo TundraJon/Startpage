@@ -4,18 +4,30 @@
   const storedTheme = localStorage.getItem('theme');
   if (storedTheme) root.setAttribute('data-theme', storedTheme);
 
-  function syncThemeIcon() {
-    const isDark = root.getAttribute('data-theme') === 'dark';
-    themeToggle.querySelector('.theme-toggle-thumb').textContent = isDark ? '☀️' : '🌙';
-  }
-  syncThemeIcon();
-
   themeToggle.addEventListener('click', () => {
     const isDark = root.getAttribute('data-theme') === 'dark';
     const next = isDark ? 'light' : 'dark';
     root.setAttribute('data-theme', next);
     localStorage.setItem('theme', next);
-    syncThemeIcon();
+  });
+
+  const helpBtn = document.getElementById('help-btn');
+  const helpOverlay = document.getElementById('help-overlay');
+  const helpClose = document.getElementById('help-close');
+  helpBtn.addEventListener('click', () => { showComingSoon('Quick tour', "This help walkthrough is coming soon — it'll walk you through adding categories, tiles, and personalizing your homepage."); });
+  helpClose.addEventListener('click', () => { helpOverlay.hidden = true; });
+  helpOverlay.addEventListener('click', (e) => {
+    if (e.target === helpOverlay) helpOverlay.hidden = true;
+  });
+
+  function showComingSoon(title, message) {
+    helpOverlay.querySelector('h2').textContent = title;
+    helpOverlay.querySelector('p').textContent = message;
+    helpOverlay.hidden = false;
+  }
+
+  document.getElementById('profile-btn').addEventListener('click', () => {
+    showComingSoon('Settings', 'Profile photo and settings are coming in a later pass.');
   });
 
   const searchForm = document.getElementById('search-form');
@@ -59,22 +71,45 @@
     document.getElementById('clock-hour').textContent = String(hours).padStart(2, '0');
     document.getElementById('clock-minute').textContent = minutes;
     document.getElementById('clock-ampm').textContent = ampm;
+    document.getElementById('clock-day').textContent = now.toLocaleDateString(undefined, { weekday: 'short' });
+    document.getElementById('clock-month').textContent = now.toLocaleDateString(undefined, { month: 'short' });
+    document.getElementById('clock-daynum').textContent = String(now.getDate());
   }
   updateClock();
   setInterval(updateClock, 1000 * 10);
 
-  const helpBtn = document.getElementById('help-btn');
-  const helpOverlay = document.getElementById('help-overlay');
-  const helpClose = document.getElementById('help-close');
-  helpBtn.addEventListener('click', () => { helpOverlay.hidden = false; });
-  helpClose.addEventListener('click', () => { helpOverlay.hidden = true; });
-  helpOverlay.addEventListener('click', (e) => {
-    if (e.target === helpOverlay) helpOverlay.hidden = true;
+  const uvBadge = document.querySelector('.uv-badge');
+  function uvSeverityClass(uv) {
+    if (uv <= 2) return 'uv-low';
+    if (uv <= 5) return 'uv-moderate';
+    if (uv <= 7) return 'uv-high';
+    if (uv <= 10) return 'uv-veryhigh';
+    return 'uv-extreme';
+  }
+  if (uvBadge) {
+    uvBadge.classList.add(uvSeverityClass(Number(uvBadge.dataset.uv)));
+  }
+
+  const weatherState = { tempF: 88, hiF: 91, loF: 72, feelsF: 92, unit: 'F' };
+  const tempUnitBtn = document.getElementById('weather-temp-unit');
+  const hiloEl = document.querySelector('.weather-hilo');
+  function toF(f) { return Math.round(f); }
+  function toC(f) { return Math.round((f - 32) * 5 / 9); }
+  function renderWeatherTemps() {
+    const conv = weatherState.unit === 'F' ? toF : toC;
+    tempUnitBtn.firstChild.textContent = conv(weatherState.tempF) + '°';
+    tempUnitBtn.querySelector('.weather-unit').textContent = weatherState.unit;
+    hiloEl.textContent =
+      '￪' + conv(weatherState.hiF) + '°/￬' + conv(weatherState.loF) +
+      '° 🌡️' + conv(weatherState.feelsF) + '°';
+  }
+  renderWeatherTemps();
+  tempUnitBtn.addEventListener('click', () => {
+    weatherState.unit = weatherState.unit === 'F' ? 'C' : 'F';
+    renderWeatherTemps();
   });
 
-  document.getElementById('profile-btn').addEventListener('click', () => {
-    helpOverlay.hidden = false;
-    helpOverlay.querySelector('h2').textContent = 'Settings';
-    helpOverlay.querySelector('p').textContent = 'Profile photo and settings are coming in a later pass.';
+  document.getElementById('weather-emoji-btn').addEventListener('click', () => {
+    showComingSoon('Hourly forecast', 'The hourly forecast view is coming in a later pass.');
   });
 })();
