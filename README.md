@@ -44,3 +44,4 @@ Not yet implemented — queued for the next build session.
 - [ ] Sample category tiles (News/Shopping/Entertainment): add a 5th sample link to each so all 5 grid columns are filled per row, instead of 4 tiles leaving an empty 5th slot.
 - [ ] Home category's row-3 tiles (Gmail, Translate, Maps, USPS): add a 5th sample link so that row is also filled to 5, same as the other categories.
 - [ ] Weather widget: since it's a tile in its own right, give it the same outline treatment as the regular tiles — border color matching the selected Home banner color (`--home-header-bg`), same as what the tile border fix already does.
+- [ ] Tile favicons: confirmed currently rendering at `width/height: 60%` of the tile (not the spec's ~80%), and that 60% is measured against the whole tile square rather than the interior space left after padding/gap/label — so the real fill is even smaller than 60% suggests. Needs to be resized up to match the spec's ~80% interior fill.
