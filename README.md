@@ -31,3 +31,4 @@ Reported after reviewing the v8 pass live. Not yet implemented — queued for th
 - [ ] Weather widget: the four bottom-row icon+number items (humidity, dew point, moon phase, UV) should be 1.2x their current size.
 - [ ] Tiles: background should be pure white, not off-white (currently using the page's off-white `--bg` behind each tile).
 - [ ] Tiles: add a border/outline whose color matches the currently-selected Home header banner color, so it updates dynamically if the user picks a different Home color (e.g. dark green banner → dark green tile borders).
+- [ ] Weather widget: background should be pure white, not off-white (same `--bg` issue as the tiles).
