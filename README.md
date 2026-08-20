@@ -49,4 +49,9 @@ Reported after reviewing the v8 pass live, built in the following pass.
 
 ## Build Queue
 
-Empty — nothing queued right now.
+Not yet implemented — queued for the next build session.
+
+- [ ] Clock widget: date stack font size — revert from 1.3x back down to 1x (i.e. back to the original 0.75rem, undoing the increase from the last pass).
+- [ ] Tile favicons: reduce from 80% down to 75% of the tile size (80% reads as a bit too big).
+- [ ] Weather widget: change the sample location text from "Groveland, FL" to "Los Ranchos de Albuquerque, NM" — a long-location fit test, similar in spirit to the clock date-length test (expected to be a tight fit).
+- [ ] Weather widget top row layout: restructure to a strict 50/50 split — left half (wind/visibility/cloud extras) sits directly above the temperature, right half (city/state) sits directly above the condition emoji, each half exactly 50% of the card width (not just space-between as it is now). Also revert this row's font size back down to 1x (undo the 1.2x bump from the last pass, back to 0.7rem).
