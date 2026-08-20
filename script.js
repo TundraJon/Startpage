@@ -229,7 +229,7 @@
   (function setupWeatherLongPress() {
     const widget = document.getElementById('weather-widget');
     const LONG_PRESS_MS = 550;
-    const MOVE_CANCEL_PX = 10;
+    const MOVE_CANCEL_PX = 20;
     let pressTimer = null;
     let startX = 0;
     let startY = 0;
