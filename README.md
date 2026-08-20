@@ -64,12 +64,9 @@ Reported after reviewing the v8 pass live, built in the following pass.
 - [x] Weather widget bottom row: `.weather-hilo` and `.weather-desc` now each constrained to exactly 50% width (`flex: 0 0 50%`), description right-justified. Verified: hi/lo/feels-like now renders on a single line (13px tall, was 25px/double before) since it's no longer being squeezed to 34%; description wraps to two lines within its own half without affecting the other side.
 - [x] Clock scheduling replaced: `setInterval(updateClock, 1000 * 10)` is gone. Now renders immediately on load, then computes ms-to-next-minute (`(60 - seconds) * 1000 - milliseconds`) and uses `setTimeout` to fire exactly on the minute boundary, rescheduling itself the same way each time (no drift-prone flat interval). Verified the ms-to-next-minute math against edge cases (:00.000 → 60000ms, :45.500 → 14500ms, :59.999 → 1ms) — all correct.
 
-## Build Queue
+## Build Log 5 (completed)
 
-Not yet implemented — queued for whenever it's relevant.
-
-- [ ] Weather (blocked on live data being wired up — WeatherAPI.com integration doesn't exist yet, this widget is still static placeholder data): 15-minute staleness-based refresh, not a plain interval. Cache the fetched data plus a fetch timestamp in `localStorage`. On load, check the cached timestamp's age: if ≥15 minutes old (or no cache exists yet), fetch immediately; otherwise render the cached data with no network call. If the page stays open past the 15-minute mark in one sitting, a timer refetches at that point. This matters because typical visits are short (well under 5 minutes) and jump between pages, so staleness needs to be tracked across visits via the stored timestamp — a plain "fetch on load, wait 15 min" interval would rarely ever actually refire within a single visit.
-- [ ] Weather options menu — "Units & Core Info" section: reorder rows to Temperature, Wind speed (unit), Wind Speed, Visibility, Cloud Cover %, Feels Like, Moon Phase, UV Index (currently Temperature, Wind speed, Feels Like, UV Index, Wind Speed display, Visibility display, Cloud Cover % display). Note Moon Phase moves here from the "Visual Flourishes" section, landing between Feels Like and UV Index — it no longer stays down with Sunrise/Sunset Gradient and Live Condition Skin. Also drop the word "display" from the three toggle labels — "Wind Speed display" → "Wind Speed", "Visibility display" → "Visibility", "Cloud Cover % display" → "Cloud Cover %" — since they're already toggles, "display" is redundant.
+- [x] Weather options menu — "Units & Core Info" section reordered to Temperature, Wind speed (unit), Wind Speed, Visibility, Cloud Cover %, Feels Like, Moon Phase, UV Index. Moon Phase moved here from "Visual Flourishes" (which now just holds Sunrise/Sunset Gradient and Live Condition Skin). Dropped the redundant word "display" from the three toggle labels. No JS/CSS changes needed — the toggle wiring is `data-toggle-setting`/`data-toggle` attribute-driven, not order-dependent, so this was a pure markup reorder. Verified the new row order and that the Moon Phase toggle still correctly hides its footer element from its new position.
 
 ### Weather Widget Phase 2 — build order item 1 (completed)
 
@@ -80,6 +77,12 @@ Resolved conflict: the spec's stacked wind/visibility/cloud layout **overrides**
 - [x] Long-press options menu built: 3 sections in the spec's order (Units & Core Info, Safety, Visual Flourishes), all 11 controls, opened via a custom long-press gesture (pointerdown + 550ms hold, cancels on move/release) rather than the browser's native context menu. All settings persist to `localStorage` (`weatherSettings`) and were verified to survive a full page reload.
 - [x] Temperature unit tap-vs-persistent split: long-press menu F/C selection is the persistent default (saved + reapplied on load); tapping the °F/°C symbol directly is a temporary peek that does not touch the stored setting. Verified directly: tapped to peek at °C, then opened the long-press menu — it still showed °F as the active/persistent selection, confirming the two are properly decoupled.
 - [x] Wind speed MPH/KPH: added as a persistent menu setting (source value stored in mph, converted for display) — not explicitly required for item 1 but natural to include alongside the temp unit work since it follows the identical pattern.
+
+## Build Queue
+
+Not yet implemented — queued for whenever it's relevant.
+
+- [ ] Weather (blocked on live data being wired up — WeatherAPI.com integration doesn't exist yet, this widget is still static placeholder data): 15-minute staleness-based refresh, not a plain interval. Cache the fetched data plus a fetch timestamp in `localStorage`. On load, check the cached timestamp's age: if ≥15 minutes old (or no cache exists yet), fetch immediately; otherwise render the cached data with no network call. If the page stays open past the 15-minute mark in one sitting, a timer refetches at that point. This matters because typical visits are short (well under 5 minutes) and jump between pages, so staleness needs to be tracked across visits via the stored timestamp — a plain "fetch on load, wait 15 min" interval would rarely ever actually refire within a single visit.
 
 ### Weather Widget Phase 2 — remaining (build order items 2–3)
 
