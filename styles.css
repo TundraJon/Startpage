@@ -178,6 +178,8 @@ main {
 
 .category-name {
   font-weight: 600;
+  font-size: 1rem;
+  margin: 0;
 }
 
 .chevron {
@@ -218,7 +220,8 @@ main {
   gap: 4px;
   text-decoration: none;
   color: var(--fg);
-  background: var(--bg);
+  background: var(--surface);
+  border: 1px solid var(--home-header-bg);
   border-radius: 8px;
   overflow: hidden;
   padding: 4px;
@@ -288,7 +291,7 @@ main {
 }
 
 .clock-hour, .clock-minute {
-  font-size: 1.9rem;
+  font-size: 3.8rem;
   line-height: 1.05;
   font-weight: 600;
 }
@@ -307,7 +310,7 @@ main {
 }
 
 .weather-widget {
-  background: var(--bg);
+  background: var(--surface);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -358,18 +361,18 @@ main {
 }
 
 .weather-temp {
-  font-size: 1.8rem;
+  font-size: 3.6rem;
   font-weight: 600;
 }
 
 .weather-unit {
-  font-size: 1rem;
+  font-size: 1.4rem;
   font-weight: 400;
   color: var(--fg-muted);
 }
 
 .weather-emoji {
-  font-size: 1.8rem;
+  font-size: 3.6rem;
 }
 
 .weather-bottom {
@@ -379,10 +382,19 @@ main {
   color: var(--fg-muted);
 }
 
+.weather-hilo .hi {
+  color: #d0342c;
+}
+
+.weather-hilo .lo {
+  color: #2563eb;
+}
+
 .weather-footer {
   display: flex;
   justify-content: space-between;
   color: var(--fg-muted);
+  font-size: 0.84rem;
 }
 
 .uv-badge.uv-low { color: #2e8b3d; }

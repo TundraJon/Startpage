@@ -92,16 +92,19 @@
 
   const weatherState = { tempF: 88, hiF: 91, loF: 72, feelsF: 92, unit: 'F' };
   const tempUnitBtn = document.getElementById('weather-temp-unit');
-  const hiloEl = document.querySelector('.weather-hilo');
+  const hiEl = document.getElementById('weather-hi');
+  const loEl = document.getElementById('weather-lo');
+  const feelsEl = document.getElementById('weather-feels');
   function toF(f) { return Math.round(f); }
   function toC(f) { return Math.round((f - 32) * 5 / 9); }
   function renderWeatherTemps() {
     const conv = weatherState.unit === 'F' ? toF : toC;
     tempUnitBtn.firstChild.textContent = conv(weatherState.tempF) + '°';
     tempUnitBtn.querySelector('.weather-unit').textContent = weatherState.unit;
-    hiloEl.textContent =
-      '￪' + conv(weatherState.hiF) + '°/￬' + conv(weatherState.loF) +
-      '° 🌡️' + conv(weatherState.feelsF) + '°';
+    hiEl.textContent = '￪' + conv(weatherState.hiF) + '°';
+    loEl.textContent = '￬' + conv(weatherState.loF) + '°';
+    const feelsIcon = weatherState.feelsF > weatherState.tempF ? '🌡️' : '🌬️';
+    feelsEl.textContent = feelsIcon + conv(weatherState.feelsF) + '°';
   }
   renderWeatherTemps();
   tempUnitBtn.addEventListener('click', () => {

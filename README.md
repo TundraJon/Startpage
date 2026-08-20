@@ -21,14 +21,14 @@ Theme and category expand/collapse state already persist per-device via `localSt
 
 ## Build Queue
 
-Reported after reviewing the v8 pass live. Not yet implemented — queued for the next build session.
+Reported after reviewing the v8 pass live, built in the following pass.
 
-- [ ] Home category header bar: currently renders ~2x too tall. Should match the thin header height of every other category (News/Shopping/Entertainment); reduce the vertical padding above/below the "Home" title. Font size itself is approximately correct.
-- [ ] Clock widget: hour and minute digits should be ~2x their current size.
-- [ ] Weather widget: current temperature number and condition emoji should be ~2x their current size.
-- [ ] Weather widget: high temp shown in red, low temp shown in blue (currently both muted/gray).
-- [ ] Weather widget: feels-like indicator should switch icon based on direction — 🌡️ when feels-like is warmer than actual temp (current behavior), 🌬️ when feels-like is cooler than actual temp.
-- [ ] Weather widget: the four bottom-row icon+number items (humidity, dew point, moon phase, UV) should be 1.2x their current size.
-- [ ] Tiles: background should be pure white, not off-white (currently using the page's off-white `--bg` behind each tile).
-- [ ] Tiles: add a border/outline whose color matches the currently-selected Home header banner color, so it updates dynamically if the user picks a different Home color (e.g. dark green banner → dark green tile borders).
-- [ ] Weather widget: background should be pure white, not off-white (same `--bg` issue as the tiles).
+- [x] Home category header bar: was rendering ~2x too tall — root cause was the `<h2>` tag's browser-default margin (not padding); normalized `.category-name` margin/font-size so it now matches the thin header height of every other category.
+- [x] Clock widget: hour and minute digits doubled in size (1.9rem → 3.8rem).
+- [x] Weather widget: current temperature number and condition emoji doubled in size (1.8rem → 3.6rem).
+- [x] Weather widget: high temp shown in red, low temp shown in blue.
+- [x] Weather widget: feels-like icon now switches direction — 🌡️ when feels-like is warmer than actual temp, 🌬️ when cooler.
+- [x] Weather widget: the four bottom-row icon+number items (humidity, dew point, moon phase, UV) sized up 1.2x (0.7rem → 0.84rem).
+- [x] Tiles: background switched from the off-white page background to pure white (`--surface`).
+- [x] Tiles: added a border matching the Home header banner color (`--home-header-bg`) — same CSS variable as the banner, so it'll track automatically once Home color personalization is built.
+- [x] Weather widget: background switched to pure white (`--surface`), same fix as the tiles.
