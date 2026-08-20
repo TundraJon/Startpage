@@ -41,3 +41,4 @@ Not yet implemented — queued for the next build session.
 - [ ] Weather widget: high, low, and feels-like text should be 1.2x their current font size.
 - [ ] Weather widget: condition description text (currently "Sunny") should also be 1.2x its current font size, to match the hi/lo/feels-like line size since it sits on the same visual row.
 - [ ] Weather widget: change the sample/placeholder condition text to "Light Thunderstorm" (to check how it wraps/fits under the condition emoji at the new size).
+- [ ] Sample category tiles (News/Shopping/Entertainment): add a 5th sample link to each so all 5 grid columns are filled per row, instead of 4 tiles leaving an empty 5th slot.
