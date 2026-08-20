@@ -76,8 +76,16 @@
     document.getElementById('clock-month').textContent = now.toLocaleDateString(undefined, { month: 'short' });
     document.getElementById('clock-daynum').textContent = String(now.getDate());
   }
+  function scheduleNextClockTick() {
+    const now = new Date();
+    const msToNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+    setTimeout(() => {
+      updateClock();
+      scheduleNextClockTick();
+    }, msToNextMinute);
+  }
   updateClock();
-  setInterval(updateClock, 1000 * 10);
+  scheduleNextClockTick();
 
   const uvBadge = document.querySelector('.uv-badge');
   function uvSeverityClass(uv) {

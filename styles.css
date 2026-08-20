@@ -398,8 +398,16 @@ main {
 .weather-bottom {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
   color: var(--fg-muted);
+}
+
+.weather-hilo {
+  flex: 0 0 50%;
+}
+
+.weather-desc {
+  flex: 0 0 50%;
+  text-align: right;
 }
 
 .weather-hilo .hi {
