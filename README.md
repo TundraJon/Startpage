@@ -18,3 +18,14 @@ Foundation in progress, per `homepage-build-spec-v7`:
 - [ ] Personalization (colors, profile photo, per-device local storage of layout)
 
 Theme and category expand/collapse state already persist per-device via `localStorage`.
+
+## Build Queue
+
+Reported after reviewing the v8 pass live. Not yet implemented — queued for the next build session.
+
+- [ ] Home category header bar: currently renders ~2x too tall. Should match the thin header height of every other category (News/Shopping/Entertainment); reduce the vertical padding above/below the "Home" title. Font size itself is approximately correct.
+- [ ] Clock widget: hour and minute digits should be ~2x their current size.
+- [ ] Weather widget: current temperature number and condition emoji should be ~2x their current size.
+- [ ] Weather widget: high temp shown in red, low temp shown in blue (currently both muted/gray).
+- [ ] Weather widget: feels-like indicator should switch icon based on direction — 🌡️ when feels-like is warmer than actual temp (current behavior), 🌬️ when feels-like is cooler than actual temp.
+- [ ] Weather widget: the four bottom-row icon+number items (humidity, dew point, moon phase, UV) should be 1.2x their current size.
