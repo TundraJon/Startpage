@@ -340,6 +340,10 @@ main {
   justify-content: space-between;
   padding: 6px 8px;
   font-size: 0.7rem;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .weather-top {
@@ -350,8 +354,19 @@ main {
 .weather-extras {
   flex: 0 0 50%;
   display: flex;
-  gap: 6px;
+  justify-content: space-between;
   color: var(--fg-muted);
+}
+
+.wx-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.wx-stack[hidden] {
+  display: none;
 }
 
 .weather-location {
@@ -465,4 +480,56 @@ main {
   font-size: 1.4rem;
   cursor: pointer;
   color: var(--fg);
+}
+
+.options-section {
+  margin-top: 18px;
+}
+
+.options-section h3 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+  margin: 0 0 8px;
+}
+
+.option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.95rem;
+}
+
+.option-row:last-child {
+  border-bottom: none;
+}
+
+.option-row input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--home-header-bg);
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.segmented button {
+  border: none;
+  background: var(--bg);
+  color: var(--fg);
+  padding: 4px 10px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.segmented button.active {
+  background: var(--home-header-bg);
+  color: var(--home-header-fg);
 }

@@ -67,27 +67,36 @@
       <div class="widget weather-widget" id="weather-widget">
         <div class="weather-top">
           <div class="weather-extras">
-            <span><span class="wx-icon">💨</span><span class="wx-val">8mph</span></span>
-            <span><span class="wx-icon">👁️</span><span class="wx-val">10mi</span></span>
-            <span><span class="wx-icon">☁️</span><span class="wx-val">20%</span></span>
+            <div class="wx-stack" data-toggle="wind">
+              <span class="wx-icon">💨</span>
+              <span class="wx-val" id="wx-wind-val">8mph</span>
+            </div>
+            <div class="wx-stack" data-toggle="visibility">
+              <span class="wx-icon">👁️</span>
+              <span class="wx-val">10mi</span>
+            </div>
+            <div class="wx-stack" data-toggle="cloud">
+              <span class="wx-icon">☁️</span>
+              <span class="wx-val">20%</span>
+            </div>
           </div>
           <div class="weather-location">
             Los Ranchos de Albuquerque, NM
           </div>
         </div>
         <div class="weather-middle">
-          <button class="weather-temp" id="weather-temp-unit" aria-label="Toggle Fahrenheit/Celsius">88°<span class="weather-unit">F</span></button>
+          <button class="weather-temp" id="weather-temp-unit" aria-label="Toggle Fahrenheit/Celsius (tap for a quick peek)">88°<span class="weather-unit">F</span></button>
           <button class="weather-emoji" id="weather-emoji-btn" aria-label="Hourly forecast">☀️</button>
         </div>
         <div class="weather-bottom">
-          <span class="weather-hilo"><span class="hi" id="weather-hi"></span>/<span class="lo" id="weather-lo"></span> <span class="feels" id="weather-feels"></span></span>
+          <span class="weather-hilo"><span class="hi" id="weather-hi"></span>/<span class="lo" id="weather-lo"></span> <span class="feels" id="weather-feels" data-toggle="feelsLike"></span></span>
           <span class="weather-desc">Moderate or heavy freezing rain</span>
         </div>
         <div class="weather-footer">
           <span><span class="wx-icon">💦</span><span class="wx-val">55%</span></span>
           <span><span class="wx-icon">💧</span><span class="wx-val">68°</span></span>
-          <span><span class="wx-icon">🌕</span><span class="wx-val">Full</span></span>
-          <span class="uv-badge" data-uv="6"><span class="wx-icon">🌞</span><span class="wx-val">6</span></span>
+          <span data-toggle="moonPhase"><span class="wx-icon">🌕</span><span class="wx-val">Full</span></span>
+          <span class="uv-badge" data-uv="6" data-toggle="uv"><span class="wx-icon">🌞</span><span class="wx-val">6</span></span>
         </div>
       </div>
 
@@ -209,6 +218,46 @@
     <button class="help-close" id="help-close" aria-label="Close help">&times;</button>
     <h2>Quick tour</h2>
     <p>This help walkthrough is coming soon — it'll walk you through adding categories, tiles, and personalizing your homepage.</p>
+  </div>
+</div>
+
+<div class="help-overlay" id="weather-options-overlay" hidden>
+  <div class="help-panel options-panel">
+    <button class="help-close" id="weather-options-close" aria-label="Close weather options">&times;</button>
+    <h2>Weather Options</h2>
+
+    <section class="options-section">
+      <h3>Units &amp; Core Info</h3>
+      <div class="option-row">
+        <span>Temperature</span>
+        <span class="segmented" data-setting="tempUnit">
+          <button type="button" data-value="F">°F</button><button type="button" data-value="C">°C</button>
+        </span>
+      </div>
+      <div class="option-row">
+        <span>Wind speed</span>
+        <span class="segmented" data-setting="windUnit">
+          <button type="button" data-value="mph">MPH</button><button type="button" data-value="kph">KPH</button>
+        </span>
+      </div>
+      <label class="option-row"><span>Feels Like</span><input type="checkbox" data-toggle-setting="feelsLike"></label>
+      <label class="option-row"><span>UV Index</span><input type="checkbox" data-toggle-setting="uv"></label>
+      <label class="option-row"><span>Wind Speed display</span><input type="checkbox" data-toggle-setting="wind"></label>
+      <label class="option-row"><span>Visibility display</span><input type="checkbox" data-toggle-setting="visibility"></label>
+      <label class="option-row"><span>Cloud Cover % display</span><input type="checkbox" data-toggle-setting="cloud"></label>
+    </section>
+
+    <section class="options-section">
+      <h3>Safety</h3>
+      <label class="option-row"><span>Severe Weather Alerts</span><input type="checkbox" data-toggle-setting="severeAlerts"></label>
+    </section>
+
+    <section class="options-section">
+      <h3>Visual Flourishes</h3>
+      <label class="option-row"><span>Moon Phase icon</span><input type="checkbox" data-toggle-setting="moonPhase"></label>
+      <label class="option-row"><span>Sunrise/Sunset Gradient</span><input type="checkbox" data-toggle-setting="sunGradient"></label>
+      <label class="option-row"><span>Live Condition Skin</span><input type="checkbox" data-toggle-setting="liveSkin"></label>
+    </section>
   </div>
 </div>
 
