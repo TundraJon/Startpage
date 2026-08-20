@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home</title>
-<link rel="stylesheet" href="styles.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
 
@@ -53,11 +53,14 @@
 
       <div class="widget clock-widget" id="clock-widget">
         <a href="https://www.timeanddate.com" target="_blank" rel="noopener" class="clock-inner">
-          <div class="clock-face" id="clock-face" data-scheme="red-black">
-            <span class="clock-ampm" id="clock-ampm"></span>
-            <span class="clock-hour" id="clock-hour">--</span>
-            <span class="clock-minute" id="clock-minute">--</span>
-            <span class="clock-tz-pill" id="clock-tz-pill">EDT</span>
+          <div class="clock-face" id="clock-face" data-scheme="red-black" data-mode="digital">
+            <div class="clock-digital" id="clock-digital">
+              <span class="clock-ampm" id="clock-ampm"></span>
+              <span class="clock-hour" id="clock-hour">--</span>
+              <span class="clock-minute" id="clock-minute">--</span>
+              <span class="clock-tz-pill" id="clock-tz-pill">EDT</span>
+            </div>
+            <svg class="clock-analog" id="clock-analog-svg" viewBox="0 0 100 100" hidden></svg>
           </div>
           <div class="clock-date">
             <span id="clock-day">-</span>
@@ -224,6 +227,51 @@
   </div>
 </div>
 
+<div class="help-overlay" id="clock-options-overlay" hidden>
+  <div class="help-panel options-panel">
+    <button class="help-close" id="clock-options-close" aria-label="Close clock options">&times;</button>
+    <h2>Clock Options</h2>
+
+    <div class="option-row">
+      <span>Mode</span>
+      <span class="segmented" data-setting="clockMode">
+        <button type="button" data-value="digital">Digital</button><button type="button" data-value="analog">Analog</button>
+      </span>
+    </div>
+    <div class="option-row">
+      <span>Hour format</span>
+      <span class="segmented" data-setting="clockHour12">
+        <button type="button" data-value="12">12hr</button><button type="button" data-value="24">24hr</button>
+      </span>
+    </div>
+
+    <section class="options-section" id="clock-digital-preview-group">
+      <h3>Color Scheme</h3>
+      <div class="scheme-grid">
+        <button type="button" class="scheme-swatch" data-scheme="red-black">
+          <span class="mini-clock" data-scheme="red-black"><span class="mh">--</span><span class="mm">--</span></span>
+        </button>
+        <button type="button" class="scheme-swatch" data-scheme="blue-black">
+          <span class="mini-clock" data-scheme="blue-black"><span class="mh">--</span><span class="mm">--</span></span>
+        </button>
+        <button type="button" class="scheme-swatch" data-scheme="black-white">
+          <span class="mini-clock" data-scheme="black-white"><span class="mh">--</span><span class="mm">--</span></span>
+        </button>
+        <button type="button" class="scheme-swatch" data-scheme="white-black">
+          <span class="mini-clock" data-scheme="white-black"><span class="mh">--</span><span class="mm">--</span></span>
+        </button>
+      </div>
+    </section>
+
+    <section class="options-section" id="clock-analog-preview-group" hidden>
+      <h3>Preview</h3>
+      <div class="analog-preview-wrap">
+        <svg class="analog-preview-svg" id="clock-analog-preview-svg" viewBox="0 0 100 100"></svg>
+      </div>
+    </section>
+  </div>
+</div>
+
 <div class="help-overlay" id="weather-options-overlay" hidden>
   <div class="help-panel options-panel">
     <button class="help-close" id="weather-options-close" aria-label="Close weather options">&times;</button>
@@ -264,6 +312,6 @@
   </div>
 </div>
 
-<script src="script.js?v=2"></script>
+<script src="script.js?v=3"></script>
 </body>
 </html>

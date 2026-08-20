@@ -260,6 +260,10 @@ main {
   grid-column: 1 / 3;
   grid-row: 1 / 3;
   aspect-ratio: 1 / 1;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .weather-widget {
@@ -280,10 +284,6 @@ main {
   flex: 0 0 auto;
   height: 78%;
   aspect-ratio: 1 / 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   position: relative;
   font-variant-numeric: tabular-nums;
 }
@@ -292,6 +292,31 @@ main {
 .clock-face[data-scheme="blue-black"] { background: #000; color: #3b82f6; }
 .clock-face[data-scheme="black-white"] { background: #fff; color: #000; }
 .clock-face[data-scheme="white-black"] { background: #000; color: #fff; }
+.clock-face[data-mode="analog"] { background: #fff; }
+
+.clock-digital {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.clock-digital[hidden] {
+  display: none;
+}
+
+.clock-analog {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.clock-analog[hidden] {
+  display: none;
+}
 
 .clock-ampm {
   position: absolute;
@@ -532,4 +557,50 @@ main {
 .segmented button.active {
   background: var(--home-header-bg);
   color: var(--home-header-fg);
+}
+
+.scheme-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.scheme-swatch {
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+  background: none;
+}
+
+.scheme-swatch.active {
+  border-color: var(--home-header-bg);
+}
+
+.mini-clock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 0;
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.mini-clock[data-scheme="red-black"] { background: #000; color: #e6293f; }
+.mini-clock[data-scheme="blue-black"] { background: #000; color: #3b82f6; }
+.mini-clock[data-scheme="black-white"] { background: #fff; color: #000; }
+.mini-clock[data-scheme="white-black"] { background: #000; color: #fff; }
+
+.analog-preview-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.analog-preview-svg {
+  width: 140px;
+  height: 140px;
 }
