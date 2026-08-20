@@ -19,7 +19,7 @@ Foundation in progress, per `homepage-build-spec-v7`:
 
 Theme and category expand/collapse state already persist per-device via `localStorage`.
 
-## Build Queue
+## Build Log (completed)
 
 Reported after reviewing the v8 pass live, built in the following pass.
 
@@ -32,3 +32,12 @@ Reported after reviewing the v8 pass live, built in the following pass.
 - [x] Tiles: background switched from the off-white page background to pure white (`--surface`).
 - [x] Tiles: added a border matching the Home header banner color (`--home-header-bg`) — same CSS variable as the banner, so it'll track automatically once Home color personalization is built.
 - [x] Weather widget: background switched to pure white (`--surface`), same fix as the tiles.
+
+## Build Queue
+
+Not yet implemented — queued for the next build session.
+
+- [ ] Clock widget: day-of-week, month, and day-numeral (the stacked date stack) should be 1.3x their current font size.
+- [ ] Weather widget: high, low, and feels-like text should be 1.2x their current font size.
+- [ ] Weather widget: condition description text (currently "Sunny") should also be 1.2x its current font size, to match the hi/lo/feels-like line size since it sits on the same visual row.
+- [ ] Weather widget: change the sample/placeholder condition text to "Light Thunderstorm" (to check how it wraps/fits under the condition emoji at the new size).
