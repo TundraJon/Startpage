@@ -61,4 +61,6 @@ Reported after reviewing the v8 pass live, built in the following pass.
 
 ## Build Queue
 
-Empty — nothing queued right now.
+Not yet implemented — queued for the next build session.
+
+- [ ] Weather widget bottom row (`.weather-bottom`): condition description currently takes 65.8% of the row width (measured), forcing the hi/lo/feels-like column down to 34.2% — which wraps "feels like" onto its own second line. Fix: constrain the description text to exactly 50% width and right-justify it (same treatment as the city/state text on the top row), giving hi/lo/feels-like the other 50% so it fits on one line.
