@@ -211,6 +211,10 @@ main {
   background: var(--surface);
 }
 
+.tile-grid[hidden] {
+  display: none;
+}
+
 .tile {
   aspect-ratio: 1 / 1;
   display: flex;

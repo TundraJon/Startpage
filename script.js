@@ -46,7 +46,8 @@
     const section = btn.closest('.category');
     const id = section.dataset.categoryId;
     const grid = section.querySelector('.tile-grid');
-    const collapsed = localStorage.getItem('category-collapsed-' + id) === 'true';
+    const stored = localStorage.getItem('category-collapsed-' + id);
+    const collapsed = stored === null ? true : stored === 'true';
     setExpanded(!collapsed);
 
     function setExpanded(expanded) {
