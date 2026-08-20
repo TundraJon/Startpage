@@ -158,7 +158,11 @@ main {
 }
 
 .category {
-  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.category:last-child {
+  border-bottom: none;
 }
 
 .category-header {
@@ -232,8 +236,8 @@ main {
 }
 
 .tile img {
-  width: 80%;
-  height: 80%;
+  width: 75%;
+  height: 75%;
   object-fit: contain;
 }
 
@@ -265,6 +269,7 @@ main {
 
 .clock-inner {
   display: flex;
+  align-items: center;
   width: 100%;
   height: 100%;
   background: var(--clock-bg);
@@ -272,7 +277,9 @@ main {
 }
 
 .clock-face {
-  flex: 0 0 62%;
+  flex: 0 0 auto;
+  height: 78%;
+  aspect-ratio: 1 / 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -310,7 +317,9 @@ main {
 }
 
 .clock-date {
-  flex: 1;
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding-right: 6px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -318,8 +327,9 @@ main {
   gap: 6px;
   color: var(--clock-fg);
   background: var(--clock-bg);
-  font-size: 0.975rem;
+  font-size: 0.75rem;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .weather-widget {
@@ -335,21 +345,23 @@ main {
 .weather-top {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
-  font-size: 0.84rem;
 }
 
 .weather-extras {
+  flex: 0 0 50%;
   display: flex;
   gap: 6px;
   color: var(--fg-muted);
 }
 
 .weather-location {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  flex: 0 0 50%;
+  text-align: right;
   color: var(--fg-muted);
+}
+
+.wx-icon {
+  font-size: 1.2em;
 }
 
 .weather-middle {
@@ -388,7 +400,6 @@ main {
   align-items: baseline;
   justify-content: space-between;
   color: var(--fg-muted);
-  font-size: 0.84rem;
 }
 
 .weather-hilo .hi {
@@ -403,7 +414,6 @@ main {
   display: flex;
   justify-content: space-between;
   color: var(--fg-muted);
-  font-size: 0.84rem;
 }
 
 .uv-badge.uv-low { color: #2e8b3d; }
