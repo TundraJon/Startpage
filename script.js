@@ -72,9 +72,6 @@
     document.getElementById('clock-hour').textContent = String(hours).padStart(2, '0');
     document.getElementById('clock-minute').textContent = minutes;
     document.getElementById('clock-ampm').textContent = ampm;
-    document.getElementById('clock-day').textContent = now.toLocaleDateString(undefined, { weekday: 'short' });
-    document.getElementById('clock-month').textContent = now.toLocaleDateString(undefined, { month: 'short' });
-    document.getElementById('clock-daynum').textContent = String(now.getDate());
   }
   updateClock();
   setInterval(updateClock, 1000 * 10);

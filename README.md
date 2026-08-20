@@ -33,18 +33,20 @@ Reported after reviewing the v8 pass live, built in the following pass.
 - [x] Tiles: added a border matching the Home header banner color (`--home-header-bg`) — same CSS variable as the banner, so it'll track automatically once Home color personalization is built.
 - [x] Weather widget: background switched to pure white (`--surface`), same fix as the tiles.
 
+## Build Log 2 (completed)
+
+- [x] Clock widget: date stack (day-of-week, month, day-numeral) font size increased 1.3x (0.75rem → 0.975rem).
+- [x] Weather widget: high, low, and feels-like text increased 1.2x, sharing a rule with the description text so both land at the same size (0.7rem → 0.84rem).
+- [x] Weather widget: condition description text increased 1.2x, same rule as above.
+- [x] Weather widget: sample condition text changed to "Light Thunderstorm".
+- [x] Sample category tiles (News/Shopping/Entertainment): added a 5th tile to each — AP News, Costco, Hulu.
+- [x] Home category's row-3 tiles: added a 5th tile (Google Calendar) alongside Gmail/Translate/Maps/USPS.
+- [x] Weather widget: added a border matching the Home banner color (`--home-header-bg`), same treatment as the regular tiles.
+- [x] Tile favicons: increased from 60% to 80% fill; tightened tile padding/gap (4px → 2px) so the label text still has room at the larger icon size.
+- [x] Weather widget: top row (wind/visibility/cloud extras + location text) increased 1.2x (0.7rem → 0.84rem).
+- [x] Clock widget: date stack swapped to static test values "Wednesday" / "September" / "20" (no longer live — the day/month were live-updating fields tied to `updateClock()`, now hardcoded so the long-form test values persist). **Result: it doesn't fit.** At the new 1.3x size, "Wednesday" and "September" both overflow the date column's width and wrap/clip against the widget's height — see screenshot state, this will need either an abbreviated form, a smaller font, or a wider date column once you've had a look.
+- [x] Timezone pill: removed from the weather widget's top row; moved to the clock widget, centered under the displayed time (inside `.clock-face`, so it inherits the active color scheme via `currentColor`), font size matched to the AM/PM indicator (0.7rem).
+
 ## Build Queue
 
-Not yet implemented — queued for the next build session.
-
-- [ ] Clock widget: day-of-week, month, and day-numeral (the stacked date stack) should be 1.3x their current font size.
-- [ ] Weather widget: high, low, and feels-like text should be 1.2x their current font size.
-- [ ] Weather widget: condition description text (currently "Sunny") should also be 1.2x its current font size, to match the hi/lo/feels-like line size since it sits on the same visual row.
-- [ ] Weather widget: change the sample/placeholder condition text to "Light Thunderstorm" (to check how it wraps/fits under the condition emoji at the new size).
-- [ ] Sample category tiles (News/Shopping/Entertainment): add a 5th sample link to each so all 5 grid columns are filled per row, instead of 4 tiles leaving an empty 5th slot.
-- [ ] Home category's row-3 tiles (Gmail, Translate, Maps, USPS): add a 5th sample link so that row is also filled to 5, same as the other categories.
-- [ ] Weather widget: since it's a tile in its own right, give it the same outline treatment as the regular tiles — border color matching the selected Home banner color (`--home-header-bg`), same as what the tile border fix already does.
-- [ ] Tile favicons: confirmed currently rendering at `width/height: 60%` of the tile (not the spec's ~80%), and that 60% is measured against the whole tile square rather than the interior space left after padding/gap/label — so the real fill is even smaller than 60% suggests. Needs to be resized up to match the spec's ~80% interior fill.
-- [ ] Weather widget: top row (wind/visibility/cloud extras, and location text) should be 1.2x its current font size, to match the sizing of the other small text/icon rows.
-- [ ] Clock widget: swap the date stack's sample values to the longest-possible day-of-week and month names — "Wednesday" and "September" — to see how the long-form text fits next to the time (currently showing live short-form date; this is a one-off test value, not the short/long toggle itself).
-- [ ] Timezone pill (currently "EDT"): remove from next to the city/state on the weather widget's top row, and instead move it to the clock widget — centered underneath the displayed time — using the clock's currently-selected color scheme (e.g. red-on-black) instead of the weather widget's neutral pill styling. Pill's font size should match the AM/PM indicator's font size.
+Empty — nothing queued right now.
