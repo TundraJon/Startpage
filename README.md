@@ -43,3 +43,4 @@ Not yet implemented — queued for the next build session.
 - [ ] Weather widget: change the sample/placeholder condition text to "Light Thunderstorm" (to check how it wraps/fits under the condition emoji at the new size).
 - [ ] Sample category tiles (News/Shopping/Entertainment): add a 5th sample link to each so all 5 grid columns are filled per row, instead of 4 tiles leaving an empty 5th slot.
 - [ ] Home category's row-3 tiles (Gmail, Translate, Maps, USPS): add a 5th sample link so that row is also filled to 5, same as the other categories.
+- [ ] Weather widget: since it's a tile in its own right, give it the same outline treatment as the regular tiles — border color matching the selected Home banner color (`--home-header-bg`), same as what the tile border fix already does.
