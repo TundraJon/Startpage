@@ -165,8 +165,8 @@ Not yet implemented — queued for whenever it's relevant. All blocked on the sa
   - At the **top edge** (`top: 0%`): size **2.5x**, this is the largest and fastest.
   - At the **middle** (`top: 50%`, the band's bottom edge): size **1x**, this is the smallest and slowest.
   - Clouds in between get intermediate size/speed, linearly interpolated by vertical position.
-- [ ] Speed recalibration: current largest-cloud speed is correct and should be preserved as the anchor for the new top-edge/2.5x case (currently `baseDurationSec(34) / size`, which at the old max size 2 gives 17s — keep 17s as the duration for the new largest/2.5x/top-edge clouds). Current smallest-cloud speed (old size 1 → 34s) was reported as ~2x too fast, i.e. too short — the new smallest/1x/middle clouds should take roughly **68s**, about double the old value.
-  - Suggested linear mapping (two anchor points: size 2.5→17s, size 1→68s): with `f = topPct / 50` (0 at top edge, 1 at middle), `size = 2.5 - 1.5*f` and `duration = 17 + 51*f` seconds. Worth double-checking this against feel once built rather than treating 17/68 as exact requirements — those are the two data points the user gave, not necessarily the only acceptable values.
+- [ ] Speed recalibration: current largest-cloud speed is correct and should be preserved as the anchor for the new top-edge/2.5x case (currently `baseDurationSec(34) / size`, which at the old max size 2 gives 17s — keep 17s as the duration for the new largest/2.5x/top-edge clouds). The smallest/1x/middle clouds should take exactly **60s** to cross the widget (user's explicit correction — not 68s as first estimated from "about 2x too fast").
+  - Linear mapping (two anchor points: size 2.5→17s, size 1→60s): with `f = topPct / 50` (0 at top edge, 1 at middle), `size = 2.5 - 1.5*f` and `duration = 17 + 43*f` seconds.
 - [ ] Cloud count formula (`round(cloudPct / 10)`) and horizontal drift (`left: -15% → 115%`) are unaffected and should stay as-is.
 
 ### New feature: automatic theme switching by local time
