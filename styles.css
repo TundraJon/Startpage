@@ -2,6 +2,7 @@
   color-scheme: light dark;
   --bg: #f2f2f2;
   --surface: #ffffff;
+  --surface-rgb: 255, 255, 255;
   --fg: #1a1a1a;
   --fg-muted: #6b6b6b;
   --border: #e0e0e0;
@@ -9,14 +10,19 @@
   --home-header-fg: #ffffff;
   --clock-bg: #000000;
   --clock-fg: #ffffff;
+  --clock-analog-frame: var(--bg);
+  --clock-analog-night: #c9c9c9;
 }
 
 :root[data-theme="dark"] {
   --bg: #14181c;
   --surface: #1e2328;
+  --surface-rgb: 30, 35, 40;
   --fg: #e8e8e8;
   --fg-muted: #9aa0a6;
   --border: #2c3238;
+  --clock-analog-frame: #3a3f45;
+  --clock-analog-night: #1a1a1a;
 }
 
 * { box-sizing: border-box; }
@@ -290,9 +296,16 @@ main {
 
 .clock-face[data-scheme="red-black"] { background: #000; color: #e6293f; }
 .clock-face[data-scheme="blue-black"] { background: #000; color: #3b82f6; }
-.clock-face[data-scheme="black-white"] { background: #fff; color: #000; }
+.clock-face[data-scheme="black-white"] { background: #000; color: #fff; }
 .clock-face[data-scheme="white-black"] { background: #000; color: #fff; }
-.clock-face[data-mode="analog"] { background: #fff; }
+.clock-face[data-mode="analog"] { background: var(--clock-analog-frame); }
+
+.clock-face[data-scheme="black-white"] .clock-digits {
+  background: #fff;
+  color: #000;
+  border-radius: 6px;
+  padding: 0 8px;
+}
 
 .clock-digital {
   width: 100%;
@@ -306,6 +319,12 @@ main {
 
 .clock-digital[hidden] {
   display: none;
+}
+
+.clock-digits {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .clock-analog {
@@ -327,7 +346,7 @@ main {
 }
 
 .clock-hour, .clock-minute {
-  font-size: 3.8rem;
+  font-size: 3rem;
   line-height: 1.05;
   font-weight: 600;
 }
@@ -369,6 +388,46 @@ main {
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
+  position: relative;
+}
+
+.weather-skin {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.weather-skin-overlay {
+  position: absolute;
+  inset: 0;
+  background: #4b5563;
+  pointer-events: none;
+}
+
+.wx-skin-cloud {
+  position: absolute;
+  left: -15%;
+  font-size: 1rem;
+  animation-name: wx-cloud-drift;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+@keyframes wx-cloud-drift {
+  from { left: -15%; }
+  to { left: 115%; }
+}
+
+.weather-top,
+.weather-middle,
+.weather-bottom,
+.weather-footer-row {
+  background: rgba(var(--surface-rgb), 0.82);
+  border-radius: 4px;
 }
 
 .weather-top {
@@ -458,10 +517,54 @@ main {
   color: #2563eb;
 }
 
+.weather-footer-row {
+  min-height: 1.5em;
+  display: flex;
+  align-items: center;
+}
+
 .weather-footer {
+  flex: 1;
   display: flex;
   justify-content: space-between;
   color: var(--fg-muted);
+}
+
+.weather-footer[hidden] {
+  display: none;
+}
+
+.weather-alert-ticker {
+  flex: 1;
+  width: 100%;
+  overflow: hidden;
+  background: #b91c1c;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+.weather-alert-ticker[hidden] {
+  display: none;
+}
+
+.weather-alert-track {
+  display: inline-block;
+  white-space: nowrap;
+  padding-left: 100%;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  animation-name: wx-alert-scroll;
+  animation-duration: 14s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes wx-alert-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
 }
 
 .uv-badge.uv-low { color: #2e8b3d; }

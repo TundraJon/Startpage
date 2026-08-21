@@ -158,20 +158,21 @@
         }));
       }
       [3, 6, 9, 12].forEach((n) => {
-        const p = polarPoint(cx, cy, 34, n * 30);
+        const p = polarPoint(cx, cy, 28, n * 30);
         const t = svgEl('text', { x: p.x, y: p.y + 3, 'text-anchor': 'middle', 'font-size': 9, fill: '#222' });
         t.textContent = String(n);
         svg.appendChild(t);
       });
       const totalMin = (now.getHours() % 12) * 60 + now.getMinutes();
-      addHand(svg, cx, cy, (totalMin / 720) * 360, 26, 2.5, '#222');
-      addHand(svg, cx, cy, (now.getMinutes() / 60) * 360, 38, 1.5, '#222');
+      addHand(svg, cx, cy, (totalMin / 720) * 360, 24, 2.5, '#222');
+      addHand(svg, cx, cy, (now.getMinutes() / 60) * 360, 36, 1.5, '#222');
     } else {
       const innerR = 34;
+      const nightFill = getComputedStyle(document.documentElement).getPropertyValue('--clock-analog-night').trim() || '#c9c9c9';
       svg.appendChild(svgEl('circle', { cx, cy, r: innerR, fill: '#fff' }));
       svg.appendChild(svgEl('path', {
         d: `M ${cx - innerR} ${cy} A ${innerR} ${innerR} 0 0 1 ${cx + innerR} ${cy} Z`,
-        fill: '#c9c9c9',
+        fill: nightFill,
       }));
       for (let i = 1; i <= 24; i++) {
         const angle = i * 15;
@@ -183,14 +184,14 @@
         }));
       }
       [6, 12, 18, 24].forEach((n) => {
-        const p = polarPoint(cx, cy, 41, n * 15);
+        const p = polarPoint(cx, cy, 37.5, n * 15);
         const t = svgEl('text', { x: p.x, y: p.y + 2.5, 'text-anchor': 'middle', 'font-size': 7, fill: '#222' });
         t.textContent = String(n);
         svg.appendChild(t);
       });
       const totalMin = now.getHours() * 60 + now.getMinutes();
-      addHand(svg, cx, cy, (totalMin / 1440) * 360, 24, 2.5, '#222');
-      addHand(svg, cx, cy, (now.getMinutes() / 60) * 360, 32, 1.5, '#222');
+      addHand(svg, cx, cy, (totalMin / 1440) * 360, 22, 2.5, '#222');
+      addHand(svg, cx, cy, (now.getMinutes() / 60) * 360, 30, 1.5, '#222');
     }
     svg.appendChild(svgEl('circle', { cx, cy, r: 2, fill: '#222' }));
   }
@@ -364,7 +365,7 @@
     localStorage.setItem(WEATHER_SETTINGS_KEY, JSON.stringify(weatherSettings));
   }
 
-  const weatherState = { tempF: 88, hiF: 91, loF: 72, feelsF: 92, windMph: 8 };
+  const weatherState = { tempF: 88, hiF: 91, loF: 72, feelsF: 92, windMph: 8, cloudPct: 20 };
   let displayTempUnit = weatherSettings.tempUnit;
 
   const tempUnitBtn = document.getElementById('weather-temp-unit');
@@ -463,7 +464,151 @@
       saveWeatherSettings();
       applyWeatherToggles();
       if (key === 'feelsLike') renderWeatherTemps();
+      if (key === 'sunGradient' || key === 'liveSkin') renderWeatherSkin();
+      if (key === 'severeAlerts') applyAlertTicker();
     });
+  });
+
+  // --- Sunrise/sunset gradient (v8 spec keyframe logic) ---
+  const SUNRISE_SEC = 6 * 3600 + 30 * 60;
+  const SUNSET_SEC = 19 * 3600 + 45 * 60;
+  const TWILIGHT_HALF = 45 * 60;
+  const TWILIGHT_WINDOW = TWILIGHT_HALF * 2;
+  const DEEP_NIGHT_SKY = { top: '#020617', bottom: '#020617' };
+  const FULL_DAY_SKY = { top: '#4a90e2', bottom: '#d1e8ff' };
+  const SUNRISE_KEYFRAMES = [
+    { ratio: 0.00, top: '#020617', bottom: '#020617' },
+    { ratio: 0.10, top: '#0f172a', bottom: '#581c87' },
+    { ratio: 0.25, top: '#2563eb', bottom: '#fca5a5' },
+    { ratio: 0.45, top: '#38bdf8', bottom: '#fef08a' },
+    { ratio: 1.00, top: '#4a90e2', bottom: '#d1e8ff' },
+  ];
+  const SUNSET_KEYFRAMES = [
+    { ratio: 0.00, top: '#020617', bottom: '#020617' },
+    { ratio: 0.10, top: '#0f172a', bottom: '#701a75' },
+    { ratio: 0.20, top: '#1a365d', bottom: '#ff4500' },
+    { ratio: 0.40, top: '#3568a6', bottom: '#ffb347' },
+    { ratio: 1.00, top: '#4a90e2', bottom: '#d1e8ff' },
+  ];
+
+  function hexToRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function rgbToHex(rgb) {
+    return '#' + rgb.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+  }
+  function lerpColor(hexA, hexB, t) {
+    const a = hexToRgb(hexA);
+    const b = hexToRgb(hexB);
+    return rgbToHex(a.map((v, i) => v + (b[i] - v) * t));
+  }
+  function interpolateKeyframes(keyframes, xRatio) {
+    for (let i = 0; i < keyframes.length - 1; i++) {
+      const lower = keyframes[i];
+      const upper = keyframes[i + 1];
+      if (xRatio >= lower.ratio && xRatio <= upper.ratio) {
+        const f = (xRatio - lower.ratio) / (upper.ratio - lower.ratio);
+        return { top: lerpColor(lower.top, upper.top, f), bottom: lerpColor(lower.bottom, upper.bottom, f) };
+      }
+    }
+    return keyframes[keyframes.length - 1];
+  }
+  function computeSkyColors(now) {
+    const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+    if (nowSec >= SUNRISE_SEC - TWILIGHT_HALF && nowSec <= SUNRISE_SEC + TWILIGHT_HALF) {
+      const xRatio = Math.min(1, Math.max(0, (nowSec - (SUNRISE_SEC - TWILIGHT_HALF)) / TWILIGHT_WINDOW));
+      return interpolateKeyframes(SUNRISE_KEYFRAMES, xRatio);
+    }
+    if (nowSec >= SUNSET_SEC - TWILIGHT_HALF && nowSec <= SUNSET_SEC + TWILIGHT_HALF) {
+      const xRatio = Math.min(1, Math.max(0, 1 - (nowSec - (SUNSET_SEC - TWILIGHT_HALF)) / TWILIGHT_WINDOW));
+      return interpolateKeyframes(SUNSET_KEYFRAMES, xRatio);
+    }
+    if (nowSec > SUNRISE_SEC + TWILIGHT_HALF && nowSec < SUNSET_SEC - TWILIGHT_HALF) {
+      return FULL_DAY_SKY;
+    }
+    return DEEP_NIGHT_SKY;
+  }
+
+  const weatherSkin = document.getElementById('weather-skin');
+  function renderWeatherSkin() {
+    if (weatherSettings.sunGradient) {
+      const sky = computeSkyColors(new Date());
+      weatherSkin.style.background = `linear-gradient(to bottom, ${sky.top}, ${sky.bottom})`;
+    } else {
+      weatherSkin.style.background = '';
+    }
+
+    if (weatherSettings.liveSkin) {
+      if (!weatherSkin.dataset.cloudsBuilt) {
+        weatherSkin.querySelectorAll('.weather-skin-overlay, .wx-skin-cloud').forEach((el) => el.remove());
+        const cloudPct = weatherState.cloudPct;
+        const overlay = document.createElement('div');
+        overlay.className = 'weather-skin-overlay';
+        overlay.style.opacity = String(cloudPct / 2 / 100);
+        weatherSkin.appendChild(overlay);
+
+        const cloudCount = Math.round(cloudPct / 10);
+        const baseDurationSec = 34;
+        for (let i = 0; i < cloudCount; i++) {
+          const cloud = document.createElement('span');
+          cloud.className = 'wx-skin-cloud';
+          cloud.textContent = '☁️';
+          const size = 1 + Math.random();
+          const duration = baseDurationSec / size;
+          cloud.style.fontSize = size + 'rem';
+          cloud.style.top = (10 + Math.random() * 60) + '%';
+          cloud.style.animationDuration = duration + 's';
+          cloud.style.animationDelay = (-Math.random() * duration) + 's';
+          weatherSkin.appendChild(cloud);
+        }
+        weatherSkin.dataset.cloudsBuilt = '1';
+      }
+    } else {
+      weatherSkin.querySelectorAll('.weather-skin-overlay, .wx-skin-cloud').forEach((el) => el.remove());
+      delete weatherSkin.dataset.cloudsBuilt;
+    }
+  }
+  renderWeatherSkin();
+
+  // --- Severe weather alert ticker ---
+  const WEATHER_ALERT_KEY = 'weatherAlertState';
+  const sampleAlert = {
+    id: 'heat-advisory-sample-1',
+    text: '⚠️ Heat Advisory in effect until 8:00 PM for Los Ranchos de Albuquerque, NM — take precautions to avoid heat-related illness. (Tap to dismiss.)',
+  };
+  let alertState = {};
+  try {
+    alertState = JSON.parse(localStorage.getItem(WEATHER_ALERT_KEY) || '{}');
+  } catch (e) {
+    alertState = {};
+  }
+  function saveAlertState() {
+    localStorage.setItem(WEATHER_ALERT_KEY, JSON.stringify(alertState));
+  }
+  function shouldShowAlert() {
+    if (!weatherSettings.severeAlerts) return false;
+    if (alertState.dismissedId !== sampleAlert.id) return true;
+    const twoHoursMs = 2 * 60 * 60 * 1000;
+    return (Date.now() - (alertState.dismissedAt || 0)) >= twoHoursMs;
+  }
+  const alertTicker = document.getElementById('weather-alert-ticker');
+  const alertTrack = document.getElementById('weather-alert-track');
+  const weatherFooter = document.getElementById('weather-footer');
+  function applyAlertTicker() {
+    const show = shouldShowAlert();
+    alertTicker.hidden = !show;
+    weatherFooter.hidden = show;
+    if (show) {
+      alertTrack.textContent = sampleAlert.text;
+    }
+  }
+  applyAlertTicker();
+  alertTicker.addEventListener('click', () => {
+    alertState.dismissedId = sampleAlert.id;
+    alertState.dismissedAt = Date.now();
+    saveAlertState();
+    applyAlertTicker();
   });
 
   attachLongPress(document.getElementById('weather-widget'), openWeatherOptions);
