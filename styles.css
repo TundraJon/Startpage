@@ -270,6 +270,8 @@ main {
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
+  position: relative;
+  border: 1px solid var(--home-header-bg);
 }
 
 .weather-widget {
@@ -352,7 +354,10 @@ main {
 }
 
 .clock-tz-pill {
-  margin-bottom: 8px;
+  position: absolute;
+  bottom: 6px;
+  right: 8px;
+  color: var(--clock-fg);
   border: 1px solid currentColor;
   border-radius: 999px;
   padding: 1px 6px;
@@ -367,7 +372,7 @@ main {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   color: var(--clock-fg);
   background: var(--clock-bg);
   font-size: 0.75rem;
@@ -422,7 +427,7 @@ main {
   animation-timing-function: linear;
   animation-iteration-count: infinite;
   pointer-events: none;
-  opacity: 0.9;
+  opacity: 0.8;
 }
 
 @keyframes wx-cloud-drift {
@@ -492,6 +497,7 @@ main {
 .weather-temp {
   font-size: 3.6rem;
   font-weight: 600;
+  color: var(--fg-muted);
 }
 
 .weather-unit {

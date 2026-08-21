@@ -1,15 +1,90 @@
 (function () {
   const root = document.documentElement;
   const themeToggle = document.getElementById('theme-toggle');
+  const themeOptionsOverlay = document.getElementById('theme-options-overlay');
+  const themeOptionsClose = document.getElementById('theme-options-close');
+  const themeAutoToggleInput = document.getElementById('theme-auto-toggle');
+
+  const THEME_AUTO_KEY = 'themeAutoMode';
+  const DAY_START_SEC = 7 * 3600;
+  const NIGHT_START_SEC = 19 * 3600;
+  let themeAutoMode = localStorage.getItem(THEME_AUTO_KEY) === 'true';
+  let themeAutoTimer = null;
+
+  function computeAutoTheme(now) {
+    const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+    return (nowSec >= DAY_START_SEC && nowSec < NIGHT_START_SEC) ? 'light' : 'dark';
+  }
+
+  function applyAutoTheme() {
+    const next = computeAutoTheme(new Date());
+    root.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+  }
+
+  function scheduleNextThemeCheck() {
+    if (themeAutoTimer) clearTimeout(themeAutoTimer);
+    if (!themeAutoMode) return;
+    const now = new Date();
+    const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+    let nextBoundarySec;
+    if (nowSec < DAY_START_SEC) nextBoundarySec = DAY_START_SEC;
+    else if (nowSec < NIGHT_START_SEC) nextBoundarySec = NIGHT_START_SEC;
+    else nextBoundarySec = DAY_START_SEC + 24 * 3600;
+    const msUntil = (nextBoundarySec - nowSec) * 1000 - now.getMilliseconds();
+    themeAutoTimer = setTimeout(() => {
+      applyAutoTheme();
+      scheduleNextThemeCheck();
+    }, msUntil);
+  }
+
   const storedTheme = localStorage.getItem('theme');
-  if (storedTheme) root.setAttribute('data-theme', storedTheme);
+  if (themeAutoMode) {
+    applyAutoTheme();
+    scheduleNextThemeCheck();
+  } else if (storedTheme) {
+    root.setAttribute('data-theme', storedTheme);
+  }
+  themeAutoToggleInput.checked = themeAutoMode;
 
   themeToggle.addEventListener('click', () => {
+    if (themeAutoMode) {
+      themeAutoMode = false;
+      localStorage.setItem(THEME_AUTO_KEY, 'false');
+      if (themeAutoTimer) { clearTimeout(themeAutoTimer); themeAutoTimer = null; }
+      themeAutoToggleInput.checked = false;
+    }
     const isDark = root.getAttribute('data-theme') === 'dark';
     const next = isDark ? 'light' : 'dark';
     root.setAttribute('data-theme', next);
     localStorage.setItem('theme', next);
   });
+
+  function openThemeOptions() {
+    themeAutoToggleInput.checked = themeAutoMode;
+    themeOptionsOverlay.hidden = false;
+  }
+  function closeThemeOptions() {
+    themeOptionsOverlay.hidden = true;
+  }
+  themeOptionsClose.addEventListener('click', closeThemeOptions);
+  themeOptionsOverlay.addEventListener('click', (e) => {
+    if (e.target === themeOptionsOverlay) closeThemeOptions();
+  });
+
+  themeAutoToggleInput.addEventListener('change', () => {
+    themeAutoMode = themeAutoToggleInput.checked;
+    localStorage.setItem(THEME_AUTO_KEY, String(themeAutoMode));
+    if (themeAutoMode) {
+      applyAutoTheme();
+      scheduleNextThemeCheck();
+    } else if (themeAutoTimer) {
+      clearTimeout(themeAutoTimer);
+      themeAutoTimer = null;
+    }
+  });
+
+  attachLongPress(themeToggle, openThemeOptions);
 
   const helpBtn = document.getElementById('help-btn');
   const helpOverlay = document.getElementById('help-overlay');
@@ -578,15 +653,16 @@
       weatherSkin.appendChild(overlay);
 
       const cloudCount = Math.round(cloudPct / 10);
-      const baseDurationSec = 34;
       for (let i = 0; i < cloudCount; i++) {
         const cloud = document.createElement('span');
         cloud.className = 'wx-skin-cloud';
         cloud.textContent = '☁️';
-        const size = 1 + Math.random();
-        const duration = baseDurationSec / size;
+        const topPct = Math.random() * 50;
+        const f = topPct / 50;
+        const size = 2.5 - 1.5 * f;
+        const duration = 17 + 43 * f;
         cloud.style.fontSize = size + 'rem';
-        cloud.style.top = (10 + Math.random() * 60) + '%';
+        cloud.style.top = topPct + '%';
         cloud.style.animationDuration = duration + 's';
         cloud.style.animationDelay = (-Math.random() * duration) + 's';
         weatherSkin.appendChild(cloud);
