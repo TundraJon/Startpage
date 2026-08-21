@@ -195,6 +195,15 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
+### Weather widget: white background off whenever a Visual Flourish is on
+
+- [ ] **Resolves the long-tabled white-base question** (open since Build Log 8's "corrected layer stack," re-raised in Build Log 10/11) — not as a blanket removal, but conditionally: no white background whenever either or both "Visual Flourishes" toggles in Weather Options (`sunGradient` "Sunrise/Sunset Gradient", `liveSkin` "Live Condition Skin") are checked. White base stays as the plain default look only when *both* are off.
+- [ ] This ripples through three places in `renderWeatherSkin()` that currently key off the testing-panel-only `weatherTestState.whiteBgOn` instead of the real settings — all three need to switch to `weatherSettings.sunGradient || weatherSettings.liveSkin`:
+  - `weatherWidgetEl.classList.toggle('no-white-bg', ...)` (script.js:668) — currently `!weatherTestState.whiteBgOn`, should become `weatherSettings.sunGradient || weatherSettings.liveSkin`.
+  - The gradient's own opacity (script.js:675) — currently blends at `weatherTestState.gradientOpacityPct` only when `whiteBgOn`, else full opacity `1`. Under the new rule, whenever `sunGradient` is on, white base is by definition off, so the gradient should just always render at full opacity `1` when shown — the partial-opacity blend-over-white path only made sense when white base could coexist with the gradient.
+  - The text-color composite math (script.js:704-705, Build Log 10/11) — same substitution, so the luminance calc reflects what's actually on screen instead of the testing-panel state.
+- [ ] **Open question, not decided here:** what happens to the testing panel's manual white-bg toggle and opacity slider once this ships? They were the tool for deciding this very question — now that it's decided (conditionally), do they get removed as no-longer-needed testing scaffolding, or kept as a preview-only override that doesn't affect the real per-flourish rule? Flagging rather than assuming either way.
+
 ### Weather widget: cloud respawn jumps around the widget instead of sliding in cleanly
 
 - [ ] Reported: when a cloud exits right and wraps around, instead of sliding smoothly in from the left, it jumps around the widget for about half a second before settling near the left edge, fully visible (not offscreen).
