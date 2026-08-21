@@ -145,3 +145,15 @@ Not yet implemented — queued for whenever it's relevant. All blocked on the sa
 - [ ] Timezone abbreviation: true local timezone of the detected location via WeatherAPI's `location.tz_id`, never UTC/device-home, UTC-offset fallback only if no standard abbreviation applies.
 - [ ] Full live data pull: feels-like, wind, visibility, cloud cover, humidity, dew point, UV, moon phase (all 8 phases), sunrise/sunset, severe alerts, hourly forecast via `/forecast.json?days=1&alerts=yes`.
 - [ ] Condition-specific base animations for Live Condition Skin (rain/snow/thunderstorm/clear day/cloudy/clear night) — the cloud-cover math is built, per-condition visual treatments aren't. Now that the testing panel exists, the night-readability problem (unreadable text against a dominant dark gradient) is also worth solving properly around whenever this is tackled — likely gradient-aware text color and/or the text-stroke idea, evaluated live via the testing panel rather than guessed at.
+
+### Clock widget: timezone pill anchoring (correction)
+
+- [ ] The Build Log 8 fix anchored the pill to the bottom of `.clock-date` via `justify-content: space-between`, which only pins it to the bottom of the narrow date column, not the widget. Needs to instead anchor to the bottom-right corner of `.clock-widget` itself, visually separated/detached from `.clock-date-stack` (not flush against it) — sitting down at the widget's own outer bottom-right edge, independent of the date column's height. Likely means taking the pill out of the `.clock-date` flow (`position: absolute` on `.clock-widget`, which already needs `position: relative` set) rather than relying on flex alignment within `.clock-date`.
+
+### Clock widget: missing border
+
+- [ ] `.clock-widget` has no border, unlike `.tile` and `.weather-widget` which both have `border: 1px solid var(--home-header-bg)`. Add the same `1px solid var(--home-header-bg)` border to `.clock-widget` for visual consistency across all three.
+
+### New feature: automatic theme switching by local time
+
+- [ ] Auto-switch `data-theme` based on the device's local time: 7:00 AM–7:00 PM → light/day theme, 7:00 PM–7:00 AM → dark/night theme, transitioning exactly at the 7:00 boundary (not gradually). Must be opt-in, not the forced default — needs a new toggle setting. No global/site-wide settings surface currently exists (only the per-widget Clock Options and Weather Options long-press menus), so this needs a new home — likely a new settings entry point, or folding it into the existing theme-toggle button's behavior (e.g. long-press it to reveal an "auto" option) rather than building a whole new settings surface just for one toggle. When enabled, presumably needs a scheduled re-check (similar pattern to `scheduleNextClockTick()`) so the switch actually fires at 7:00 without requiring a page reload, and should defer to/override the manual toggle appropriately (open question: does manually toggling while auto-mode is on disable auto-mode, or get overridden at the next boundary?).
