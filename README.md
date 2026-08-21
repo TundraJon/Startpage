@@ -154,9 +154,20 @@ Not yet implemented — queued for whenever it's relevant. All blocked on the sa
 
 - [ ] `.clock-widget` has no border, unlike `.tile` and `.weather-widget` which both have `border: 1px solid var(--home-header-bg)`. Add the same `1px solid var(--home-header-bg)` border to `.clock-widget` for visual consistency across all three.
 
-### Weather widget: cloud overlay / drifting clouds not rendering
+### ~~Weather widget: cloud overlay / drifting clouds not rendering~~ (not a bug — confirmed)
 
-- [ ] Reported: at 50% cloud cover, neither the gray cloud-overlay layer (expected 25% opacity per `overlay.style.opacity = cloudPct / 2 / 100`) nor the drifting cloud emoji are visible at all. Code review: the math and CSS both check out (`.weather-skin-overlay` background `#4b5563` at the computed opacity; `.wx-skin-cloud` count = `round(cloudPct / 10)` = 5 at 50%, animated via `@keyframes wx-cloud-drift`) — both effects live inside the same `if (weatherSettings.liveSkin)` block in `renderWeatherSkin()`, so both vanishing together points at that flag reading `false` rather than a rendering bug. `liveSkin` defaults to `true`, but it's a real checkbox ("Live Condition Skin" in Weather Options) — a saved `false` in the browser's `localStorage` `weatherSettings` from an earlier toggle would silently gate off the whole layer with no other symptom. Needs confirming against the actual toggle state before assuming this is the root cause; if the toggle is already on and the layer still doesn't render, needs further investigation.
+- [x] Root cause confirmed by user: the "Live Condition Skin" toggle in Weather Options was simply off. No code issue, nothing to build.
+
+### Weather widget: cloud layer distribution (height-correlated size + speed)
+
+- [ ] Clouds should only occupy the **top 50%** of the widget — change `.wx-skin-cloud`'s `top` random range from the current `10% + random*60%` (10%–70%) to `0%–50%`.
+- [ ] Size and speed should no longer be randomized independently of position — both should derive from where the cloud sits vertically within that top-50% band:
+  - At the **top edge** (`top: 0%`): size **2.5x**, this is the largest and fastest.
+  - At the **middle** (`top: 50%`, the band's bottom edge): size **1x**, this is the smallest and slowest.
+  - Clouds in between get intermediate size/speed, linearly interpolated by vertical position.
+- [ ] Speed recalibration: current largest-cloud speed is correct and should be preserved as the anchor for the new top-edge/2.5x case (currently `baseDurationSec(34) / size`, which at the old max size 2 gives 17s — keep 17s as the duration for the new largest/2.5x/top-edge clouds). Current smallest-cloud speed (old size 1 → 34s) was reported as ~2x too fast, i.e. too short — the new smallest/1x/middle clouds should take roughly **68s**, about double the old value.
+  - Suggested linear mapping (two anchor points: size 2.5→17s, size 1→68s): with `f = topPct / 50` (0 at top edge, 1 at middle), `size = 2.5 - 1.5*f` and `duration = 17 + 51*f` seconds. Worth double-checking this against feel once built rather than treating 17/68 as exact requirements — those are the two data points the user gave, not necessarily the only acceptable values.
+- [ ] Cloud count formula (`round(cloudPct / 10)`) and horizontal drift (`left: -15% → 115%`) are unaffected and should stay as-is.
 
 ### New feature: automatic theme switching by local time
 
