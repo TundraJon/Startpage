@@ -172,6 +172,7 @@ Not yet implemented — queued for whenever it's relevant. All blocked on the sa
 - [ ] Speed recalibration: current largest-cloud speed is correct and should be preserved as the anchor for the new top-edge/2.5x case (currently `baseDurationSec(34) / size`, which at the old max size 2 gives 17s — keep 17s as the duration for the new largest/2.5x/top-edge clouds). The smallest/1x/middle clouds should take exactly **60s** to cross the widget (user's explicit correction — not 68s as first estimated from "about 2x too fast").
   - Linear mapping (two anchor points: size 2.5→17s, size 1→60s): with `f = topPct / 50` (0 at top edge, 1 at middle), `size = 2.5 - 1.5*f` and `duration = 17 + 43*f` seconds.
 - [ ] Cloud count formula (`round(cloudPct / 10)`) and horizontal drift (`left: -15% → 115%`) are unaffected and should stay as-is.
+- [ ] Cloud opacity: change `.wx-skin-cloud`'s `opacity` from the current `0.9` to `0.8`.
 
 ### New feature: automatic theme switching by local time
 
