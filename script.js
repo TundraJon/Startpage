@@ -144,8 +144,11 @@
     const cx = 50;
     const cy = 50;
     const now = new Date();
+    const rootStyle = getComputedStyle(document.documentElement);
+    const dayFill = rootStyle.getPropertyValue('--clock-analog-day').trim() || '#fff';
+    const nightFill = rootStyle.getPropertyValue('--clock-analog-night').trim() || '#c9c9c9';
 
-    svg.appendChild(svgEl('circle', { cx, cy, r: 48, fill: '#fff', stroke: '#333', 'stroke-width': 1 }));
+    svg.appendChild(svgEl('circle', { cx, cy, r: 48, fill: dayFill, stroke: '#333', 'stroke-width': 1 }));
 
     if (hour12) {
       for (let i = 1; i <= 12; i++) {
@@ -158,7 +161,7 @@
         }));
       }
       [3, 6, 9, 12].forEach((n) => {
-        const p = polarPoint(cx, cy, 28, n * 30);
+        const p = polarPoint(cx, cy, 34, n * 30);
         const t = svgEl('text', { x: p.x, y: p.y + 3, 'text-anchor': 'middle', 'font-size': 9, fill: '#222' });
         t.textContent = String(n);
         svg.appendChild(t);
@@ -168,8 +171,7 @@
       addHand(svg, cx, cy, (now.getMinutes() / 60) * 360, 36, 1.5, '#222');
     } else {
       const innerR = 34;
-      const nightFill = getComputedStyle(document.documentElement).getPropertyValue('--clock-analog-night').trim() || '#c9c9c9';
-      svg.appendChild(svgEl('circle', { cx, cy, r: innerR, fill: '#fff' }));
+      svg.appendChild(svgEl('circle', { cx, cy, r: innerR, fill: dayFill }));
       svg.appendChild(svgEl('path', {
         d: `M ${cx - innerR} ${cy} A ${innerR} ${innerR} 0 0 1 ${cx + innerR} ${cy} Z`,
         fill: nightFill,
@@ -531,45 +533,149 @@
   }
 
   const weatherSkin = document.getElementById('weather-skin');
+  const weatherWidgetEl = document.getElementById('weather-widget');
+
+  // --- Testing panel state (temporary dev tool, not part of the real app) ---
+  const weatherTestState = {
+    timeOverrideSec: null,
+    cloudOverridePct: null,
+    whiteBgOn: true,
+    gradientOpacityPct: 18,
+    textStroke: false,
+  };
+
+  function getEffectiveSkyTime() {
+    if (weatherTestState.timeOverrideSec === null) return new Date();
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setSeconds(weatherTestState.timeOverrideSec);
+    return d;
+  }
+
+  function getEffectiveCloudPct() {
+    return weatherTestState.cloudOverridePct !== null ? weatherTestState.cloudOverridePct : weatherState.cloudPct;
+  }
+
   function renderWeatherSkin() {
+    weatherWidgetEl.classList.toggle('no-white-bg', !weatherTestState.whiteBgOn);
+    weatherWidgetEl.classList.toggle('test-text-stroke', weatherTestState.textStroke);
+
     if (weatherSettings.sunGradient) {
-      const sky = computeSkyColors(new Date());
+      const sky = computeSkyColors(getEffectiveSkyTime());
       weatherSkin.style.background = `linear-gradient(to bottom, ${sky.top}, ${sky.bottom})`;
+      weatherSkin.style.opacity = weatherTestState.whiteBgOn ? String(weatherTestState.gradientOpacityPct / 100) : '1';
     } else {
       weatherSkin.style.background = '';
+      weatherSkin.style.opacity = '';
     }
 
+    weatherSkin.querySelectorAll('.weather-skin-overlay, .wx-skin-cloud').forEach((el) => el.remove());
     if (weatherSettings.liveSkin) {
-      if (!weatherSkin.dataset.cloudsBuilt) {
-        weatherSkin.querySelectorAll('.weather-skin-overlay, .wx-skin-cloud').forEach((el) => el.remove());
-        const cloudPct = weatherState.cloudPct;
-        const overlay = document.createElement('div');
-        overlay.className = 'weather-skin-overlay';
-        overlay.style.opacity = String(cloudPct / 2 / 100);
-        weatherSkin.appendChild(overlay);
+      const cloudPct = getEffectiveCloudPct();
+      const overlay = document.createElement('div');
+      overlay.className = 'weather-skin-overlay';
+      overlay.style.opacity = String(cloudPct / 2 / 100);
+      weatherSkin.appendChild(overlay);
 
-        const cloudCount = Math.round(cloudPct / 10);
-        const baseDurationSec = 34;
-        for (let i = 0; i < cloudCount; i++) {
-          const cloud = document.createElement('span');
-          cloud.className = 'wx-skin-cloud';
-          cloud.textContent = '☁️';
-          const size = 1 + Math.random();
-          const duration = baseDurationSec / size;
-          cloud.style.fontSize = size + 'rem';
-          cloud.style.top = (10 + Math.random() * 60) + '%';
-          cloud.style.animationDuration = duration + 's';
-          cloud.style.animationDelay = (-Math.random() * duration) + 's';
-          weatherSkin.appendChild(cloud);
-        }
-        weatherSkin.dataset.cloudsBuilt = '1';
+      const cloudCount = Math.round(cloudPct / 10);
+      const baseDurationSec = 34;
+      for (let i = 0; i < cloudCount; i++) {
+        const cloud = document.createElement('span');
+        cloud.className = 'wx-skin-cloud';
+        cloud.textContent = '☁️';
+        const size = 1 + Math.random();
+        const duration = baseDurationSec / size;
+        cloud.style.fontSize = size + 'rem';
+        cloud.style.top = (10 + Math.random() * 60) + '%';
+        cloud.style.animationDuration = duration + 's';
+        cloud.style.animationDelay = (-Math.random() * duration) + 's';
+        weatherSkin.appendChild(cloud);
       }
-    } else {
-      weatherSkin.querySelectorAll('.weather-skin-overlay, .wx-skin-cloud').forEach((el) => el.remove());
-      delete weatherSkin.dataset.cloudsBuilt;
     }
   }
   renderWeatherSkin();
+
+  // --- Testing panel wiring ---
+  (function setupTestingPanel() {
+    const overlay = document.getElementById('testing-panel-overlay');
+    const trigger = document.getElementById('testing-panel-trigger');
+    const closeBtn = document.getElementById('testing-panel-close');
+    const timeEnabled = document.getElementById('test-time-enabled');
+    const timeInput = document.getElementById('test-time-input');
+    const cloudSlider = document.getElementById('test-cloud-slider');
+    const cloudValue = document.getElementById('test-cloud-value');
+    const whiteBgToggle = document.getElementById('test-whitebg-toggle');
+    const opacitySlider = document.getElementById('test-opacity-slider');
+    const opacityValue = document.getElementById('test-opacity-value');
+    const textStrokeToggle = document.getElementById('test-textstroke-toggle');
+    const resetBtn = document.getElementById('test-reset-btn');
+
+    function timeStringToSeconds(str) {
+      const [h, m] = str.split(':').map(Number);
+      return h * 3600 + m * 60;
+    }
+    function secondsToTimeString(sec) {
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+    }
+
+    trigger.addEventListener('click', () => { overlay.hidden = false; });
+    closeBtn.addEventListener('click', () => { overlay.hidden = true; });
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.hidden = true; });
+
+    timeEnabled.addEventListener('change', () => {
+      weatherTestState.timeOverrideSec = timeEnabled.checked ? timeStringToSeconds(timeInput.value) : null;
+      renderWeatherSkin();
+    });
+    timeInput.addEventListener('input', () => {
+      if (timeEnabled.checked) {
+        weatherTestState.timeOverrideSec = timeStringToSeconds(timeInput.value);
+        renderWeatherSkin();
+      }
+    });
+
+    cloudSlider.addEventListener('input', () => {
+      weatherTestState.cloudOverridePct = Number(cloudSlider.value);
+      cloudValue.textContent = cloudSlider.value + '%';
+      renderWeatherSkin();
+    });
+
+    whiteBgToggle.addEventListener('change', () => {
+      weatherTestState.whiteBgOn = whiteBgToggle.checked;
+      opacitySlider.disabled = !whiteBgToggle.checked;
+      renderWeatherSkin();
+    });
+
+    opacitySlider.addEventListener('input', () => {
+      weatherTestState.gradientOpacityPct = Number(opacitySlider.value);
+      opacityValue.textContent = opacitySlider.value + '%';
+      renderWeatherSkin();
+    });
+
+    textStrokeToggle.addEventListener('change', () => {
+      weatherTestState.textStroke = textStrokeToggle.checked;
+      renderWeatherSkin();
+    });
+
+    resetBtn.addEventListener('click', () => {
+      weatherTestState.timeOverrideSec = null;
+      weatherTestState.cloudOverridePct = null;
+      weatherTestState.whiteBgOn = true;
+      weatherTestState.gradientOpacityPct = 18;
+      weatherTestState.textStroke = false;
+      timeEnabled.checked = false;
+      timeInput.value = secondsToTimeString(SUNSET_SEC);
+      cloudSlider.value = 20;
+      cloudValue.textContent = '20%';
+      whiteBgToggle.checked = true;
+      opacitySlider.disabled = false;
+      opacitySlider.value = 18;
+      opacityValue.textContent = '18%';
+      textStrokeToggle.checked = false;
+      renderWeatherSkin();
+    });
+  })();
 
   // --- Severe weather alert ticker ---
   const WEATHER_ALERT_KEY = 'weatherAlertState';

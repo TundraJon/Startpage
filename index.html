@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home</title>
-<link rel="stylesheet" href="styles.css?v=4">
+<link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
 
@@ -60,14 +60,16 @@
                 <span class="clock-hour" id="clock-hour">--</span>
                 <span class="clock-minute" id="clock-minute">--</span>
               </div>
-              <span class="clock-tz-pill" id="clock-tz-pill">EDT</span>
             </div>
             <svg class="clock-analog" id="clock-analog-svg" viewBox="0 0 100 100" hidden></svg>
           </div>
           <div class="clock-date">
-            <span id="clock-day">-</span>
-            <span id="clock-month">-</span>
-            <span id="clock-daynum">-</span>
+            <div class="clock-date-stack">
+              <span id="clock-day">-</span>
+              <span id="clock-month">-</span>
+              <span id="clock-daynum">-</span>
+            </div>
+            <span class="clock-tz-pill" id="clock-tz-pill">EDT</span>
           </div>
         </a>
       </div>
@@ -227,6 +229,58 @@
 
 </main>
 
+<button id="testing-panel-trigger" class="testing-panel-trigger" aria-label="Open testing panel">🧪 Testing Panel</button>
+
+<div class="help-overlay" id="testing-panel-overlay" hidden>
+  <div class="help-panel">
+    <button class="help-close" id="testing-panel-close" aria-label="Close testing panel">&times;</button>
+    <h2>🧪 Testing Panel</h2>
+    <p class="testing-note">Temporary dev tool for previewing the weather widget's sky gradient and layering. Not part of the real app — will be removed later.</p>
+
+    <section class="options-section">
+      <h3>Time Override</h3>
+      <div class="option-row">
+        <span>Use override</span>
+        <input type="checkbox" id="test-time-enabled">
+      </div>
+      <div class="option-row">
+        <span>Time of day</span>
+        <input type="time" id="test-time-input" value="19:45">
+      </div>
+    </section>
+
+    <section class="options-section">
+      <h3>Cloud Cover</h3>
+      <div class="option-row">
+        <span>Cloud % <span id="test-cloud-value">20%</span></span>
+        <input type="range" id="test-cloud-slider" min="0" max="100" value="20">
+      </div>
+    </section>
+
+    <section class="options-section">
+      <h3>Sky Layer</h3>
+      <div class="option-row">
+        <span>White background</span>
+        <input type="checkbox" id="test-whitebg-toggle" checked>
+      </div>
+      <div class="option-row">
+        <span>Gradient opacity <span id="test-opacity-value">18%</span></span>
+        <input type="range" id="test-opacity-slider" min="0" max="100" value="18">
+      </div>
+    </section>
+
+    <section class="options-section">
+      <h3>Readability</h3>
+      <div class="option-row">
+        <span>Text outline (medium gray)</span>
+        <input type="checkbox" id="test-textstroke-toggle">
+      </div>
+    </section>
+
+    <button type="button" class="testing-reset-btn" id="test-reset-btn">Reset to defaults</button>
+  </div>
+</div>
+
 <div class="help-overlay" id="help-overlay" hidden>
   <div class="help-panel">
     <button class="help-close" id="help-close" aria-label="Close help">&times;</button>
@@ -320,6 +374,6 @@
   </div>
 </div>
 
-<script src="script.js?v=4"></script>
+<script src="script.js?v=5"></script>
 </body>
 </html>
