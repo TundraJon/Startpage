@@ -580,6 +580,20 @@
     const b = hexToRgb(hexB);
     return rgbToHex(a.map((v, i) => v + (b[i] - v) * t));
   }
+  function lerpRgb(rgbA, rgbB, t) {
+    return rgbA.map((v, i) => v + (rgbB[i] - v) * t);
+  }
+  function parseCssColor(str) {
+    const m = str.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/);
+    return m ? [parseFloat(m[1]), parseFloat(m[2]), parseFloat(m[3])] : [255, 255, 255];
+  }
+  function relativeLuminance(rgb) {
+    const [r, g, b] = rgb.map((c) => {
+      c /= 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
   function interpolateKeyframes(keyframes, xRatio) {
     for (let i = 0; i < keyframes.length - 1; i++) {
       const lower = keyframes[i];
@@ -631,12 +645,18 @@
     return weatherTestState.cloudOverridePct !== null ? weatherTestState.cloudOverridePct : weatherState.cloudPct;
   }
 
+  const WX_TEXT_LIGHT = '#000000';
+  const WX_TEXT_DARK = '#808080';
+  const WX_TEXT_LUMINANCE_THRESHOLD = 0.5;
+  const WX_CLOUD_TINT_RGB = [75, 85, 99]; // #4b5563
+
   function renderWeatherSkin() {
     weatherWidgetEl.classList.toggle('no-white-bg', !weatherTestState.whiteBgOn);
     weatherWidgetEl.classList.toggle('test-text-stroke', weatherTestState.textStroke);
 
+    let sky = null;
     if (weatherSettings.sunGradient) {
-      const sky = computeSkyColors(getEffectiveSkyTime());
+      sky = computeSkyColors(getEffectiveSkyTime());
       weatherSkin.style.background = `linear-gradient(to bottom, ${sky.top}, ${sky.bottom})`;
       weatherSkin.style.opacity = weatherTestState.whiteBgOn ? String(weatherTestState.gradientOpacityPct / 100) : '1';
     } else {
@@ -645,8 +665,8 @@
     }
 
     weatherSkin.querySelectorAll('.weather-skin-overlay, .wx-skin-cloud').forEach((el) => el.remove());
+    const cloudPct = getEffectiveCloudPct();
     if (weatherSettings.liveSkin) {
-      const cloudPct = getEffectiveCloudPct();
       const overlay = document.createElement('div');
       overlay.className = 'weather-skin-overlay';
       overlay.style.opacity = String(cloudPct / 2 / 100);
@@ -667,6 +687,22 @@
         cloud.style.animationDelay = (-Math.random() * duration) + 's';
         weatherSkin.appendChild(cloud);
       }
+    }
+
+    if (weatherSettings.sunGradient || weatherSettings.liveSkin) {
+      let composite = parseCssColor(getComputedStyle(weatherWidgetEl).backgroundColor);
+      if (sky) {
+        const skyAvgRgb = hexToRgb(lerpColor(sky.top, sky.bottom, 0.5));
+        const gradOpacity = weatherTestState.whiteBgOn ? weatherTestState.gradientOpacityPct / 100 : 1;
+        composite = weatherTestState.whiteBgOn ? lerpRgb(composite, skyAvgRgb, gradOpacity) : skyAvgRgb;
+      }
+      if (weatherSettings.liveSkin) {
+        composite = lerpRgb(composite, WX_CLOUD_TINT_RGB, cloudPct / 2 / 100);
+      }
+      const textColor = relativeLuminance(composite) > WX_TEXT_LUMINANCE_THRESHOLD ? WX_TEXT_LIGHT : WX_TEXT_DARK;
+      weatherWidgetEl.style.setProperty('--wx-text-color', textColor);
+    } else {
+      weatherWidgetEl.style.removeProperty('--wx-text-color');
     }
   }
   renderWeatherSkin();

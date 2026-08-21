@@ -454,7 +454,7 @@ main {
   flex: 0 0 50%;
   display: flex;
   justify-content: space-between;
-  color: var(--fg-muted);
+  color: var(--wx-text-color, var(--fg-muted));
 }
 
 .wx-stack {
@@ -471,7 +471,7 @@ main {
 .weather-location {
   flex: 0 0 50%;
   text-align: right;
-  color: var(--fg-muted);
+  color: var(--wx-text-color, var(--fg-muted));
 }
 
 .wx-icon {
@@ -497,13 +497,13 @@ main {
 .weather-temp {
   font-size: 3.6rem;
   font-weight: 600;
-  color: var(--fg-muted);
+  color: var(--wx-text-color, var(--fg-muted));
 }
 
 .weather-unit {
   font-size: 1.4rem;
   font-weight: 400;
-  color: var(--fg-muted);
+  color: var(--wx-text-color, var(--fg-muted));
 }
 
 .weather-emoji {
@@ -513,7 +513,7 @@ main {
 .weather-bottom {
   display: flex;
   align-items: baseline;
-  color: var(--fg-muted);
+  color: var(--wx-text-color, var(--fg-muted));
 }
 
 .weather-hilo {
@@ -543,7 +543,7 @@ main {
   flex: 1;
   display: flex;
   justify-content: space-between;
-  color: var(--fg-muted);
+  color: var(--wx-text-color, var(--fg-muted));
 }
 
 .weather-footer[hidden] {
