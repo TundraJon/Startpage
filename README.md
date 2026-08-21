@@ -154,6 +154,10 @@ Not yet implemented — queued for whenever it's relevant. All blocked on the sa
 
 - [ ] `.clock-widget` has no border, unlike `.tile` and `.weather-widget` which both have `border: 1px solid var(--home-header-bg)`. Add the same `1px solid var(--home-header-bg)` border to `.clock-widget` for visual consistency across all three.
 
+### Weather widget: temperature font color should match unit color
+
+- [ ] `.weather-temp` (the big degree number, e.g. "88") currently gets `color: var(--fg)` from the shared `.weather-temp, .weather-emoji` rule; `.weather-unit` (the "F"/"C" suffix) is `color: var(--fg-muted)`. Change the temperature number to also use `var(--fg-muted)` so both match — add `color: var(--fg-muted);` to `.weather-temp`'s own rule block (`styles.css:492`), which already overrides the shared rule by source order, so this won't affect `.weather-emoji`.
+
 ### ~~Weather widget: cloud overlay / drifting clouds not rendering~~ (not a bug — confirmed)
 
 - [x] Root cause confirmed by user: the "Live Condition Skin" toggle in Weather Options was simply off. No code issue, nothing to build.
