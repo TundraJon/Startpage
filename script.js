@@ -647,8 +647,22 @@
 
   const WX_TEXT_LIGHT = '#000000';
   const WX_TEXT_DARK = '#808080';
-  const WX_TEXT_LUMINANCE_THRESHOLD = 0.5;
+  const WX_TEXT_THRESHOLD_MARGIN = 0.05;
+  const WX_TEXT_LUMINANCE_THRESHOLD = relativeLuminance(hexToRgb(WX_TEXT_DARK)) - WX_TEXT_THRESHOLD_MARGIN;
   const WX_CLOUD_TINT_RGB = [75, 85, 99]; // #4b5563
+  const WX_CLOUD_OFFSCREEN_BUFFER_PX = 4;
+
+  function randomizeCloud(cloud) {
+    const topPct = Math.random() * 50;
+    const f = topPct / 50;
+    const size = 2.5 - 1.5 * f;
+    const duration = 17 + 43 * f;
+    cloud.style.fontSize = size + 'rem';
+    cloud.style.top = topPct + '%';
+    cloud.style.animationDuration = duration + 's';
+    cloud.style.animationDelay = (-Math.random() * duration) + 's';
+    cloud.style.setProperty('--cloud-w', (cloud.offsetWidth + WX_CLOUD_OFFSCREEN_BUFFER_PX) + 'px');
+  }
 
   function renderWeatherSkin() {
     weatherWidgetEl.classList.toggle('no-white-bg', !weatherTestState.whiteBgOn);
@@ -672,20 +686,14 @@
       overlay.style.opacity = String(cloudPct / 2 / 100);
       weatherSkin.appendChild(overlay);
 
-      const cloudCount = Math.round(cloudPct / 10);
+      const cloudCount = Math.floor(cloudPct / 10);
       for (let i = 0; i < cloudCount; i++) {
         const cloud = document.createElement('span');
         cloud.className = 'wx-skin-cloud';
         cloud.textContent = '☁️';
-        const topPct = Math.random() * 50;
-        const f = topPct / 50;
-        const size = 2.5 - 1.5 * f;
-        const duration = 17 + 43 * f;
-        cloud.style.fontSize = size + 'rem';
-        cloud.style.top = topPct + '%';
-        cloud.style.animationDuration = duration + 's';
-        cloud.style.animationDelay = (-Math.random() * duration) + 's';
         weatherSkin.appendChild(cloud);
+        randomizeCloud(cloud);
+        cloud.addEventListener('animationiteration', () => randomizeCloud(cloud));
       }
     }
 

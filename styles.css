@@ -421,7 +421,7 @@ main {
 
 .wx-skin-cloud {
   position: absolute;
-  left: -15%;
+  left: calc(-1 * var(--cloud-w, 40px));
   font-size: 1rem;
   animation-name: wx-cloud-drift;
   animation-timing-function: linear;
@@ -431,8 +431,8 @@ main {
 }
 
 @keyframes wx-cloud-drift {
-  from { left: -15%; }
-  to { left: 115%; }
+  from { left: calc(-1 * var(--cloud-w, 40px)); }
+  to { left: calc(100% + var(--cloud-w, 40px)); }
 }
 
 .weather-widget.no-white-bg {
