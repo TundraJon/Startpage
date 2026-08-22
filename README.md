@@ -195,6 +195,10 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
+### Auto theme toggle belongs in the real Settings menu, not just the long-press overlay
+
+- [ ] Correction to a decision flagged as open in Build Log 9: the "Automatic (day 7am–7pm / night 7pm–7am)" checkbox was placed in a new long-press-triggered "Theme Options" overlay (long-pressing the theme button), invented at build time since no global settings surface existed yet. User's ask: it should live in the "Settings" menu instead. There's already a real home for this — the profile button (`profile-btn`) currently opens a generic "Settings" coming-soon placeholder (script.js:104-106, "Profile photo and settings are coming in a later pass") — that's presumably the intended real Settings surface, not yet built out. When that gets built, the auto-theme toggle needs to move there (or at minimum also appear there). Open question: does the long-press Theme Options overlay go away entirely once a real Settings menu exists, or stay as a secondary quick-access path? Not deciding that here, just flagging it the same way the white-bg testing-panel question was flagged.
+
 ### Everything on screen must follow the theme toggle instantly (audit + fix)
 
 - [ ] User's ask is comprehensive, not just the clock: "make sure everything on the screen obeys the dark/light toggle instantly." Audited every `getComputedStyle` call in script.js (the only mechanism by which a color could get baked in and miss a live update) — there are exactly two, both genuine instances of the same bug class, everything else is plain CSS `var(--fg)`/`var(--bg)`/etc. directly in the stylesheet, which already updates instantly and automatically with no JS involved:
