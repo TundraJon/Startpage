@@ -195,6 +195,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
+### Analog clock face doesn't follow a theme change until the next minute tick
+
+- [ ] Reported: switching to dark mode, the clock doesn't visually follow until the time changes. Confirmed via code read: `renderAnalogFace()` (script.js:217-224) reads `--clock-analog-day`/`--clock-analog-night` via `getComputedStyle(document.documentElement)` once and bakes the result as static SVG `fill` attributes — it does not use a live CSS `var()` reference inside the SVG, so it doesn't update on its own when the custom properties change. It's only re-invoked from `updateClock()` (the minute-boundary tick) and a few explicit UI actions (opening Clock Options, changing mode/scheme) — never from a theme change. Neither the manual theme-toggle click handler nor the new auto-theme's `applyAutoTheme()` (both near the top of script.js) call it, so after `data-theme` flips, the analog face keeps showing the old theme's colors until the clock's own next scheduled redraw happens to catch up. The digital clock face is unaffected — it's driven by plain CSS `var()` in the stylesheet, which updates instantly with no JS involved.
+- [ ] Fix: call `updateClock()` (which internally calls `renderAnalogFace()` when in analog mode) right after `data-theme` is set, in both the theme-toggle click handler and `applyAutoTheme()`. Also worth checking the Clock Options preview SVG (`clock-analog-preview-svg`) for the same staleness if the options panel is left open across a theme change, though that's a much smaller edge case than the live homepage widget.
+
 ### Weather widget: white background off whenever a Visual Flourish is on
 
 - [ ] **Resolves the long-tabled white-base question** (open since Build Log 8's "corrected layer stack," re-raised in Build Log 10/11) — not as a blanket removal, but conditionally: no white background whenever either or both "Visual Flourishes" toggles in Weather Options (`sunGradient` "Sunrise/Sunset Gradient", `liveSkin` "Live Condition Skin") are checked. White base stays as the plain default look only when *both* are off.
