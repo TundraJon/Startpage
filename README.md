@@ -229,6 +229,12 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
+### Live Condition Skin: darker cloud overlay for Heavy Rain / Thunderstorm
+
+- [ ] User's rule: Heavy Rain should darken the cloud gray overlay (heavier clouds); Thunderstorm should be darker still than Heavy Rain. "Nothing crazy, just darker" — modest steps, not a dramatic swing.
+- [ ] Currently the cloud overlay's tint color is a single fixed gray, `#4b5563` (`.weather-skin-overlay`'s `background`, script.js:866 creates the element with no per-condition color logic yet — only its *opacity* varies, via `cloudPct / 2 / 100`, script.js:867). Needs a new branch there: when `weatherTestState.conditionSkins` has `'thunderstorm'`, use a darker tint than when it has `'heavyRain'` (Thunderstorm's base is already Heavy Rain per the existing spec, so it should darken *on top of* Heavy Rain's tint, not independently); otherwise keep the current `#4b5563`. Suggested starting values, meant to be tuned live via the testing panel rather than treated as exact: Heavy Rain ≈ `#3c444f` (~20% darker than the base gray), Thunderstorm ≈ `#2d333b` (~40% darker than the base gray). The existing opacity-by-cloud-% formula stays unchanged — this is about the tint's own color, not how strongly it's blended in.
+- [ ] **Cross-cutting detail, easy to miss:** `WX_CLOUD_TINT_RGB` (script.js:655, currently `[75, 85, 99]` — the same fixed `#4b5563`) feeds the dynamic text-color composite calc (script.js:898, Build Log 10/11/12) as a hardcoded stand-in for whatever the overlay's actual color is. If the overlay's real color changes per-condition but this constant doesn't move with it, the black/gray text-color decision will be computed against the wrong (too-light) tint whenever Heavy Rain or Thunderstorm is active — the composite needs to use whichever tint color is actually on screen at that moment, not always the base gray.
+
 ### Weather widget: increase cloud opacity to 90%
 
 - [ ] `.wx-skin-cloud`'s `opacity` (styles.css:446) is currently `0.8` (set per an earlier request). Change to `0.9`.
