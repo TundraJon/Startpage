@@ -229,6 +229,10 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
+### Weather widget: increase cloud opacity to 90%
+
+- [ ] `.wx-skin-cloud`'s `opacity` (styles.css:446) is currently `0.8` (set per an earlier request). Change to `0.9`.
+
 ### Cloud respawn: real fix — replace the element instead of mutating a running animation
 
 - [ ] Reported still jittering/jumping after the Build Log 12 fix (which only stopped touching `animation-delay` on respawn). Root cause, now fully isolated: reassigning `animation-duration` mid-flight causes the identical jump on its own — any change to either timing property on a currently-running CSS animation makes the browser reinterpret the animation's current position in its cycle, which can land past 100% and cascade another `animationiteration` immediately. This isn't fixable by being more careful about *which* properties get reassigned — duration has to change on respawn (that's the whole point: new height → new speed), so mutating the live element's animation properties at all is fundamentally the wrong approach here.
