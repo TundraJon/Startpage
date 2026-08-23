@@ -1,8 +1,8 @@
 (function () {
   const root = document.documentElement;
   const themeToggle = document.getElementById('theme-toggle');
-  const themeOptionsOverlay = document.getElementById('theme-options-overlay');
-  const themeOptionsClose = document.getElementById('theme-options-close');
+  const settingsOverlay = document.getElementById('settings-overlay');
+  const settingsClose = document.getElementById('settings-close');
   const themeAutoToggleInput = document.getElementById('theme-auto-toggle');
 
   const THEME_AUTO_KEY = 'themeAutoMode';
@@ -14,6 +14,11 @@
   function computeAutoTheme(now) {
     const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
     return (nowSec >= DAY_START_SEC && nowSec < NIGHT_START_SEC) ? 'light' : 'dark';
+  }
+
+  function syncThemeDependentUI() {
+    updateClock();
+    renderWeatherSkin();
   }
 
   function applyAutoTheme() {
@@ -34,6 +39,7 @@
     const msUntil = (nextBoundarySec - nowSec) * 1000 - now.getMilliseconds();
     themeAutoTimer = setTimeout(() => {
       applyAutoTheme();
+      syncThemeDependentUI();
       scheduleNextThemeCheck();
     }, msUntil);
   }
@@ -58,18 +64,19 @@
     const next = isDark ? 'light' : 'dark';
     root.setAttribute('data-theme', next);
     localStorage.setItem('theme', next);
+    syncThemeDependentUI();
   });
 
-  function openThemeOptions() {
+  function openSettings() {
     themeAutoToggleInput.checked = themeAutoMode;
-    themeOptionsOverlay.hidden = false;
+    settingsOverlay.hidden = false;
   }
-  function closeThemeOptions() {
-    themeOptionsOverlay.hidden = true;
+  function closeSettings() {
+    settingsOverlay.hidden = true;
   }
-  themeOptionsClose.addEventListener('click', closeThemeOptions);
-  themeOptionsOverlay.addEventListener('click', (e) => {
-    if (e.target === themeOptionsOverlay) closeThemeOptions();
+  settingsClose.addEventListener('click', closeSettings);
+  settingsOverlay.addEventListener('click', (e) => {
+    if (e.target === settingsOverlay) closeSettings();
   });
 
   themeAutoToggleInput.addEventListener('change', () => {
@@ -77,14 +84,13 @@
     localStorage.setItem(THEME_AUTO_KEY, String(themeAutoMode));
     if (themeAutoMode) {
       applyAutoTheme();
+      syncThemeDependentUI();
       scheduleNextThemeCheck();
     } else if (themeAutoTimer) {
       clearTimeout(themeAutoTimer);
       themeAutoTimer = null;
     }
   });
-
-  attachLongPress(themeToggle, openThemeOptions);
 
   const helpBtn = document.getElementById('help-btn');
   const helpOverlay = document.getElementById('help-overlay');
@@ -101,9 +107,7 @@
     helpOverlay.hidden = false;
   }
 
-  document.getElementById('profile-btn').addEventListener('click', () => {
-    showComingSoon('Settings', 'Profile photo and settings are coming in a later pass.');
-  });
+  document.getElementById('profile-btn').addEventListener('click', openSettings);
 
   const searchForm = document.getElementById('search-form');
   const searchEngine = document.getElementById('search-engine');
@@ -628,9 +632,8 @@
   const weatherTestState = {
     timeOverrideSec: null,
     cloudOverridePct: null,
-    whiteBgOn: true,
-    gradientOpacityPct: 18,
     textStroke: false,
+    conditionSkins: new Set(),
   };
 
   function getEffectiveSkyTime() {
@@ -660,19 +663,197 @@
     cloud.style.fontSize = size + 'rem';
     cloud.style.top = topPct + '%';
     cloud.style.animationDuration = duration + 's';
-    cloud.style.animationDelay = (-Math.random() * duration) + 's';
     cloud.style.setProperty('--cloud-w', (cloud.offsetWidth + WX_CLOUD_OFFSCREEN_BUFFER_PX) + 'px');
   }
 
+  // --- Live Condition Skin: precipitation/effect layers (rain, snow, hail, lightning, stars, rays, fog) ---
+  // Not blocked on the WeatherAPI connection: driven entirely by the "Preview Condition Skins" testing
+  // panel picker (weatherTestState.conditionSkins), since there's no live condition data yet.
+  const precipCanvas = document.createElement('canvas');
+  precipCanvas.className = 'weather-skin-precip';
+  const precipCtx = precipCanvas.getContext('2d');
+  const flashDiv = document.createElement('div');
+  flashDiv.className = 'weather-skin-flash';
+
+  let conditionParticles = [];
+  let conditionStars = [];
+  let conditionFog = [];
+  let flashState = { until: 0, nextAt: 0, opacity: 0 };
+  let lastParticleKey = '';
+
+  function rebuildConditionParticles(c, w, h) {
+    conditionParticles = [];
+    const heavy = c.has('heavyRain') || c.has('thunderstorm');
+    const rainCount = heavy ? 45 : (c.has('lightRain') ? 17 : 0);
+    for (let i = 0; i < rainCount; i++) {
+      conditionParticles.push({
+        type: 'rain', x: Math.random() * w, y: Math.random() * h,
+        speed: heavy ? 6 + Math.random() * 2 : 3 + Math.random() * 1.5,
+        len: 8 + Math.random() * 6,
+      });
+    }
+    if (c.has('snow')) {
+      for (let i = 0; i < 25; i++) {
+        conditionParticles.push({
+          type: 'snow', x: Math.random() * w, y: Math.random() * h,
+          speed: 0.6 + Math.random() * 0.6, r: 1.5 + Math.random() * 1.5,
+          swayPhase: Math.random() * Math.PI * 2, swaySpeed: 0.5 + Math.random() * 0.5, swayAmp: 4 + Math.random() * 4,
+        });
+      }
+    }
+    if (c.has('hail')) {
+      for (let i = 0; i < 30; i++) {
+        conditionParticles.push({
+          type: 'hail', x: Math.random() * w, y: Math.random() * h,
+          speed: 7 + Math.random() * 2, r: 2 + Math.random() * 1.2, state: 'fall', bounceT: 0,
+        });
+      }
+    }
+    conditionFog = c.has('fog')
+      ? Array.from({ length: 2 + Math.floor(Math.random() * 2) }, () => ({
+          x: Math.random() * w, y: h * (0.2 + Math.random() * 0.6), r: w * 0.35 + Math.random() * w * 0.15,
+          speed: 3 + Math.random() * 3, dir: Math.random() < 0.5 ? 1 : -1,
+        }))
+      : [];
+    conditionStars = c.has('clearNight')
+      ? Array.from({ length: 15 + Math.floor(Math.random() * 11) }, () => ({
+          x: Math.random() * w, y: Math.random() * h * 0.8, r: 0.8 + Math.random(),
+          phase: Math.random() * Math.PI * 2, speed: 0.5 + Math.random(),
+        }))
+      : [];
+  }
+
+  function stepConditionSkin(ts) {
+    requestAnimationFrame(stepConditionSkin);
+    const c = weatherTestState.conditionSkins;
+    if (!weatherSettings.liveSkin || c.size === 0) {
+      if (precipCanvas.width) precipCtx.clearRect(0, 0, precipCanvas.width, precipCanvas.height);
+      flashDiv.style.opacity = '0';
+      return;
+    }
+    const rect = weatherSkin.getBoundingClientRect();
+    const w = Math.max(1, Math.round(rect.width));
+    const h = Math.max(1, Math.round(rect.height));
+    const key = [...c].sort().join(',') + '|' + w + 'x' + h;
+    if (key !== lastParticleKey) {
+      precipCanvas.width = w;
+      precipCanvas.height = h;
+      rebuildConditionParticles(c, w, h);
+      lastParticleKey = key;
+    }
+    precipCtx.clearRect(0, 0, w, h);
+
+    precipCtx.strokeStyle = (c.has('heavyRain') || c.has('thunderstorm')) ? 'rgba(120,140,170,0.55)' : 'rgba(160,180,200,0.45)';
+    precipCtx.lineWidth = 1.2;
+    for (const p of conditionParticles) {
+      if (p.type !== 'rain') continue;
+      p.y += p.speed;
+      p.x += p.speed * 0.25;
+      if (p.y > h) { p.y = -p.len; p.x = Math.random() * w; }
+      precipCtx.beginPath();
+      precipCtx.moveTo(p.x, p.y);
+      precipCtx.lineTo(p.x - p.len * 0.3, p.y - p.len);
+      precipCtx.stroke();
+    }
+
+    precipCtx.fillStyle = 'rgba(255,255,255,0.9)';
+    for (const p of conditionParticles) {
+      if (p.type !== 'snow') continue;
+      p.y += p.speed;
+      p.swayPhase += 0.02 * p.swaySpeed;
+      if (p.y > h) { p.y = -4; p.x = Math.random() * w; }
+      const x = p.x + Math.sin(p.swayPhase) * p.swayAmp;
+      precipCtx.beginPath();
+      precipCtx.arc(x, p.y, p.r, 0, Math.PI * 2);
+      precipCtx.fill();
+    }
+
+    precipCtx.fillStyle = 'rgba(230,235,240,0.95)';
+    for (const p of conditionParticles) {
+      if (p.type !== 'hail') continue;
+      if (p.state === 'fall') {
+        p.y += p.speed;
+        if (p.y > h - p.r) {
+          p.state = 'bounce';
+          p.bounceT = 0;
+          p.bounceFromY = h - p.r;
+        }
+      } else {
+        p.bounceT += 1;
+        const hop = Math.sin(Math.min(p.bounceT / 10, 1) * Math.PI) * 8;
+        p.y = p.bounceFromY - hop;
+        if (p.bounceT > 14) {
+          p.state = 'fall';
+          p.y = -4;
+          p.x = Math.random() * w;
+        }
+      }
+      precipCtx.globalAlpha = p.state === 'bounce' ? Math.max(0, 1 - p.bounceT / 14) : 1;
+      precipCtx.beginPath();
+      precipCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      precipCtx.fill();
+      precipCtx.globalAlpha = 1;
+    }
+
+    for (const b of conditionFog) {
+      b.x += b.speed * 0.02 * b.dir;
+      if (b.x - b.r > w) b.x = -b.r;
+      if (b.x + b.r < 0) b.x = w + b.r;
+      const grad = precipCtx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
+      grad.addColorStop(0, 'rgba(220,220,225,0.14)');
+      grad.addColorStop(1, 'rgba(220,220,225,0)');
+      precipCtx.fillStyle = grad;
+      precipCtx.beginPath();
+      precipCtx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      precipCtx.fill();
+    }
+
+    for (const s of conditionStars) {
+      s.phase += 0.015 * s.speed;
+      const tw = (0.4 + 0.6 * (0.5 + 0.5 * Math.sin(s.phase))).toFixed(2);
+      precipCtx.fillStyle = `rgba(255,255,255,${tw})`;
+      precipCtx.beginPath();
+      precipCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      precipCtx.fill();
+    }
+
+    if (c.has('clearDay')) {
+      const angle = (ts / 1000) * (2 * Math.PI / 240);
+      const rayLen = Math.max(w, h) * 0.5;
+      precipCtx.strokeStyle = 'rgba(255,230,150,0.35)';
+      precipCtx.lineWidth = 2;
+      for (let i = 0; i < 5; i++) {
+        const a = angle + (i / 5) * Math.PI * 2;
+        precipCtx.beginPath();
+        precipCtx.moveTo(w, 0);
+        precipCtx.lineTo(w - Math.cos(a) * rayLen, Math.sin(a) * rayLen);
+        precipCtx.stroke();
+      }
+    }
+
+    if (c.has('thunderstorm')) {
+      if (ts > flashState.nextAt) {
+        flashState.until = ts + 100 + Math.random() * 50;
+        flashState.opacity = 0.2 + Math.random() * 0.1;
+        flashState.nextAt = ts + 8000 + Math.random() * 12000;
+      }
+      flashDiv.style.opacity = ts < flashState.until ? String(flashState.opacity) : '0';
+    } else {
+      flashDiv.style.opacity = '0';
+    }
+  }
+  requestAnimationFrame(stepConditionSkin);
+
   function renderWeatherSkin() {
-    weatherWidgetEl.classList.toggle('no-white-bg', !weatherTestState.whiteBgOn);
+    const hasFlourish = weatherSettings.sunGradient || weatherSettings.liveSkin;
+    weatherWidgetEl.classList.toggle('no-white-bg', hasFlourish);
     weatherWidgetEl.classList.toggle('test-text-stroke', weatherTestState.textStroke);
 
     let sky = null;
     if (weatherSettings.sunGradient) {
       sky = computeSkyColors(getEffectiveSkyTime());
       weatherSkin.style.background = `linear-gradient(to bottom, ${sky.top}, ${sky.bottom})`;
-      weatherSkin.style.opacity = weatherTestState.whiteBgOn ? String(weatherTestState.gradientOpacityPct / 100) : '1';
+      weatherSkin.style.opacity = '1';
     } else {
       weatherSkin.style.background = '';
       weatherSkin.style.opacity = '';
@@ -685,6 +866,8 @@
       overlay.className = 'weather-skin-overlay';
       overlay.style.opacity = String(cloudPct / 2 / 100);
       weatherSkin.appendChild(overlay);
+      // Fixed layer order: gradient -> cloud overlay -> precipitation -> floating clouds -> lightning flash.
+      weatherSkin.appendChild(precipCanvas);
 
       const cloudCount = Math.floor(cloudPct / 10);
       for (let i = 0; i < cloudCount; i++) {
@@ -693,17 +876,24 @@
         cloud.textContent = '☁️';
         weatherSkin.appendChild(cloud);
         randomizeCloud(cloud);
+        cloud.style.animationDelay = (-Math.random() * parseFloat(cloud.style.animationDuration)) + 's';
         cloud.addEventListener('animationiteration', () => randomizeCloud(cloud));
       }
+
+      weatherSkin.appendChild(flashDiv);
+    } else {
+      precipCanvas.remove();
+      flashDiv.remove();
     }
 
-    if (weatherSettings.sunGradient || weatherSettings.liveSkin) {
-      let composite = parseCssColor(getComputedStyle(weatherWidgetEl).backgroundColor);
-      if (sky) {
-        const skyAvgRgb = hexToRgb(lerpColor(sky.top, sky.bottom, 0.5));
-        const gradOpacity = weatherTestState.whiteBgOn ? weatherTestState.gradientOpacityPct / 100 : 1;
-        composite = weatherTestState.whiteBgOn ? lerpRgb(composite, skyAvgRgb, gradOpacity) : skyAvgRgb;
-      }
+    if (hasFlourish) {
+      // White base is always off here (no-white-bg is set above whenever hasFlourish), so the
+      // composite starts from the sky gradient if there is one, otherwise from the page's own
+      // background showing through the now-transparent widget (not the widget's own computed
+      // color, which is transparent and would misread as black).
+      let composite = sky
+        ? hexToRgb(lerpColor(sky.top, sky.bottom, 0.5))
+        : parseCssColor(getComputedStyle(document.body).backgroundColor);
       if (weatherSettings.liveSkin) {
         composite = lerpRgb(composite, WX_CLOUD_TINT_RGB, cloudPct / 2 / 100);
       }
@@ -724,10 +914,8 @@
     const timeInput = document.getElementById('test-time-input');
     const cloudSlider = document.getElementById('test-cloud-slider');
     const cloudValue = document.getElementById('test-cloud-value');
-    const whiteBgToggle = document.getElementById('test-whitebg-toggle');
-    const opacitySlider = document.getElementById('test-opacity-slider');
-    const opacityValue = document.getElementById('test-opacity-value');
     const textStrokeToggle = document.getElementById('test-textstroke-toggle');
+    const conditionSkinToggles = document.querySelectorAll('.test-condition-skin');
     const resetBtn = document.getElementById('test-reset-btn');
 
     function timeStringToSeconds(str) {
@@ -761,38 +949,29 @@
       renderWeatherSkin();
     });
 
-    whiteBgToggle.addEventListener('change', () => {
-      weatherTestState.whiteBgOn = whiteBgToggle.checked;
-      opacitySlider.disabled = !whiteBgToggle.checked;
-      renderWeatherSkin();
-    });
-
-    opacitySlider.addEventListener('input', () => {
-      weatherTestState.gradientOpacityPct = Number(opacitySlider.value);
-      opacityValue.textContent = opacitySlider.value + '%';
-      renderWeatherSkin();
-    });
-
     textStrokeToggle.addEventListener('change', () => {
       weatherTestState.textStroke = textStrokeToggle.checked;
       renderWeatherSkin();
     });
 
+    conditionSkinToggles.forEach((cb) => {
+      cb.addEventListener('change', () => {
+        if (cb.checked) weatherTestState.conditionSkins.add(cb.value);
+        else weatherTestState.conditionSkins.delete(cb.value);
+      });
+    });
+
     resetBtn.addEventListener('click', () => {
       weatherTestState.timeOverrideSec = null;
       weatherTestState.cloudOverridePct = null;
-      weatherTestState.whiteBgOn = true;
-      weatherTestState.gradientOpacityPct = 18;
       weatherTestState.textStroke = false;
+      weatherTestState.conditionSkins.clear();
       timeEnabled.checked = false;
       timeInput.value = secondsToTimeString(SUNSET_SEC);
       cloudSlider.value = 20;
       cloudValue.textContent = '20%';
-      whiteBgToggle.checked = true;
-      opacitySlider.disabled = false;
-      opacitySlider.value = 18;
-      opacityValue.textContent = '18%';
       textStrokeToggle.checked = false;
+      conditionSkinToggles.forEach((cb) => { cb.checked = false; });
       renderWeatherSkin();
     });
   })();
