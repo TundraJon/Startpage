@@ -652,8 +652,61 @@
   const WX_TEXT_DARK = '#808080';
   const WX_TEXT_THRESHOLD_MARGIN = 0.05;
   const WX_TEXT_LUMINANCE_THRESHOLD = relativeLuminance(hexToRgb(WX_TEXT_DARK)) - WX_TEXT_THRESHOLD_MARGIN;
-  const WX_CLOUD_TINT_RGB = [75, 85, 99]; // #4b5563
   const WX_CLOUD_OFFSCREEN_BUFFER_PX = 4;
+
+  // Cloud overlay tint: no longer a fixed gray — derived from the current sky color's own
+  // brightness, scaled by a day/night base plus a per-condition darkening shift. All tunable
+  // live via the testing panel sliders.
+  const WX_CLOUD_TUNABLES = {
+    dayBasePct: 40,
+    nightBasePct: 40,
+    lightRainPct: 10,
+    heavyRainPct: 20,
+    thunderstormPct: 40,
+  };
+
+  function isDaytime(now) {
+    const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+    return nowSec >= SUNRISE_SEC - TWILIGHT_HALF && nowSec <= SUNSET_SEC + TWILIGHT_HALF;
+  }
+
+  function conditionShiftPct(conditionSkins) {
+    if (conditionSkins.has('thunderstorm')) return WX_CLOUD_TUNABLES.thunderstormPct;
+    if (conditionSkins.has('heavyRain')) return WX_CLOUD_TUNABLES.heavyRainPct;
+    if (conditionSkins.has('lightRain')) return WX_CLOUD_TUNABLES.lightRainPct;
+    return 0;
+  }
+
+  function computeCloudTint(now, conditionSkins) {
+    const sky = computeSkyColors(now);
+    const skyRgb = hexToRgb(lerpColor(sky.top, sky.bottom, 0.5));
+    const daytime = isDaytime(now);
+    const basePct = daytime ? -WX_CLOUD_TUNABLES.dayBasePct : WX_CLOUD_TUNABLES.nightBasePct;
+    const multiplier = 1 + basePct / 100 - conditionShiftPct(conditionSkins) / 100;
+    const rgb = skyRgb.map((v) => Math.max(0, Math.min(255, v * multiplier)));
+    return { rgb, multiplier, daytime };
+  }
+
+  function cloudOverlayOpacity(cloudPct, daytime) {
+    return daytime ? cloudPct / 2 / 100 : cloudPct / 100;
+  }
+
+  function updateCloudTestingReadout(cloudTint, opacityFraction) {
+    const readout = document.getElementById('test-cloud-readout');
+    const swatch = document.getElementById('test-cloud-swatch');
+    const hexEl = document.getElementById('test-cloud-hex');
+    if (!readout) return;
+    if (!cloudTint) {
+      readout.textContent = 'Branch: — · Brightness: — of sky · Opacity: —';
+      swatch.style.background = 'transparent';
+      hexEl.textContent = '—';
+      return;
+    }
+    const hex = rgbToHex(cloudTint.rgb);
+    readout.textContent = `Branch: ${cloudTint.daytime ? 'Day' : 'Night'} · Brightness: ${Math.round(cloudTint.multiplier * 100)}% of sky · Opacity: ${Math.round(opacityFraction * 100)}%`;
+    swatch.style.background = hex;
+    hexEl.textContent = hex;
+  }
 
   function randomizeCloud(cloud) {
     const topPct = Math.random() * 50;
@@ -664,6 +717,24 @@
     cloud.style.top = topPct + '%';
     cloud.style.animationDuration = duration + 's';
     cloud.style.setProperty('--cloud-w', (cloud.offsetWidth + WX_CLOUD_OFFSCREEN_BUFFER_PX) + 'px');
+  }
+
+  // Respawning a cloud by mutating a running animation's duration/delay in place causes the
+  // browser to reinterpret its current cycle position and jump — confirmed via isolated repro.
+  // The reliable fix is to replace the element entirely: a freshly-created element just starts
+  // a clean animation from its own "from" keyframe, nothing to reinterpret.
+  function spawnCloud(oldCloud) {
+    const cloud = document.createElement('span');
+    cloud.className = 'wx-skin-cloud';
+    cloud.textContent = '☁️';
+    if (oldCloud) {
+      weatherSkin.replaceChild(cloud, oldCloud);
+    } else {
+      weatherSkin.appendChild(cloud);
+    }
+    randomizeCloud(cloud);
+    cloud.addEventListener('animationiteration', () => spawnCloud(cloud));
+    return cloud;
   }
 
   // --- Live Condition Skin: precipitation/effect layers (rain, snow, hail, lightning, stars, rays, fog) ---
@@ -861,29 +932,31 @@
 
     weatherSkin.querySelectorAll('.weather-skin-overlay, .wx-skin-cloud').forEach((el) => el.remove());
     const cloudPct = getEffectiveCloudPct();
+    let cloudTint = null;
     if (weatherSettings.liveSkin) {
+      cloudTint = computeCloudTint(getEffectiveSkyTime(), weatherTestState.conditionSkins);
       const overlay = document.createElement('div');
       overlay.className = 'weather-skin-overlay';
-      overlay.style.opacity = String(cloudPct / 2 / 100);
+      overlay.style.background = rgbToHex(cloudTint.rgb);
+      overlay.style.opacity = String(cloudOverlayOpacity(cloudPct, cloudTint.daytime));
       weatherSkin.appendChild(overlay);
       // Fixed layer order: gradient -> cloud overlay -> precipitation -> floating clouds -> lightning flash.
       weatherSkin.appendChild(precipCanvas);
 
       const cloudCount = Math.floor(cloudPct / 10);
       for (let i = 0; i < cloudCount; i++) {
-        const cloud = document.createElement('span');
-        cloud.className = 'wx-skin-cloud';
-        cloud.textContent = '☁️';
-        weatherSkin.appendChild(cloud);
-        randomizeCloud(cloud);
+        const cloud = spawnCloud();
+        // Stagger only the initial batch so they don't all start in lockstep; respawns via
+        // spawnCloud(oldCloud) deliberately get no delay — a fresh element just starts cleanly.
         cloud.style.animationDelay = (-Math.random() * parseFloat(cloud.style.animationDuration)) + 's';
-        cloud.addEventListener('animationiteration', () => randomizeCloud(cloud));
       }
 
       weatherSkin.appendChild(flashDiv);
+      updateCloudTestingReadout(cloudTint, cloudOverlayOpacity(cloudPct, cloudTint.daytime));
     } else {
       precipCanvas.remove();
       flashDiv.remove();
+      updateCloudTestingReadout(null, 0);
     }
 
     if (hasFlourish) {
@@ -894,8 +967,8 @@
       let composite = sky
         ? hexToRgb(lerpColor(sky.top, sky.bottom, 0.5))
         : parseCssColor(getComputedStyle(document.body).backgroundColor);
-      if (weatherSettings.liveSkin) {
-        composite = lerpRgb(composite, WX_CLOUD_TINT_RGB, cloudPct / 2 / 100);
+      if (weatherSettings.liveSkin && cloudTint) {
+        composite = lerpRgb(composite, cloudTint.rgb, cloudOverlayOpacity(cloudPct, cloudTint.daytime));
       }
       const textColor = relativeLuminance(composite) > WX_TEXT_LUMINANCE_THRESHOLD ? WX_TEXT_LIGHT : WX_TEXT_DARK;
       weatherWidgetEl.style.setProperty('--wx-text-color', textColor);
@@ -916,6 +989,16 @@
     const cloudValue = document.getElementById('test-cloud-value');
     const textStrokeToggle = document.getElementById('test-textstroke-toggle');
     const conditionSkinToggles = document.querySelectorAll('.test-condition-skin');
+    const dayBaseSlider = document.getElementById('test-cloud-daybase-slider');
+    const dayBaseValue = document.getElementById('test-cloud-daybase-value');
+    const nightBaseSlider = document.getElementById('test-cloud-nightbase-slider');
+    const nightBaseValue = document.getElementById('test-cloud-nightbase-value');
+    const lightRainSlider = document.getElementById('test-cloud-lightrain-slider');
+    const lightRainValue = document.getElementById('test-cloud-lightrain-value');
+    const heavyRainSlider = document.getElementById('test-cloud-heavyrain-slider');
+    const heavyRainValue = document.getElementById('test-cloud-heavyrain-value');
+    const thunderstormSlider = document.getElementById('test-cloud-thunderstorm-slider');
+    const thunderstormValue = document.getElementById('test-cloud-thunderstorm-value');
     const resetBtn = document.getElementById('test-reset-btn');
 
     function timeStringToSeconds(str) {
@@ -958,8 +1041,22 @@
       cb.addEventListener('change', () => {
         if (cb.checked) weatherTestState.conditionSkins.add(cb.value);
         else weatherTestState.conditionSkins.delete(cb.value);
+        renderWeatherSkin();
       });
     });
+
+    function bindCloudTunable(slider, valueEl, key) {
+      slider.addEventListener('input', () => {
+        WX_CLOUD_TUNABLES[key] = Number(slider.value);
+        valueEl.textContent = slider.value + '%';
+        renderWeatherSkin();
+      });
+    }
+    bindCloudTunable(dayBaseSlider, dayBaseValue, 'dayBasePct');
+    bindCloudTunable(nightBaseSlider, nightBaseValue, 'nightBasePct');
+    bindCloudTunable(lightRainSlider, lightRainValue, 'lightRainPct');
+    bindCloudTunable(heavyRainSlider, heavyRainValue, 'heavyRainPct');
+    bindCloudTunable(thunderstormSlider, thunderstormValue, 'thunderstormPct');
 
     resetBtn.addEventListener('click', () => {
       weatherTestState.timeOverrideSec = null;
@@ -972,6 +1069,16 @@
       cloudValue.textContent = '20%';
       textStrokeToggle.checked = false;
       conditionSkinToggles.forEach((cb) => { cb.checked = false; });
+      WX_CLOUD_TUNABLES.dayBasePct = 40;
+      WX_CLOUD_TUNABLES.nightBasePct = 40;
+      WX_CLOUD_TUNABLES.lightRainPct = 10;
+      WX_CLOUD_TUNABLES.heavyRainPct = 20;
+      WX_CLOUD_TUNABLES.thunderstormPct = 40;
+      dayBaseSlider.value = 40; dayBaseValue.textContent = '40%';
+      nightBaseSlider.value = 40; nightBaseValue.textContent = '40%';
+      lightRainSlider.value = 10; lightRainValue.textContent = '10%';
+      heavyRainSlider.value = 20; heavyRainValue.textContent = '20%';
+      thunderstormSlider.value = 40; thunderstormValue.textContent = '40%';
       renderWeatherSkin();
     });
   })();

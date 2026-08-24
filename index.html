@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home</title>
-<link rel="stylesheet" href="styles.css?v=9">
+<link rel="stylesheet" href="styles.css?v=10">
 </head>
 <body>
 
@@ -278,6 +278,33 @@
       <label class="option-row"><span>Snow</span><input type="checkbox" class="test-condition-skin" value="snow"></label>
       <label class="option-row"><span>Fog/Mist</span><input type="checkbox" class="test-condition-skin" value="fog"></label>
       <label class="option-row"><span>Hail</span><input type="checkbox" class="test-condition-skin" value="hail"></label>
+
+      <h3>Cloud Brightness Formula</h3>
+      <div class="option-row">
+        <span>Day base darkness <span id="test-cloud-daybase-value">40%</span></span>
+        <input type="range" id="test-cloud-daybase-slider" min="0" max="100" value="40">
+      </div>
+      <div class="option-row">
+        <span>Night base brightness <span id="test-cloud-nightbase-value">40%</span></span>
+        <input type="range" id="test-cloud-nightbase-slider" min="0" max="100" value="40">
+      </div>
+      <div class="option-row">
+        <span>Light Rain shift <span id="test-cloud-lightrain-value">10%</span></span>
+        <input type="range" id="test-cloud-lightrain-slider" min="0" max="100" value="10">
+      </div>
+      <div class="option-row">
+        <span>Heavy Rain shift <span id="test-cloud-heavyrain-value">20%</span></span>
+        <input type="range" id="test-cloud-heavyrain-slider" min="0" max="100" value="20">
+      </div>
+      <div class="option-row">
+        <span>Thunderstorm shift <span id="test-cloud-thunderstorm-value">40%</span></span>
+        <input type="range" id="test-cloud-thunderstorm-slider" min="0" max="100" value="40">
+      </div>
+      <p class="testing-note" id="test-cloud-readout">Branch: — · Brightness: — of sky · Opacity: —</p>
+      <div class="testing-swatch-row">
+        <span class="testing-swatch" id="test-cloud-swatch"></span>
+        <span id="test-cloud-hex">—</span>
+      </div>
     </section>
 
     <button type="button" class="testing-reset-btn" id="test-reset-btn">Reset to defaults</button>
@@ -388,6 +415,6 @@
   </div>
 </div>
 
-<script src="script.js?v=9"></script>
+<script src="script.js?v=10"></script>
 </body>
 </html>
