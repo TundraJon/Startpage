@@ -459,7 +459,7 @@
   const weatherState = {
     tempF: 88, hiF: 91, loF: 72, feelsF: 92, windMph: 8, cloudPct: 20,
     humidity: 55, dewPointF: 68, uv: 6, visibilityMi: 10, moonPhase: 'Full Moon',
-    conditionCode: null, conditionText: 'Moderate or heavy freezing rain',
+    conditionCode: 1201, conditionText: 'Moderate or heavy freezing rain',
     locationName: 'Los Ranchos de Albuquerque, NM', tzId: null,
     sunrise: null, sunset: null, alerts: [], hourly: [],
   };
@@ -515,6 +515,25 @@
     'Full Moon': '🌕', 'Waning Gibbous': '🌖', 'Last Quarter': '🌗', 'Waning Crescent': '🌘',
   };
 
+  // Full range of WeatherAPI's condition codes, not just the precip subset WX_CONDITION_MAP uses
+  // for picking the Live Condition Skin animation (that one deliberately omits clear/cloudy).
+  const WX_WEATHER_ICON_MAP = {
+    1000: '☀️', 1003: '⛅', 1006: '☁️', 1009: '☁️',
+    1030: '🌫️', 1135: '🌫️', 1147: '🌫️',
+    1063: '🌦️', 1150: '🌦️', 1153: '🌦️', 1180: '🌦️', 1240: '🌦️',
+    1183: '🌧️', 1186: '🌧️', 1189: '🌧️', 1192: '🌧️', 1195: '🌧️', 1198: '🌧️', 1201: '🌧️', 1243: '🌧️',
+    1072: '🌧️', 1168: '🌧️', 1171: '🌧️',
+    1246: '⛈️', 1087: '⛈️', 1273: '⛈️', 1276: '⛈️', 1279: '⛈️', 1282: '⛈️',
+    1066: '🌨️', 1069: '🌨️', 1114: '🌨️', 1204: '🌨️', 1207: '🌨️', 1210: '🌨️', 1213: '🌨️',
+    1216: '🌨️', 1249: '🌨️', 1252: '🌨️', 1255: '🌨️',
+    1117: '❄️', 1219: '❄️', 1222: '❄️', 1225: '❄️', 1258: '❄️',
+    1237: '🧊', 1261: '🧊', 1264: '🧊',
+  };
+  function weatherIconForCode(code) {
+    return WX_WEATHER_ICON_MAP[code] || '🌡️';
+  }
+  const weatherEmojiBtn = document.getElementById('weather-emoji-btn');
+
   function renderWeatherExtras() {
     const conv = displayTempUnit === 'F' ? toF : toC;
     visibilityValEl.textContent = Math.round(weatherState.visibilityMi) + 'mi';
@@ -530,10 +549,11 @@
     }
     locationEl.textContent = weatherState.locationName;
     descEl.textContent = weatherState.conditionText;
+    weatherEmojiBtn.textContent = weatherIconForCode(weatherState.conditionCode);
   }
   renderWeatherExtras();
 
-  document.getElementById('weather-emoji-btn').addEventListener('click', () => {
+  weatherEmojiBtn.addEventListener('click', () => {
     showComingSoon('Hourly forecast', 'The hourly forecast view is coming in a later pass.');
   });
 
@@ -600,8 +620,10 @@
   });
 
   // --- Sunrise/sunset gradient (v8 spec keyframe logic) ---
-  const SUNRISE_SEC = 6 * 3600 + 30 * 60;
-  const SUNSET_SEC = 19 * 3600 + 45 * 60;
+  // Defaults until live data arrives (no key configured yet, or before the first fetch resolves);
+  // overwritten with the real location's actual sunrise/sunset once WeatherAPI data lands.
+  let SUNRISE_SEC = 6 * 3600 + 30 * 60;
+  let SUNSET_SEC = 19 * 3600 + 45 * 60;
   const TWILIGHT_HALF = 45 * 60;
   const TWILIGHT_WINDOW = TWILIGHT_HALF * 2;
   const DEEP_NIGHT_SKY = { top: '#020617', bottom: '#020617' };
@@ -756,6 +778,16 @@
     thunderstormPct: 40,
   };
 
+  // Fog: previously a fixed 0.14 peak opacity at a baked-in pixel radius — too faint to notice.
+  // Opacity/size/speed are read live at draw time (not baked into each blob at creation) so their
+  // sliders take effect immediately; only blob count needs a rebuild, forced via lastParticleKey.
+  const WX_FOG_TUNABLES = {
+    opacityPct: 45,
+    blobCount: 4,
+    sizePct: 40,
+    speedMult: 3,
+  };
+
   function isDaytime(now) {
     const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
     return nowSec >= SUNRISE_SEC - TWILIGHT_HALF && nowSec <= SUNSET_SEC + TWILIGHT_HALF;
@@ -860,7 +892,55 @@
   let conditionParticles = [];
   let conditionStars = [];
   let conditionFog = [];
-  let flashState = { until: 0, nextAt: 0, opacity: 0 };
+  let flashState = { until: 0, nextAt: 0, opacity: 0, pendingSecondAt: 0, boltPath: null, boltUntil: 0 };
+
+  // Procedurally generate a jagged bolt each time it fires — never the same shape twice — as a
+  // zigzag random-walk from a random point along the top edge down to a random depth, with an
+  // occasional small fork partway down.
+  function generateBoltPath(w, h) {
+    const startX = w * (0.15 + Math.random() * 0.7);
+    const endY = h * (0.4 + Math.random() * 0.5);
+    const segments = 5 + Math.floor(Math.random() * 4);
+    const main = [{ x: startX, y: 0 }];
+    let x = startX;
+    for (let i = 1; i <= segments; i++) {
+      x += (Math.random() - 0.5) * w * 0.12;
+      main.push({ x, y: (endY / segments) * i });
+    }
+    let fork = null;
+    if (Math.random() < 0.4) {
+      const forkStart = main[Math.floor(main.length / 2)];
+      fork = [forkStart];
+      let fx = forkStart.x;
+      let fy = forkStart.y;
+      const forkSegs = 2 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < forkSegs; i++) {
+        fx += (Math.random() - 0.3) * w * 0.1;
+        fy += (h - forkStart.y) * 0.15;
+        fork.push({ x: fx, y: fy });
+      }
+    }
+    return { main, fork };
+  }
+  function drawBoltPath(path) {
+    precipCtx.save();
+    precipCtx.strokeStyle = 'rgba(255,250,220,0.95)';
+    precipCtx.shadowColor = 'rgba(255,250,220,0.8)';
+    precipCtx.shadowBlur = 8;
+    precipCtx.lineWidth = 2;
+    precipCtx.beginPath();
+    precipCtx.moveTo(path.main[0].x, path.main[0].y);
+    for (let i = 1; i < path.main.length; i++) precipCtx.lineTo(path.main[i].x, path.main[i].y);
+    precipCtx.stroke();
+    if (path.fork) {
+      precipCtx.lineWidth = 1.2;
+      precipCtx.beginPath();
+      precipCtx.moveTo(path.fork[0].x, path.fork[0].y);
+      for (let i = 1; i < path.fork.length; i++) precipCtx.lineTo(path.fork[i].x, path.fork[i].y);
+      precipCtx.stroke();
+    }
+    precipCtx.restore();
+  }
   let lastParticleKey = '';
 
   function rebuildConditionParticles(c, w, h, ts) {
@@ -892,8 +972,8 @@
       }
     }
     conditionFog = c.has('fog')
-      ? Array.from({ length: 2 + Math.floor(Math.random() * 2) }, () => ({
-          x: Math.random() * w, y: h * (0.2 + Math.random() * 0.6), r: w * 0.35 + Math.random() * w * 0.15,
+      ? Array.from({ length: WX_FOG_TUNABLES.blobCount }, () => ({
+          x: Math.random() * w, y: h * (0.2 + Math.random() * 0.6), sizeFactor: 0.8 + Math.random() * 0.4,
           speed: 3 + Math.random() * 3, dir: Math.random() < 0.5 ? 1 : -1,
         }))
       : [];
@@ -970,11 +1050,17 @@
           p.state = 'bounce';
           p.bounceT = 0;
           p.bounceFromY = h - p.r;
+          p.bounceFromX = p.x;
+          // -30..+30 degrees off straight-up, so a stone can shoot off to either side or bounce
+          // straight back. ~75% keep the base height; ~25% bounce 1-100% higher, per user spec.
+          p.bounceAngle = (Math.random() * 60 - 30) * Math.PI / 180;
+          p.bounceHeightMult = Math.random() < 0.25 ? 1 + (0.01 + Math.random() * 0.99) : 1;
         }
       } else {
         p.bounceT += 1;
-        const hop = Math.sin(Math.min(p.bounceT / 10, 1) * Math.PI) * 8;
+        const hop = Math.sin(Math.min(p.bounceT / 10, 1) * Math.PI) * 8 * p.bounceHeightMult;
         p.y = p.bounceFromY - hop;
+        p.x = p.bounceFromX + hop * Math.tan(p.bounceAngle);
         if (p.bounceT > 14) {
           p.state = 'fall';
           p.y = -4;
@@ -989,15 +1075,16 @@
     }
 
     for (const b of conditionFog) {
-      b.x += b.speed * 0.02 * b.dir;
-      if (b.x - b.r > w) b.x = -b.r;
-      if (b.x + b.r < 0) b.x = w + b.r;
-      const grad = precipCtx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
-      grad.addColorStop(0, 'rgba(220,220,225,0.14)');
+      const r = w * (WX_FOG_TUNABLES.sizePct / 100) * b.sizeFactor;
+      b.x += b.speed * 0.02 * b.dir * WX_FOG_TUNABLES.speedMult;
+      if (b.x - r > w) b.x = -r;
+      if (b.x + r < 0) b.x = w + r;
+      const grad = precipCtx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r);
+      grad.addColorStop(0, `rgba(220,220,225,${WX_FOG_TUNABLES.opacityPct / 100})`);
       grad.addColorStop(1, 'rgba(220,220,225,0)');
       precipCtx.fillStyle = grad;
       precipCtx.beginPath();
-      precipCtx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      precipCtx.arc(b.x, b.y, r, 0, Math.PI * 2);
       precipCtx.fill();
     }
 
@@ -1035,14 +1122,28 @@
     }
 
     if (c.has('thunderstorm')) {
-      if (ts > flashState.nextAt) {
+      // Most flashes stay single, as before. Occasionally (~32%) a flash schedules a quick
+      // second one right after it, rather than always waiting for the normal long gap. Each
+      // flash independently has up to a 10% chance of also drawing a random bolt.
+      const dueForSecond = flashState.pendingSecondAt > 0 && ts >= flashState.pendingSecondAt;
+      const dueForNext = flashState.pendingSecondAt === 0 && ts > flashState.nextAt;
+      if (dueForSecond || dueForNext) {
         flashState.until = ts + 100 + Math.random() * 50;
         flashState.opacity = 0.2 + Math.random() * 0.1;
-        flashState.nextAt = ts + 8000 + Math.random() * 12000;
+        flashState.boltPath = Math.random() < 0.10 ? generateBoltPath(w, h) : null;
+        flashState.boltUntil = flashState.until;
+        if (dueForNext && Math.random() < 0.32) {
+          flashState.pendingSecondAt = flashState.until + 80 + Math.random() * 100;
+        } else {
+          flashState.pendingSecondAt = 0;
+          flashState.nextAt = ts + 8000 + Math.random() * 12000;
+        }
       }
       flashDiv.style.opacity = ts < flashState.until ? String(flashState.opacity) : '0';
+      if (flashState.boltPath && ts < flashState.boltUntil) drawBoltPath(flashState.boltPath);
     } else {
       flashDiv.style.opacity = '0';
+      flashState.boltPath = null;
     }
   }
   requestAnimationFrame(stepConditionSkin);
@@ -1139,6 +1240,14 @@
     const heavyRainValue = document.getElementById('test-cloud-heavyrain-value');
     const thunderstormSlider = document.getElementById('test-cloud-thunderstorm-slider');
     const thunderstormValue = document.getElementById('test-cloud-thunderstorm-value');
+    const fogOpacitySlider = document.getElementById('test-fog-opacity-slider');
+    const fogOpacityValue = document.getElementById('test-fog-opacity-value');
+    const fogCountSlider = document.getElementById('test-fog-count-slider');
+    const fogCountValue = document.getElementById('test-fog-count-value');
+    const fogSizeSlider = document.getElementById('test-fog-size-slider');
+    const fogSizeValue = document.getElementById('test-fog-size-value');
+    const fogSpeedSlider = document.getElementById('test-fog-speed-slider');
+    const fogSpeedValue = document.getElementById('test-fog-speed-value');
     const resetBtn = document.getElementById('test-reset-btn');
 
     function timeStringToSeconds(str) {
@@ -1198,6 +1307,24 @@
     bindCloudTunable(heavyRainSlider, heavyRainValue, 'heavyRainPct');
     bindCloudTunable(thunderstormSlider, thunderstormValue, 'thunderstormPct');
 
+    fogOpacitySlider.addEventListener('input', () => {
+      WX_FOG_TUNABLES.opacityPct = Number(fogOpacitySlider.value);
+      fogOpacityValue.textContent = fogOpacitySlider.value + '%';
+    });
+    fogCountSlider.addEventListener('input', () => {
+      WX_FOG_TUNABLES.blobCount = Number(fogCountSlider.value);
+      fogCountValue.textContent = fogCountSlider.value;
+      lastParticleKey = ''; // force a rebuild so the new blob count actually takes effect
+    });
+    fogSizeSlider.addEventListener('input', () => {
+      WX_FOG_TUNABLES.sizePct = Number(fogSizeSlider.value);
+      fogSizeValue.textContent = fogSizeSlider.value + '%';
+    });
+    fogSpeedSlider.addEventListener('input', () => {
+      WX_FOG_TUNABLES.speedMult = Number(fogSpeedSlider.value);
+      fogSpeedValue.textContent = fogSpeedSlider.value + 'x';
+    });
+
     resetBtn.addEventListener('click', () => {
       weatherTestState.timeOverrideSec = null;
       weatherTestState.cloudOverridePct = null;
@@ -1219,16 +1346,21 @@
       lightRainSlider.value = 10; lightRainValue.textContent = '10%';
       heavyRainSlider.value = 20; heavyRainValue.textContent = '20%';
       thunderstormSlider.value = 40; thunderstormValue.textContent = '40%';
+      WX_FOG_TUNABLES.opacityPct = 45;
+      WX_FOG_TUNABLES.blobCount = 4;
+      WX_FOG_TUNABLES.sizePct = 40;
+      WX_FOG_TUNABLES.speedMult = 3;
+      fogOpacitySlider.value = 45; fogOpacityValue.textContent = '45%';
+      fogCountSlider.value = 4; fogCountValue.textContent = '4';
+      fogSizeSlider.value = 40; fogSizeValue.textContent = '40%';
+      fogSpeedSlider.value = 3; fogSpeedValue.textContent = '3x';
+      lastParticleKey = '';
       renderWeatherSkin();
     });
   })();
 
   // --- Severe weather alert ticker ---
   const WEATHER_ALERT_KEY = 'weatherAlertState';
-  const sampleAlert = {
-    id: 'heat-advisory-sample-1',
-    text: '⚠️ Heat Advisory in effect until 8:00 PM for Los Ranchos de Albuquerque, NM — take precautions to avoid heat-related illness. (Tap to dismiss.)',
-  };
   let alertState = {};
   try {
     alertState = JSON.parse(localStorage.getItem(WEATHER_ALERT_KEY) || '{}');
@@ -1238,17 +1370,21 @@
   function saveAlertState() {
     localStorage.setItem(WEATHER_ALERT_KEY, JSON.stringify(alertState));
   }
+  // No real alert is the normal, common case — returns null rather than a placeholder, so
+  // nothing gets shown as if it were real when it isn't (previously fell back to a hardcoded
+  // sample alert here, which displayed unconditionally whenever there was no genuine one).
   function currentAlert() {
     if (weatherState.alerts && weatherState.alerts.length > 0) {
       const a = weatherState.alerts[0];
       const headline = a.headline || a.event || 'Weather Alert';
       return { id: headline, text: `⚠️ ${headline}${a.desc ? ' — ' + a.desc : ''} (Tap to dismiss.)` };
     }
-    return sampleAlert;
+    return null;
   }
   function shouldShowAlert() {
     if (!weatherSettings.severeAlerts) return false;
     const alert = currentAlert();
+    if (!alert) return false;
     if (alertState.dismissedId !== alert.id) return true;
     const twoHoursMs = 2 * 60 * 60 * 1000;
     return (Date.now() - (alertState.dismissedAt || 0)) >= twoHoursMs;
@@ -1267,6 +1403,7 @@
   applyAlertTicker();
   alertTicker.addEventListener('click', () => {
     const alert = currentAlert();
+    if (!alert) return;
     alertState.dismissedId = alert.id;
     alertState.dismissedAt = Date.now();
     saveAlertState();
@@ -1313,6 +1450,17 @@
     });
   }
 
+  // WeatherAPI's astro.sunrise/astro.sunset are "HH:MM AM/PM" strings (e.g. "06:32 AM") — parse
+  // into seconds-of-day so SUNRISE_SEC/SUNSET_SEC can be derived from the real location instead
+  // of staying on their hardcoded defaults.
+  function parseAstroTime(str) {
+    const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec((str || '').trim());
+    if (!m) return null;
+    let h = parseInt(m[1], 10) % 12;
+    if (/pm/i.test(m[3])) h += 12;
+    return h * 3600 + parseInt(m[2], 10) * 60;
+  }
+
   function tzAbbreviation(tzId) {
     if (!tzId) return '';
     try {
@@ -1352,6 +1500,10 @@
     if (loc.tz_id) weatherState.tzId = loc.tz_id;
     weatherState.sunrise = astro.sunrise || null;
     weatherState.sunset = astro.sunset || null;
+    const parsedSunrise = parseAstroTime(astro.sunrise);
+    const parsedSunset = parseAstroTime(astro.sunset);
+    if (parsedSunrise !== null) SUNRISE_SEC = parsedSunrise;
+    if (parsedSunset !== null) SUNSET_SEC = parsedSunset;
     weatherState.alerts = (data.alerts && data.alerts.alert) || [];
     weatherState.hourly = fday.hour || [];
 
