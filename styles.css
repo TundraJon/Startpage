@@ -635,6 +635,23 @@ main {
   user-select: none;
 }
 
+/* Testing Panel docks to the bottom half of the screen instead of covering it fully, so the
+   weather widget stays visible above it while picking a testing option — Settings/Help stay
+   full-screen centered modals via the shared .help-overlay rules above. */
+#testing-panel-overlay {
+  align-items: flex-end;
+  justify-content: stretch;
+  padding: 0;
+}
+
+#testing-panel-overlay .help-panel {
+  max-width: none;
+  width: 100%;
+  height: 50vh;
+  max-height: 50vh;
+  border-radius: 12px 12px 0 0;
+}
+
 .help-close {
   position: absolute;
   top: 10px;

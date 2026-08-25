@@ -458,7 +458,7 @@
 
   const weatherState = {
     tempF: 88, hiF: 91, loF: 72, feelsF: 92, windMph: 8, cloudPct: 20,
-    humidity: 55, dewPointF: 68, uv: 6, visibilityMi: 10, moonPhase: 'Full',
+    humidity: 55, dewPointF: 68, uv: 6, visibilityMi: 10, moonPhase: 'Full Moon',
     conditionCode: null, conditionText: 'Moderate or heavy freezing rain',
     locationName: 'Los Ranchos de Albuquerque, NM', tzId: null,
     sunrise: null, sunset: null, alerts: [], hourly: [],
@@ -505,9 +505,15 @@
   const humidityValEl = document.getElementById('wx-humidity-val');
   const dewPointValEl = document.getElementById('wx-dewpoint-val');
   const moonPhaseValEl = document.getElementById('wx-moonphase-val');
+  const moonPhaseIconEl = document.getElementById('wx-moonphase-icon');
   const uvValEl = document.getElementById('wx-uv-val');
   const locationEl = document.getElementById('weather-location');
   const descEl = document.getElementById('weather-desc');
+
+  const WX_MOON_PHASE_ICONS = {
+    'New Moon': '🌑', 'Waxing Crescent': '🌒', 'First Quarter': '🌓', 'Waxing Gibbous': '🌔',
+    'Full Moon': '🌕', 'Waning Gibbous': '🌖', 'Last Quarter': '🌗', 'Waning Crescent': '🌘',
+  };
 
   function renderWeatherExtras() {
     const conv = displayTempUnit === 'F' ? toF : toC;
@@ -516,6 +522,7 @@
     humidityValEl.textContent = Math.round(weatherState.humidity) + '%';
     dewPointValEl.textContent = conv(weatherState.dewPointF) + '°';
     moonPhaseValEl.textContent = weatherState.moonPhase;
+    moonPhaseIconEl.textContent = WX_MOON_PHASE_ICONS[weatherState.moonPhase] || moonPhaseIconEl.textContent;
     uvValEl.textContent = String(Math.round(weatherState.uv));
     if (uvBadge) {
       uvBadge.className = 'uv-badge ' + uvSeverityClass(Number(weatherState.uv));
@@ -651,20 +658,35 @@
     }
     return keyframes[keyframes.length - 1];
   }
-  function computeSkyColors(now) {
+  // Shared boundary math: xRatio is 0 at the night end of a transition window and 1 at the day
+  // end, consistently for both sunrise and sunset, and pinned to 0/1 outside the windows. Both
+  // the sky-color interpolation and the star-fade factor read from this one place.
+  function computeSkyPhase(now) {
     const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
     if (nowSec >= SUNRISE_SEC - TWILIGHT_HALF && nowSec <= SUNRISE_SEC + TWILIGHT_HALF) {
       const xRatio = Math.min(1, Math.max(0, (nowSec - (SUNRISE_SEC - TWILIGHT_HALF)) / TWILIGHT_WINDOW));
-      return interpolateKeyframes(SUNRISE_KEYFRAMES, xRatio);
+      return { window: 'sunrise', xRatio };
     }
     if (nowSec >= SUNSET_SEC - TWILIGHT_HALF && nowSec <= SUNSET_SEC + TWILIGHT_HALF) {
       const xRatio = Math.min(1, Math.max(0, 1 - (nowSec - (SUNSET_SEC - TWILIGHT_HALF)) / TWILIGHT_WINDOW));
-      return interpolateKeyframes(SUNSET_KEYFRAMES, xRatio);
+      return { window: 'sunset', xRatio };
     }
     if (nowSec > SUNRISE_SEC + TWILIGHT_HALF && nowSec < SUNSET_SEC - TWILIGHT_HALF) {
-      return FULL_DAY_SKY;
+      return { window: 'day', xRatio: 1 };
     }
+    return { window: 'night', xRatio: 0 };
+  }
+  function computeSkyColors(now) {
+    const phase = computeSkyPhase(now);
+    if (phase.window === 'sunrise') return interpolateKeyframes(SUNRISE_KEYFRAMES, phase.xRatio);
+    if (phase.window === 'sunset') return interpolateKeyframes(SUNSET_KEYFRAMES, phase.xRatio);
+    if (phase.window === 'day') return FULL_DAY_SKY;
     return DEEP_NIGHT_SKY;
+  }
+  // Continuous 0 (full day) - 1 (full night) value, for the star-fade multiplier when the
+  // Sunrise/Sunset Gradient toggle is on (fade through the transition rather than hard-cutting).
+  function computeNightFactor(now) {
+    return 1 - computeSkyPhase(now).xRatio;
   }
 
   const weatherSkin = document.getElementById('weather-skin');
@@ -706,6 +728,23 @@
   const WX_TEXT_LUMINANCE_THRESHOLD = relativeLuminance(hexToRgb(WX_TEXT_DARK)) - WX_TEXT_THRESHOLD_MARGIN;
   const WX_CLOUD_OFFSCREEN_BUFFER_PX = 4;
 
+  // Star colors: mostly white/near-white, a minority visibly tinted. Weighted pick at creation.
+  const WX_STAR_COLORS = [
+    { rgb: [255, 255, 255], weight: 70 },
+    { rgb: [202, 225, 255], weight: 12 }, // blue-white
+    { rgb: [255, 244, 214], weight: 10 }, // pale yellow
+    { rgb: [255, 210, 161], weight: 8 },  // pale orange
+  ];
+  function pickStarColor() {
+    const total = WX_STAR_COLORS.reduce((sum, c) => sum + c.weight, 0);
+    let r = Math.random() * total;
+    for (const c of WX_STAR_COLORS) {
+      if (r < c.weight) return c.rgb;
+      r -= c.weight;
+    }
+    return WX_STAR_COLORS[0].rgb;
+  }
+
   // Cloud overlay tint: no longer a fixed gray — derived from the current sky color's own
   // brightness, scaled by a day/night base plus a per-condition darkening shift. All tunable
   // live via the testing panel sliders.
@@ -720,6 +759,13 @@
   function isDaytime(now) {
     const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
     return nowSec >= SUNRISE_SEC - TWILIGHT_HALF && nowSec <= SUNSET_SEC + TWILIGHT_HALF;
+  }
+
+  // "Clear" is the absence of any of these — not its own explicit signal. Clear Day/Clear Night
+  // are inferred from isDaytime()/computeNightFactor() rather than being selectable states.
+  const WX_PRECIP_CONDITION_KEYS = ['lightRain', 'heavyRain', 'thunderstorm', 'snow', 'hail', 'fog'];
+  function isConditionClear(conditionSkins) {
+    return !WX_PRECIP_CONDITION_KEYS.some((k) => conditionSkins.has(k));
   }
 
   function conditionShiftPct(conditionSkins) {
@@ -789,6 +835,19 @@
     return cloud;
   }
 
+  // Mobile Chrome can throttle or reset running CSS animation state for a backgrounded tab.
+  // Nothing here listens for that, so a cloud's drift position can come back wrong (stacked at
+  // the left edge) after switching away and back. Re-stagger every existing cloud the same safe
+  // way the initial batch gets staggered whenever the page becomes visible again — cheap, and a
+  // no-op in normal use since this only fires on an actual hide->show transition, not on load.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    weatherSkin.querySelectorAll('.wx-skin-cloud').forEach((oldCloud) => {
+      const cloud = spawnCloud(oldCloud);
+      cloud.style.animationDelay = (-Math.random() * parseFloat(cloud.style.animationDuration)) + 's';
+    });
+  });
+
   // --- Live Condition Skin: precipitation/effect layers (rain, snow, hail, lightning, stars, rays, fog) ---
   // Not blocked on the WeatherAPI connection: driven entirely by the "Preview Condition Skins" testing
   // panel picker (weatherTestState.conditionSkins), since there's no live condition data yet.
@@ -804,7 +863,7 @@
   let flashState = { until: 0, nextAt: 0, opacity: 0 };
   let lastParticleKey = '';
 
-  function rebuildConditionParticles(c, w, h) {
+  function rebuildConditionParticles(c, w, h, ts) {
     conditionParticles = [];
     const heavy = c.has('heavyRain') || c.has('thunderstorm');
     const rainCount = heavy ? 45 : (c.has('lightRain') ? 17 : 0);
@@ -838,18 +897,27 @@
           speed: 3 + Math.random() * 3, dir: Math.random() < 0.5 ? 1 : -1,
         }))
       : [];
-    conditionStars = c.has('clearNight')
-      ? Array.from({ length: 15 + Math.floor(Math.random() * 11) }, () => ({
-          x: Math.random() * w, y: Math.random() * h * 0.8, r: 0.8 + Math.random(),
-          phase: Math.random() * Math.PI * 2, speed: 0.5 + Math.random(),
-        }))
+    // Stars exist whenever the sky is clear (no precip condition active) — day/night visibility
+    // is gated per-frame in stepConditionSkin, not here, so their flicker state survives the
+    // sunrise/sunset boundary instead of being torn down and rebuilt at it.
+    conditionStars = isConditionClear(c)
+      ? Array.from({ length: 15 + Math.floor(Math.random() * 11) }, () => {
+          const isDim = Math.random() < 0.2;
+          const baseline = isDim ? 0.15 + Math.random() * 0.2 : 0.75 + Math.random() * 0.25;
+          return {
+            x: Math.random() * w, y: Math.random() * h * 0.8, r: 0.4 + Math.random() * 0.6,
+            color: pickStarColor(), isDim, baseline,
+            flickerStart: -1, flickerDur: 0, flickerDelta: 0,
+            nextFlickerAt: ts + 500 + Math.random() * 6000,
+          };
+        })
       : [];
   }
 
   function stepConditionSkin(ts) {
     requestAnimationFrame(stepConditionSkin);
     const c = getEffectiveConditionSkins();
-    if (!weatherSettings.liveSkin || c.size === 0) {
+    if (!weatherSettings.liveSkin) {
       if (precipCanvas.width) precipCtx.clearRect(0, 0, precipCanvas.width, precipCanvas.height);
       flashDiv.style.opacity = '0';
       return;
@@ -857,11 +925,13 @@
     const rect = weatherSkin.getBoundingClientRect();
     const w = Math.max(1, Math.round(rect.width));
     const h = Math.max(1, Math.round(rect.height));
-    const key = [...c].sort().join(',') + '|' + w + 'x' + h;
+    const dpr = window.devicePixelRatio || 1;
+    const key = [...c].sort().join(',') + '|' + w + 'x' + h + '@' + dpr;
     if (key !== lastParticleKey) {
-      precipCanvas.width = w;
-      precipCanvas.height = h;
-      rebuildConditionParticles(c, w, h);
+      precipCanvas.width = Math.round(w * dpr);
+      precipCanvas.height = Math.round(h * dpr);
+      precipCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      rebuildConditionParticles(c, w, h, ts);
       lastParticleKey = key;
     }
     precipCtx.clearRect(0, 0, w, h);
@@ -931,26 +1001,36 @@
       precipCtx.fill();
     }
 
-    for (const s of conditionStars) {
-      s.phase += 0.015 * s.speed;
-      const tw = (0.4 + 0.6 * (0.5 + 0.5 * Math.sin(s.phase))).toFixed(2);
-      precipCtx.fillStyle = `rgba(255,255,255,${tw})`;
-      precipCtx.beginPath();
-      precipCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-      precipCtx.fill();
-    }
-
-    if (c.has('clearDay')) {
-      const angle = (ts / 1000) * (2 * Math.PI / 240);
-      const rayLen = Math.max(w, h) * 0.5;
-      precipCtx.strokeStyle = 'rgba(255,230,150,0.35)';
-      precipCtx.lineWidth = 2;
-      for (let i = 0; i < 5; i++) {
-        const a = angle + (i / 5) * Math.PI * 2;
+    // Stars: mostly steady at their own baseline brightness, with occasional brief (well under a
+    // second), asynchronous dips (usually-bright stars) or flares (usually-dim stars) — real
+    // scintillation, not a continuous pulse. Visibility as a whole fades with the sunrise/sunset
+    // transition when the gradient toggle is on, or hard-cuts at the day/night boundary when off.
+    const skyTime = getEffectiveSkyTime();
+    const starVisibility = weatherSettings.sunGradient ? computeNightFactor(skyTime) : (isDaytime(skyTime) ? 0 : 1);
+    if (starVisibility > 0) {
+      for (const s of conditionStars) {
+        if (s.flickerStart < 0 && ts >= s.nextFlickerAt) {
+          s.flickerStart = ts;
+          s.flickerDur = 150 + Math.random() * 500;
+          const swing = (s.isDim ? 1 - s.baseline : s.baseline) * (0.6 + Math.random() * 0.4);
+          s.flickerDelta = s.isDim ? swing : -swing;
+        }
+        let opacity = s.baseline;
+        if (s.flickerStart >= 0) {
+          const elapsed = ts - s.flickerStart;
+          if (elapsed >= s.flickerDur) {
+            s.flickerStart = -1;
+            s.nextFlickerAt = ts + 2000 + Math.random() * 6000;
+          } else {
+            const ease = Math.sin((elapsed / s.flickerDur) * Math.PI);
+            opacity = s.baseline + s.flickerDelta * ease;
+          }
+        }
+        opacity = Math.max(0, Math.min(1, opacity)) * starVisibility;
+        precipCtx.fillStyle = `rgba(${s.color[0]},${s.color[1]},${s.color[2]},${opacity.toFixed(2)})`;
         precipCtx.beginPath();
-        precipCtx.moveTo(w, 0);
-        precipCtx.lineTo(w - Math.cos(a) * rayLen, Math.sin(a) * rayLen);
-        precipCtx.stroke();
+        precipCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        precipCtx.fill();
       }
     }
 
@@ -972,9 +1052,17 @@
     weatherWidgetEl.classList.toggle('no-white-bg', hasFlourish);
     weatherWidgetEl.classList.toggle('test-text-stroke', weatherTestState.textStroke);
 
+    // Day/night is a base fact independent of the gradient toggle: with the toggle on, the full
+    // multi-stop sunrise/sunset transition applies; with it off but Live Skin on, a flat
+    // day-or-night background still applies (no twilight blending, hard cut at the boundary)
+    // instead of no background at all. With both off, there's no background, as before.
     let sky = null;
     if (weatherSettings.sunGradient) {
       sky = computeSkyColors(getEffectiveSkyTime());
+      weatherSkin.style.background = `linear-gradient(to bottom, ${sky.top}, ${sky.bottom})`;
+      weatherSkin.style.opacity = '1';
+    } else if (weatherSettings.liveSkin) {
+      sky = isDaytime(getEffectiveSkyTime()) ? FULL_DAY_SKY : DEEP_NIGHT_SKY;
       weatherSkin.style.background = `linear-gradient(to bottom, ${sky.top}, ${sky.bottom})`;
       weatherSkin.style.opacity = '1';
     } else {
@@ -1269,7 +1357,7 @@
 
     weatherLiveConditions.clear();
     const mapped = mapConditionCode(weatherState.conditionCode);
-    weatherLiveConditions.add(mapped || (isDaytime(new Date()) ? 'clearDay' : 'clearNight'));
+    if (mapped) weatherLiveConditions.add(mapped);
 
     renderWeatherTemps();
     renderWind();
