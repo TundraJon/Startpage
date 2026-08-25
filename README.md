@@ -264,6 +264,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
+### Moon phase icon frozen at placeholder (doesn't match live phase text)
+
+- [ ] **Root cause (confirmed via testing):** `index.html:110`'s moon-phase icon (`<span id="wx-moonphase-icon">🌕</span>`) is a hardcoded static emoji. The `id` was added this session so it *could* be wired up, but `renderWeatherExtras()` in script.js only ever sets `wx-moonphase-val`'s text (the phase name, e.g. "Waxing Gibbous") — no code maps that name to an emoji and updates the icon element. So the icon stays stuck on its Full-moon placeholder forever regardless of the real phase, while the text next to it is correct. Verified: a mocked live response with `astro.moon_phase: "Waxing Gibbous"` correctly rendered that text but still showed 🌕.
+- [ ] Fix: add an 8-phase name→emoji map (New 🌑, Waxing Crescent 🌒, First Quarter 🌓, Waxing Gibbous 🌔, Full 🌕, Waning Gibbous 🌖, Last Quarter 🌗, Waning Crescent 🌘) and set `wx-moonphase-icon`'s textContent from it alongside the existing text update in `renderWeatherExtras()`.
+
 ### Live Condition Skin: day/night is a base fact, independent of the Sunrise/Sunset Gradient toggle
 
 - [ ] **Clarifies the architecture, resolves both open questions from the "counterintuitive" discussion:** day and night are both determined by sunrise/sunset times for the current location — that determination is a base fact, always true, regardless of any toggle. The "Sunrise/Sunset Gradient" toggle controls *only* the specific color-transition overlay effect layered on top of that fact (the sunrise/sunset keyframe blend, the oranges/purples/blues) — not whether day/night is known or reflected at all.
