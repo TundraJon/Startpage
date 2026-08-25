@@ -264,6 +264,16 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
+### Stars visible at 4pm with the testing-panel time override — confirms an already-queued item
+
+- [ ] **Not a new bug — reproduces the existing "day/night is a base fact" item below.** "Clear Night" is currently a manual Testing Panel checkbox (`weatherTestState.conditionSkins`), completely independent of the time override — checking it shows stars regardless of what time is selected, including 4pm. The already-queued fix (see "Live Condition Skin: day/night is a base fact" further down) makes Clear Day/Clear Night automatic, inferred from the real/overridden time via `isDaytime()`, and removes the manual checkboxes entirely — once built, this exact scenario becomes impossible by construction. No separate fix needed here; just confirms that item is worth doing.
+
+### Star twinkle: too slow, too big (look like snowflakes), and should read darker
+
+- [ ] **Twinkle speed — root cause found.** `stepConditionSkin(ts)` receives a real timestamp from `requestAnimationFrame` and uses it correctly for the Clear-Day sun-ray rotation and the thunderstorm flash timing — but star twinkle does not: `s.phase += 0.015 * s.speed` advances by a fixed amount **per invocation**, not per elapsed millisecond. So twinkle rate is silently tied to however many frames per second the device actually renders — on a real phone under load (animated clouds, precipitation canvas, etc. all sharing the same rAF budget), a lower effective frame rate directly makes the twinkle slower than intended, without any code change. Fix: scale the phase increment by real elapsed time since the last frame (using `ts`) instead of a fixed per-frame constant, matching how rays/flash already work.
+- [ ] **Star size:** current radius is `0.8 + Math.random()` (0.8–1.8px), close enough to snow's `1.5 + Math.random()*1.5` (1.5–3px) fill-circle rendering to read as the same shape at a glance. Fix: shrink meaningfully (e.g. ~0.4–1.0px) so stars read as fine points rather than snowflake-sized dots.
+- [ ] **Star darkness — aesthetic preference, no root cause needed.** Current twinkle opacity swings `0.4` to `1.0` (`rgba(255,255,255,tw)`), reaching full-bright white at its peak. Wants the whole range pulled darker/dimmer — e.g. something like a `0.2`–`0.6` ceiling instead of `0.4`–`1.0` (exact values to be tuned against how it actually looks once built).
+
 ### Clouds stack up at the left edge after the tab regains focus following a background period
 
 - [ ] **Diagnosis, confirmed:** clouds appearing to reset to the left edge and all move right together happens after switching away from the browser tab for a while and back — not on a plain refresh (that path was tested and ruled out: initial-spawn stagger and respawn timing both checked out fine via headless Chromium). Nothing in script.js listens for tab visibility at all, so the reset is the browser's own animation/compositor engine throttling or discarding running CSS animation state while the tab is backgrounded, on mobile Chrome. This also explains why it only showed up 3 times rather than every refresh — it needs the tab to actually be backgrounded, not just reloaded.
