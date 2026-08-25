@@ -302,6 +302,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
+### Fog/Mist renders, but far too faintly to actually see
+
+- [ ] **Confirmed via direct pixel measurement, not just a code read.** Fog does render — the "nothing happens" report isn't a wiring bug — but it's calibrated so subtly it's effectively invisible. Turned it on and measured the actual precip canvas: peak opacity anywhere is only 58/255 (≈23%), and that's just the exact center of one of 2–3 soft radial-gradient blobs (`conditionFog`, script.js:894–899/991–1001) that fade to fully transparent at their own edges — so almost all of the ~97% of the canvas they cover is far weaker than even that 23% figure. The blobs also drift very slowly (`b.speed * 0.02`, ~0.06–0.36px per frame), so there's barely any visible motion either.
+- [ ] Fix direction: raise the base opacity meaningfully (currently `rgba(220,220,225,0.14)` at each blob's own center — the true ceiling), and/or increase blob count/size/drift speed, then look at it against the actual widget (not just canvas pixel values in isolation, since the cloud tint overlay and background sit visually on top of/behind it) to calibrate something actually perceptible as "foggy."
+
 ### Hail bounce: random angle and varied height
 
 - [ ] **Current behavior (script.js:964–989):** every hailstone bounces purely vertically — `hop = Math.sin(Math.min(p.bounceT / 10, 1) * Math.PI) * 8` moves `p.y` alone, `p.x` never changes during the bounce — and the `* 8` is a fixed constant, so every stone bounces to exactly the same height. Matches the user's description exactly.
