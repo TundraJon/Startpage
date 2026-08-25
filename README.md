@@ -302,6 +302,12 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
+### Fake sample alert shown as if real whenever there's no genuine severe weather alert
+
+- [ ] **Root cause (confirmed via code search):** `currentAlert()` (script.js) falls back to a hardcoded `sampleAlert` — `"⚠️ Heat Advisory in effect until 8:00 PM for Los Ranchos de Albuquerque, NM..."` — whenever `weatherState.alerts` is empty. That's the normal case on any day without genuine severe weather, so the fake alert displays as if it were real and current, for a location that has nothing to do with the user's actual location. It was originally built as a dev placeholder to preview the alert ticker UI before live WeatherAPI alerts existed, and never got gated off once real alerts were wired up this session (Build Log 14) — `shouldShowAlert()` only checks the `severeAlerts` setting and dismissal state, nothing distinguishes "no real alert" from "show the fake one."
+- [ ] **User-visible impact, confirmed:** the user saw this fire on their real device, describing it accurately as "a weather advisory that has nothing to do with my location."
+- [ ] Fix: `currentAlert()`/`shouldShowAlert()` should not show anything when `weatherState.alerts` is empty — no alert is the correct, common state. Remove the `sampleAlert` fallback from the normal code path entirely (it can stay as a fixture for manual UI testing if that's still wanted, but should require an explicit opt-in — e.g. a Testing Panel toggle — never a silent default).
+
 ### Weather emoji icon frozen at a placeholder sun, regardless of actual conditions
 
 - [ ] **Root cause (confirmed via code search):** `index.html`'s `weather-emoji-btn` button (`<button class="weather-emoji" id="weather-emoji-btn" aria-label="Hourly forecast">☀️</button>`) is a hardcoded static emoji. In script.js it's only ever wired for its click handler (opens a "coming soon" hourly-forecast placeholder) — nothing updates its emoji content based on the actual condition. `renderWeatherExtras()` sets the *text* next to it (`weatherState.conditionText`, e.g. "Overcast") but never touches the emoji itself. Same class of bug as the moon-phase icon fixed in Build Log 15 — a placeholder never wired up.
