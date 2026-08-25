@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home</title>
-<link rel="stylesheet" href="styles.css?v=10">
+<link rel="stylesheet" href="styles.css?v=11">
 </head>
 <body>
 
@@ -84,14 +84,14 @@
             </div>
             <div class="wx-stack" data-toggle="visibility">
               <span class="wx-icon">👁️</span>
-              <span class="wx-val">10mi</span>
+              <span class="wx-val" id="wx-visibility-val">10mi</span>
             </div>
             <div class="wx-stack" data-toggle="cloud">
               <span class="wx-icon">☁️</span>
-              <span class="wx-val">20%</span>
+              <span class="wx-val" id="wx-cloudpct-val">20%</span>
             </div>
           </div>
-          <div class="weather-location">
+          <div class="weather-location" id="weather-location">
             Los Ranchos de Albuquerque, NM
           </div>
         </div>
@@ -101,14 +101,14 @@
         </div>
         <div class="weather-bottom">
           <span class="weather-hilo"><span class="hi" id="weather-hi"></span>/<span class="lo" id="weather-lo"></span> <span class="feels" id="weather-feels" data-toggle="feelsLike"></span></span>
-          <span class="weather-desc">Moderate or heavy freezing rain</span>
+          <span class="weather-desc" id="weather-desc">Moderate or heavy freezing rain</span>
         </div>
         <div class="weather-footer-row" id="weather-footer-row">
           <div class="weather-footer" id="weather-footer">
-            <span><span class="wx-icon">💦</span><span class="wx-val">55%</span></span>
-            <span><span class="wx-icon">💧</span><span class="wx-val">68°</span></span>
-            <span data-toggle="moonPhase"><span class="wx-icon">🌕</span><span class="wx-val">Full</span></span>
-            <span class="uv-badge" data-uv="6" data-toggle="uv"><span class="wx-icon">🌞</span><span class="wx-val">6</span></span>
+            <span><span class="wx-icon">💦</span><span class="wx-val" id="wx-humidity-val">55%</span></span>
+            <span><span class="wx-icon">💧</span><span class="wx-val" id="wx-dewpoint-val">68°</span></span>
+            <span data-toggle="moonPhase"><span class="wx-icon" id="wx-moonphase-icon">🌕</span><span class="wx-val" id="wx-moonphase-val">Full</span></span>
+            <span class="uv-badge" data-uv="6" data-toggle="uv"><span class="wx-icon">🌞</span><span class="wx-val" id="wx-uv-val">6</span></span>
           </div>
           <button class="weather-alert-ticker" id="weather-alert-ticker" aria-label="Severe weather alert, tap to dismiss" hidden>
             <span class="weather-alert-track" id="weather-alert-track"></span>
@@ -327,6 +327,14 @@
       <h3>Theme</h3>
       <label class="option-row"><span>Automatic (day 7am–7pm / night 7pm–7am)</span><input type="checkbox" id="theme-auto-toggle"></label>
     </section>
+    <section class="options-section">
+      <h3>Weather</h3>
+      <p class="testing-note">Your WeatherAPI.com key is stored only in this browser (never leaves your device, never committed to the site's source).</p>
+      <div class="option-row">
+        <span>WeatherAPI Key</span>
+        <input type="password" id="weatherapi-key-input" autocomplete="off" spellcheck="false" placeholder="paste key here" style="width: 55%; min-width: 0;">
+      </div>
+    </section>
   </div>
 </div>
 
@@ -415,6 +423,6 @@
   </div>
 </div>
 
-<script src="script.js?v=10"></script>
+<script src="script.js?v=11"></script>
 </body>
 </html>

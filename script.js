@@ -67,6 +67,16 @@
     syncThemeDependentUI();
   });
 
+  const WEATHERAPI_KEY_STORAGE = 'weatherApiKey';
+  const weatherApiKeyInput = document.getElementById('weatherapi-key-input');
+  weatherApiKeyInput.value = localStorage.getItem(WEATHERAPI_KEY_STORAGE) || '';
+  weatherApiKeyInput.addEventListener('change', () => {
+    const key = weatherApiKeyInput.value.trim();
+    if (key) localStorage.setItem(WEATHERAPI_KEY_STORAGE, key);
+    else localStorage.removeItem(WEATHERAPI_KEY_STORAGE);
+    refreshLiveWeather(true);
+  });
+
   function openSettings() {
     themeAutoToggleInput.checked = themeAutoMode;
     settingsOverlay.hidden = false;
@@ -446,7 +456,13 @@
     localStorage.setItem(WEATHER_SETTINGS_KEY, JSON.stringify(weatherSettings));
   }
 
-  const weatherState = { tempF: 88, hiF: 91, loF: 72, feelsF: 92, windMph: 8, cloudPct: 20 };
+  const weatherState = {
+    tempF: 88, hiF: 91, loF: 72, feelsF: 92, windMph: 8, cloudPct: 20,
+    humidity: 55, dewPointF: 68, uv: 6, visibilityMi: 10, moonPhase: 'Full',
+    conditionCode: null, conditionText: 'Moderate or heavy freezing rain',
+    locationName: 'Los Ranchos de Albuquerque, NM', tzId: null,
+    sunrise: null, sunset: null, alerts: [], hourly: [],
+  };
   let displayTempUnit = weatherSettings.tempUnit;
 
   const tempUnitBtn = document.getElementById('weather-temp-unit');
@@ -483,6 +499,32 @@
       : Math.round(weatherState.windMph) + 'mph';
   }
   renderWind();
+
+  const visibilityValEl = document.getElementById('wx-visibility-val');
+  const cloudPctValEl = document.getElementById('wx-cloudpct-val');
+  const humidityValEl = document.getElementById('wx-humidity-val');
+  const dewPointValEl = document.getElementById('wx-dewpoint-val');
+  const moonPhaseValEl = document.getElementById('wx-moonphase-val');
+  const uvValEl = document.getElementById('wx-uv-val');
+  const locationEl = document.getElementById('weather-location');
+  const descEl = document.getElementById('weather-desc');
+
+  function renderWeatherExtras() {
+    const conv = displayTempUnit === 'F' ? toF : toC;
+    visibilityValEl.textContent = Math.round(weatherState.visibilityMi) + 'mi';
+    cloudPctValEl.textContent = Math.round(weatherState.cloudPct) + '%';
+    humidityValEl.textContent = Math.round(weatherState.humidity) + '%';
+    dewPointValEl.textContent = conv(weatherState.dewPointF) + '°';
+    moonPhaseValEl.textContent = weatherState.moonPhase;
+    uvValEl.textContent = String(Math.round(weatherState.uv));
+    if (uvBadge) {
+      uvBadge.className = 'uv-badge ' + uvSeverityClass(Number(weatherState.uv));
+      uvBadge.dataset.uv = String(Math.round(weatherState.uv));
+    }
+    locationEl.textContent = weatherState.locationName;
+    descEl.textContent = weatherState.conditionText;
+  }
+  renderWeatherExtras();
 
   document.getElementById('weather-emoji-btn').addEventListener('click', () => {
     showComingSoon('Hourly forecast', 'The hourly forecast view is coming in a later pass.');
@@ -635,6 +677,16 @@
     textStroke: false,
     conditionSkins: new Set(),
   };
+
+  // Real (non-test) active conditions, derived from live data. Declared here (early) rather
+  // than down by the rest of the live-weather code because renderWeatherSkin()'s very first
+  // synchronous call at load time already needs getEffectiveConditionSkins() — declaring it
+  // later caused a temporal-dead-zone crash that silently prevented the initial fetch from
+  // ever running.
+  const weatherLiveConditions = new Set();
+  function getEffectiveConditionSkins() {
+    return weatherTestState.conditionSkins.size > 0 ? weatherTestState.conditionSkins : weatherLiveConditions;
+  }
 
   function getEffectiveSkyTime() {
     if (weatherTestState.timeOverrideSec === null) return new Date();
@@ -796,7 +848,7 @@
 
   function stepConditionSkin(ts) {
     requestAnimationFrame(stepConditionSkin);
-    const c = weatherTestState.conditionSkins;
+    const c = getEffectiveConditionSkins();
     if (!weatherSettings.liveSkin || c.size === 0) {
       if (precipCanvas.width) precipCtx.clearRect(0, 0, precipCanvas.width, precipCanvas.height);
       flashDiv.style.opacity = '0';
@@ -934,7 +986,7 @@
     const cloudPct = getEffectiveCloudPct();
     let cloudTint = null;
     if (weatherSettings.liveSkin) {
-      cloudTint = computeCloudTint(getEffectiveSkyTime(), weatherTestState.conditionSkins);
+      cloudTint = computeCloudTint(getEffectiveSkyTime(), getEffectiveConditionSkins());
       const overlay = document.createElement('div');
       overlay.className = 'weather-skin-overlay';
       overlay.style.background = rgbToHex(cloudTint.rgb);
@@ -1098,9 +1150,18 @@
   function saveAlertState() {
     localStorage.setItem(WEATHER_ALERT_KEY, JSON.stringify(alertState));
   }
+  function currentAlert() {
+    if (weatherState.alerts && weatherState.alerts.length > 0) {
+      const a = weatherState.alerts[0];
+      const headline = a.headline || a.event || 'Weather Alert';
+      return { id: headline, text: `⚠️ ${headline}${a.desc ? ' — ' + a.desc : ''} (Tap to dismiss.)` };
+    }
+    return sampleAlert;
+  }
   function shouldShowAlert() {
     if (!weatherSettings.severeAlerts) return false;
-    if (alertState.dismissedId !== sampleAlert.id) return true;
+    const alert = currentAlert();
+    if (alertState.dismissedId !== alert.id) return true;
     const twoHoursMs = 2 * 60 * 60 * 1000;
     return (Date.now() - (alertState.dismissedAt || 0)) >= twoHoursMs;
   }
@@ -1112,16 +1173,146 @@
     alertTicker.hidden = !show;
     weatherFooter.hidden = show;
     if (show) {
-      alertTrack.textContent = sampleAlert.text;
+      alertTrack.textContent = currentAlert().text;
     }
   }
   applyAlertTicker();
   alertTicker.addEventListener('click', () => {
-    alertState.dismissedId = sampleAlert.id;
+    const alert = currentAlert();
+    alertState.dismissedId = alert.id;
     alertState.dismissedAt = Date.now();
     saveAlertState();
     applyAlertTicker();
   });
+
+  // --- Live WeatherAPI.com integration ---
+  const WEATHER_CACHE_KEY = 'weatherLiveCache';
+  const WEATHER_STALE_MS = 15 * 60 * 1000;
+  // Fallback location matches the original placeholder text (Los Ranchos de Albuquerque, NM),
+  // used only if geolocation is unavailable, declined, or times out.
+  const FALLBACK_COORDS = { lat: 35.1497, lon: -106.6764 };
+
+  // WeatherAPI condition codes mapped to the existing Live Condition Skin keys. WeatherAPI's
+  // free condition-code set has no distinct "hail" code, so hail isn't mappable this way yet.
+  const WX_CONDITION_MAP = {
+    1087: 'thunderstorm', 1273: 'thunderstorm', 1276: 'thunderstorm', 1279: 'thunderstorm', 1282: 'thunderstorm',
+    1192: 'heavyRain', 1195: 'heavyRain', 1201: 'heavyRain', 1243: 'heavyRain', 1246: 'heavyRain',
+    1063: 'lightRain', 1150: 'lightRain', 1153: 'lightRain', 1168: 'lightRain', 1171: 'lightRain',
+    1180: 'lightRain', 1183: 'lightRain', 1186: 'lightRain', 1189: 'lightRain', 1198: 'lightRain', 1240: 'lightRain',
+    1066: 'snow', 1069: 'snow', 1072: 'snow', 1114: 'snow', 1117: 'snow',
+    1204: 'snow', 1207: 'snow', 1210: 'snow', 1213: 'snow', 1216: 'snow', 1219: 'snow', 1222: 'snow', 1225: 'snow',
+    1237: 'snow', 1249: 'snow', 1252: 'snow', 1255: 'snow', 1258: 'snow', 1261: 'snow', 1264: 'snow',
+    1030: 'fog', 1135: 'fog', 1147: 'fog',
+  };
+  function mapConditionCode(code) {
+    return WX_CONDITION_MAP[code] || null;
+  }
+
+  function getCoords() {
+    // geolocation's own `timeout` option isn't reliable when a permission prompt is left
+    // unanswered rather than explicitly denied — it can hang indefinitely in that case. Race
+    // it against an explicit JS-level timeout so a fetch is never blocked forever.
+    return new Promise((resolve) => {
+      let settled = false;
+      const settle = (coords) => { if (!settled) { settled = true; resolve(coords); } };
+      if (!('geolocation' in navigator)) { settle(FALLBACK_COORDS); return; }
+      setTimeout(() => settle(FALLBACK_COORDS), 9000);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => settle({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+        () => settle(FALLBACK_COORDS),
+        { timeout: 8000, maximumAge: 30 * 60 * 1000 }
+      );
+    });
+  }
+
+  function tzAbbreviation(tzId) {
+    if (!tzId) return '';
+    try {
+      const parts = new Intl.DateTimeFormat('en-US', { timeZone: tzId, timeZoneName: 'short' }).formatToParts(new Date());
+      const tzPart = parts.find((p) => p.type === 'timeZoneName');
+      if (tzPart && tzPart.value && !/^GMT/.test(tzPart.value)) return tzPart.value;
+      const offsetParts = new Intl.DateTimeFormat('en-US', { timeZone: tzId, timeZoneName: 'shortOffset' }).formatToParts(new Date());
+      const offsetPart = offsetParts.find((p) => p.type === 'timeZoneName');
+      return offsetPart ? offsetPart.value.replace('GMT', 'UTC') : '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function applyLiveWeatherData(data) {
+    const loc = data.location || {};
+    const cur = data.current || {};
+    const fday = (data.forecast && data.forecast.forecastday && data.forecast.forecastday[0]) || {};
+    const day = fday.day || {};
+    const astro = fday.astro || {};
+
+    if (cur.temp_f !== undefined) weatherState.tempF = cur.temp_f;
+    if (day.maxtemp_f !== undefined) weatherState.hiF = day.maxtemp_f;
+    if (day.mintemp_f !== undefined) weatherState.loF = day.mintemp_f;
+    if (cur.feelslike_f !== undefined) weatherState.feelsF = cur.feelslike_f;
+    if (cur.wind_mph !== undefined) weatherState.windMph = cur.wind_mph;
+    if (cur.cloud !== undefined) weatherState.cloudPct = cur.cloud;
+    if (cur.humidity !== undefined) weatherState.humidity = cur.humidity;
+    if (cur.dewpoint_f !== undefined) weatherState.dewPointF = cur.dewpoint_f;
+    if (cur.uv !== undefined) weatherState.uv = cur.uv;
+    if (cur.vis_miles !== undefined) weatherState.visibilityMi = cur.vis_miles;
+    if (astro.moon_phase) weatherState.moonPhase = astro.moon_phase;
+    if (cur.condition && cur.condition.code !== undefined) weatherState.conditionCode = cur.condition.code;
+    if (cur.condition && cur.condition.text) weatherState.conditionText = cur.condition.text;
+    const locName = [loc.name, loc.region].filter(Boolean).join(', ');
+    if (locName) weatherState.locationName = locName;
+    if (loc.tz_id) weatherState.tzId = loc.tz_id;
+    weatherState.sunrise = astro.sunrise || null;
+    weatherState.sunset = astro.sunset || null;
+    weatherState.alerts = (data.alerts && data.alerts.alert) || [];
+    weatherState.hourly = fday.hour || [];
+
+    weatherLiveConditions.clear();
+    const mapped = mapConditionCode(weatherState.conditionCode);
+    weatherLiveConditions.add(mapped || (isDaytime(new Date()) ? 'clearDay' : 'clearNight'));
+
+    renderWeatherTemps();
+    renderWind();
+    renderWeatherExtras();
+    renderWeatherSkin();
+    applyAlertTicker();
+
+    if (weatherState.tzId) {
+      const abbr = tzAbbreviation(weatherState.tzId);
+      const tzPill = document.getElementById('clock-tz-pill');
+      if (abbr && tzPill) tzPill.textContent = abbr;
+    }
+  }
+
+  async function loadLiveWeather(force) {
+    const key = localStorage.getItem(WEATHERAPI_KEY_STORAGE);
+    if (!key) return;
+    let cache = null;
+    try { cache = JSON.parse(localStorage.getItem(WEATHER_CACHE_KEY) || 'null'); } catch (e) { cache = null; }
+    const isStale = !cache || (Date.now() - cache.fetchedAt) >= WEATHER_STALE_MS;
+    if (!force && cache && !isStale) {
+      applyLiveWeatherData(cache.data);
+      return;
+    }
+    const coords = await getCoords();
+    try {
+      const url = `https://api.weatherapi.com/v1/forecast.json?key=${encodeURIComponent(key)}&q=${coords.lat},${coords.lon}&days=1&aqi=no&alerts=yes`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('WeatherAPI request failed: ' + res.status);
+      const data = await res.json();
+      localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ fetchedAt: Date.now(), data }));
+      applyLiveWeatherData(data);
+    } catch (e) {
+      console.error('Weather fetch failed:', e);
+      if (cache) applyLiveWeatherData(cache.data);
+    }
+  }
+
+  function refreshLiveWeather(force) {
+    loadLiveWeather(!!force);
+  }
+
+  refreshLiveWeather(false);
 
   attachLongPress(document.getElementById('weather-widget'), openWeatherOptions);
 })();
