@@ -302,5 +302,9 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
-_Empty — nothing currently queued._
+### Weather emoji icon frozen at a placeholder sun, regardless of actual conditions
+
+- [ ] **Root cause (confirmed via code search):** `index.html`'s `weather-emoji-btn` button (`<button class="weather-emoji" id="weather-emoji-btn" aria-label="Hourly forecast">☀️</button>`) is a hardcoded static emoji. In script.js it's only ever wired for its click handler (opens a "coming soon" hourly-forecast placeholder) — nothing updates its emoji content based on the actual condition. `renderWeatherExtras()` sets the *text* next to it (`weatherState.conditionText`, e.g. "Overcast") but never touches the emoji itself. Same class of bug as the moon-phase icon fixed in Build Log 15 — a placeholder never wired up.
+- [ ] **Not a fit for the existing `WX_CONDITION_MAP`.** That map only covers precipitation-type codes (rain/snow/fog/thunderstorm) for picking the Live Condition Skin animation, and deliberately has no entries for clear/cloudy/overcast — those intentionally fall through to "clear" for skin purposes. This icon needs its own broader map covering the full range of WeatherAPI condition codes (clear, partly cloudy, cloudy, overcast, fog, drizzle, rain, snow, sleet, thunderstorm, etc.), not a reuse of the skin map.
+- [ ] Fix: build a dedicated code→emoji table for `weather-emoji-btn` and set its textContent from `weatherState.conditionCode` in `renderWeatherExtras()`, alongside the existing text update.
 
