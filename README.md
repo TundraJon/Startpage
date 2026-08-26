@@ -369,6 +369,12 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [ ] **User feedback:** the double-speed 25% of stones aren't visually distinguishable from the rest — they all blend together — and overall the bounce doesn't look realistic enough.
 - [ ] **Requested change:** double the starting `baseSpeed` value itself (7-9 → 14-18), so every stone's bounce height doubles from where it is now. Since the boosted tier is `baseSpeed * 2`, doubling the base cascades automatically — boosted stones become 28-36. No other change to the angle/trig model.
 
+### Wire up dead Testing Panel checkboxes: Partly Cloudy / Cloudy / Overcast
+
+- [ ] **Current behavior (confirmed via grep):** index.html has `.test-condition-skin` checkboxes with `value="partlyCloudy"` and `value="overcast"` (labeled "Partly Cloudy" and "Overcast/Cloudy"), but neither value is referenced anywhere in script.js — checking them does nothing at all. (Live weather's condition icon already handles these correctly via `WX_WEATHER_ICON_MAP` at script.js:521 — ☀️/⛅/☁️/☁️ for codes 1000/1003/1006/1009 — so this is a Testing Panel-only gap, not a live-data bug.)
+- [ ] **Requested change:** split the existing "Overcast/Cloudy" checkbox into two separate ones — "Cloudy" and "Overcast" — keeping "Partly Cloudy", for three checkboxes total. Checking one should preview its weather icon (`weatherEmojiBtn`) using the existing icon map (partlyCloudy → ⛅ / code 1003, cloudy → ☁️ / code 1006, overcast → ☁️ / code 1009). These checkboxes must **not** touch cloud %/opacity/overlay in any way — icon preview only, cloud coverage stays governed solely by the existing cloud % override slider.
+- [ ] **Open question for the user:** Cloudy and Overcast currently share the same ☁️ emoji in `WX_WEATHER_ICON_MAP` — decide whether to keep them identical or give Overcast a distinct icon before/when this is built.
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
