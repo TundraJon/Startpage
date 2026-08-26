@@ -410,11 +410,12 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
   - All drizzle conditions use 🌦️ uniformly — move 1072, 1168, and 1171 from 🌧️ to 🌦️, joining 1150/1153.
   - Blowing snow (1114) gets its own distinct icon, 🌬️, separated out from the general 🌨️ snow group.
 
-### Replace the 8 broad Testing Panel condition checkboxes with one checkbox per exact WeatherAPI condition (48 total)
+### Replace the 8 broad Testing Panel condition checkboxes with one radio button per exact WeatherAPI condition (48 total)
 
-- [ ] **Scope:** supersedes and replaces two now-removed queue items — an earlier "split Overcast/Cloudy into 3 checkboxes, icon preview only" item, and an earlier "wire all 8 existing checkboxes to the icon" item — with full per-code granularity instead. Each of the 48 WeatherAPI condition codes gets its own checkbox, each wired to show the matching icon **and** trigger the matching precipitation/effect animation (not just the icon, per this request).
+- [ ] **Scope:** supersedes and replaces two now-removed queue items — an earlier "split Overcast/Cloudy into 3 checkboxes, icon preview only" item, and an earlier "wire all 8 existing checkboxes to the icon" item — with full per-code granularity instead. Each of the 48 WeatherAPI condition codes gets its own selector, each wired to show the matching icon **and** trigger the matching precipitation/effect animation (not just the icon, per this request).
+- [ ] **Control type, confirmed with the user:** these must be **radio buttons, not checkboxes** — only one condition is ever real at a time, so only one selection should be possible. This also fully replaces the need for a multi-select priority order (see removed open question below) — mutual exclusivity is enforced by the control itself.
 - [ ] **This requires reworking `WX_CONDITION_MAP` (the code→animation map), not just extending it** — several of its existing assignments conflict with the decisions confirmed below (e.g. it currently maps sleet and ice-pellet codes to `snow`, and code 1072 to `snow` as well) and need to change.
-- [ ] **Full code → icon → animation table (animation values: `lightRain`, `heavyRain`, `thunderstorm`, `snow`, `hail`, `fog`, `thunderSnow` (new), or "cloud-only / none" for clear/cloud states):**
+- [ ] **Full code → icon → animation table (animation values: `lightRain`, `heavyRain`, `thunderstorm`, `snow`, `hail`, `fog`, `thunderSnow` (new), `snowFog` (new), or "cloud-only / none" for clear/cloud states):**
 
   | Code | Condition | Icon | Animation |
   |------|-----------|------|-----------|
@@ -441,7 +442,7 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
   | 1072 | Patchy freezing drizzle possible | 🌦️ (per drizzle fix above) | lightRain (by severity) |
   | 1168 | Freezing drizzle | 🌦️ | lightRain (by severity) |
   | 1171 | Heavy freezing drizzle | 🌦️ | heavyRain (by severity) |
-  | 1246 | Torrential rain shower | ⛈️ **(see open question below)** | heavyRain (existing) — icon/animation mismatch flagged |
+  | 1246 | Torrential rain shower | 🌧️ (confirmed — resolves the earlier icon/animation mismatch) | heavyRain |
   | 1087 | Thundery outbreaks possible | ⛈️ | thunderstorm |
   | 1273 | Patchy light rain with thunder | ⛈️ | thunderstorm |
   | 1276 | Moderate or heavy rain with thunder | ⛈️ | thunderstorm |
@@ -458,7 +459,7 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
   | 1249 | Light sleet showers | 🌨️ | hail |
   | 1252 | Moderate or heavy sleet showers | 🌨️ | hail |
   | 1255 | Light snow showers | 🌨️ | snow |
-  | 1117 | Blizzard | ❄️ | snow (assumed default — see open question) |
+  | 1117 | Blizzard | ❄️ | **snowFog (new combined animation, confirmed — snow falling plus the fog effect)** |
   | 1219 | Moderate snow | ❄️ | snow |
   | 1222 | Patchy heavy snow | ❄️ | snow |
   | 1225 | Heavy snow | ❄️ | snow |
@@ -467,11 +468,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
   | 1261 | Light showers of ice pellets | 🧊 | hail |
   | 1264 | Moderate or heavy showers of ice pellets | 🧊 | hail |
 
-- [ ] **New capability needed:** `thunderSnow` doesn't exist yet — it's lightning flashes/bolts (the existing thunderstorm flash system) playing simultaneously with falling snow, instead of the existing thunderstorm behavior which currently forces heavy-rain visuals alongside the lightning. This needs the flash logic decoupled from the `heavy = c.has('heavyRain') || c.has('thunderstorm')` rain-forcing behavior so it can pair with snow instead for these two codes specifically.
-- [ ] **Open questions for whoever builds this:**
-  1. **1246 icon/animation mismatch:** "Torrential rain shower" has a thunderstorm-family icon (⛈️) but a Heavy Rain-only animation (no lightning) in the existing map. Decide whether to change its icon to 🌧️ (matching its actual heavyRain animation) or change its animation to thunderstorm (matching its current icon) — not decided here.
-  2. **Blizzard (1117) / Blowing snow (1114):** defaulted to the plain `snow` animation above (no existing wind-blown variant exists) — confirm this is acceptable, or note if a distinct blowing/wind-driven snow visual is wanted later.
-  3. **Checkbox interaction with 48 items:** the user asked for checkboxes specifically (not radio buttons), but real-world conditions are mutually exclusive — only one code is ever active at once. A priority order is needed for when multiple are checked simultaneously (the earlier 8-category version of this same open question suggested thunderstorm → hail → heavyRain → lightRain → snow → fog → overcast → cloudy → partlyCloudy as a severity-based default); this needs extending to all 48 codes, or the checkboxes could be grouped/organized by category (Clear/Cloud, Rain, Freezing Rain, Thunderstorm, Snow, Sleet/Ice, Fog) to make 48 items manageable in the UI. Neither the priority order nor the UI grouping has been decided yet.
+- [ ] **New capabilities needed — two new combined animations, neither exists yet:**
+  - `thunderSnow`: lightning flashes/bolts (the existing thunderstorm flash system) playing simultaneously with falling snow, instead of the existing thunderstorm behavior which currently forces heavy-rain visuals alongside the lightning. This needs the flash logic decoupled from the `heavy = c.has('heavyRain') || c.has('thunderstorm')` rain-forcing behavior so it can pair with snow instead, for the two thunder+snow codes specifically.
+  - `snowFog` (Blizzard only): the existing snow animation and the existing fog animation running at the same time.
+- [ ] **Open question for whoever builds this:** blowing snow (1114) still defaults to the plain `snow` animation (no existing wind-blown variant) — the user separately floated giving it its own distinct animation (snow falling at an angle) but explicitly asked not to queue that yet; still just `snow` for now, revisit later if/when that's decided.
+- [ ] **Explicitly not queued yet, per the user — for future discussion only:** the user is considering bespoke animation variants for some of these conditions beyond reusing the existing lightRain/heavyRain/snow/hail/fog effects as-is — e.g. blowing snow rendered as snow falling at roughly a 45° angle instead of straight down, torrential rain using larger/denser rain streaks than normal heavy rain, "stuff like that." They're unsure how far to take this, given visual weather effects were never the original intent of this project (a links homepage). Not designed or logged here — noted only so it isn't lost, and only becomes queue work if/when explicitly requested.
 
 ## Build Planner
 
