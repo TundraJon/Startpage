@@ -418,3 +418,7 @@ _Backlog of items to get to eventually — not being actively worked on. Promote
 
 - [ ] No `<link rel="icon">` is declared in `index.html` and no `favicon.ico` file exists in the repo, so browsers automatically request `/favicon.ico` on every load and it 404s. Purely cosmetic (console/server-log noise only), unrelated to any widget functionality. Low priority — planned for the final build stage.
 
+### Possibly reduce HAIL_GRAVITY for a calmer bounce
+
+- [ ] User's note: on top of the queued 75% hail speed cut, `HAIL_GRAVITY` (currently `3` px/frame², script.js) may also need reducing to get a "cool effect" rather than the current "ice Armageddon" look — bounces reading as too chaotic/frantic. Explicitly to revisit *after* seeing the speed-cut build in action, not now — no specific target value decided yet.
+
