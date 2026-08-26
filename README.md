@@ -392,7 +392,23 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
-_Empty — nothing currently queued._
+### Heavy freezing drizzle (1171): change animation from Heavy Rain to Light Rain
+
+- [ ] **Current behavior (confirmed in script.js WX_CONDITIONS):** code 1171 "Heavy freezing drizzle" has `anim: 'heavyRain'`, set per the earlier "freezing rain/drizzle by severity" rule.
+- [ ] **Requested change, confirmed with the user:** change 1171's `anim` to `'lightRain'`. No other freezing-rain/drizzle codes affected — this is specifically about 1171.
+
+### Snow showers (1255, 1258): new combined snow + light rain animation
+
+- [ ] **Current behavior:** "Light snow showers" (1255) and "Moderate or heavy snow showers" (1258) both have `anim: 'snow'` (plain snow, no rain).
+- [ ] **Requested change, confirmed with the user:** both codes get a new composite animation — snow falling together with the Light Rain effect. Following the same pattern already used for `thunderSnow`/`snowFog` (decomposing a composite key into existing base effects via `WX_ANIM_DECOMPOSE` rather than new rendering logic), add `snowRain: ['snow', 'lightRain']` and set both 1255 and 1258 to `anim: 'snowRain'`.
+- [ ] **Note for whoever builds this:** double-check whether the existing `heavy = c.has('heavyRain') || (c.has('thunderstorm') && !c.has('snow'))` rain-forcing guard needs any adjustment for this new composite — `lightRain` isn't part of that heavy-rain-forcing logic at all (it's driven by the separate `c.has('lightRain') ? 17 : 0` branch), so decomposing `snowRain` into `{snow, lightRain}` should just work by simply having both flags active simultaneously, same as the other two composites — but verify this is actually the case once built, the same way `thunderSnow`/`snowFog` were verified.
+
+### Hail: cut baseSpeed to 25% of its current value
+
+- [ ] **Current behavior (confirmed in script.js:1062):** `const baseSpeed = 14 + Math.random() * 4;` (14-18, boosted 25% of stones to 28-36) — this is already-doubled from the pre-Build-Log-18 baseline (7-9/14-18) at the user's earlier request.
+- [ ] **User feedback:** the hail animation is currently far too fast — stones "bouncing all over the place, filling the screen," reading more like a snow flurry than discrete hail.
+- [ ] **Requested change, confirmed with the user:** cut `baseSpeed` to 25% of its current value: `14 + Math.random() * 4` → `3.5 + Math.random() * 1`, so the range becomes 3.5-4.5 (boosted stones 7-9 — notably now *lower* than the pre-doubling original 7-9/14-18 baseline, since this is a 75% cut applied on top of the earlier doubling, not a reversion to the old value).
+- [ ] **Explicitly confirmed consequence:** since `HAIL_GRAVITY` stays unchanged and both bounce height (`vy0²/2g`) and flight time (`2vy0/g`) scale with the launch speed, this cut shrinks bounce arcs proportionally too (roughly to 1/16 the peak height, 1/4 the flight time, at a given angle) — not just the fall speed. The user chose this (full proportional cut) over the alternative (slowing fall speed only, decoupling bounce scale) when asked directly.
 
 ## Build Planner
 
