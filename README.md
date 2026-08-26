@@ -411,6 +411,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [ ] **Explicitly confirmed consequence:** since `HAIL_GRAVITY` stays unchanged and both bounce height (`vy0²/2g`) and flight time (`2vy0/g`) scale with the launch speed, this cut shrinks bounce arcs proportionally too (roughly to 1/16 the peak height, 1/4 the flight time, at a given angle) — not just the fall speed. The user chose this (full proportional cut) over the alternative (slowing fall speed only, decoupling bounce scale) when asked directly.
 - [ ] **Also requested: cut the hailstone count to 75% of current.** Current count is 30 (`for (let i = 0; i < 30; i++)`, script.js:1058); 75% of 30 is 22.5, rounded to 22.
 
+### Sleet showers (1249, 1252): new combined hail + rain animation, split by severity
+
+- [ ] **Current behavior:** all five sleet codes (1069 Patchy sleet possible, 1204 Light sleet, 1207 Moderate or heavy sleet, 1249 Light sleet showers, 1252 Moderate or heavy sleet showers) currently use plain `anim: 'hail'`.
+- [ ] **Requested change, confirmed with the user:** scoped to the two "showers" codes only — 1069/1204/1207 (plain sleet, no "showers" in the name) stay plain `hail`, unchanged. Add two new composites, following the same `WX_ANIM_DECOMPOSE` pattern as `thunderSnow`/`snowFog`/`snowRain`: `hailLightRain: ['hail', 'lightRain']` and `hailHeavyRain: ['hail', 'heavyRain']`. Set 1249 (Light sleet showers) to `anim: 'hailLightRain'` and 1252 (Moderate or heavy sleet showers) to `anim: 'hailHeavyRain'` — split by severity, matching how freezing rain/drizzle already splits Light/Heavy Rain by severity.
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
