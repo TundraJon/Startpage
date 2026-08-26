@@ -375,6 +375,17 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [ ] **Requested change:** split the existing "Overcast/Cloudy" checkbox into two separate ones — "Cloudy" and "Overcast" — keeping "Partly Cloudy", for three checkboxes total. Checking one should preview its weather icon (`weatherEmojiBtn`) using an updated icon map: partly cloudy → 🌤️ / code 1003, cloudy → 🌥️ / code 1006, overcast → ☁️ / code 1009. These checkboxes must **not** touch cloud %/opacity/overlay in any way — icon preview only, cloud coverage stays governed solely by the existing cloud % override slider.
 - [ ] **Icons finalized by the user:** Partly Cloudy = 🌤️, Cloudy = 🌥️, Overcast = ☁️. This also updates `WX_WEATHER_ICON_MAP`'s existing entries for codes 1003 (was ⛅) and 1006 (was ☁️, same as 1009) so live weather picks up the same distinct icons — code 1009 (Overcast) keeps its current ☁️.
 
+### Hail opacity: full opacity through the bounce arc, fade only after the second touchdown
+
+- [ ] **Current behavior (confirmed in script.js:1063-1098):** Fill color is `rgba(230,235,240,0.95)` (95%, not 100%). During the bounce, `globalAlpha = Math.max(0, 1 - p.bounceT/14)` fades the stone from full opacity down to invisible starting at the very first frame of the bounce (`bounceT=0`) — the fade runs across the *entire* bounce, including the initial up-arc, not just after landing again.
+- [ ] **Also discovered while investigating:** the bounce arc's horizontal motion (`x = bounceFromX + bounceHorizontal * ease`) uses the same `ease` scalar as the vertical motion. Since `ease` rises 0→1→0 over the arc, `x` returns exactly to `bounceFromX` at the point the stone comes back down (~bounceT=10) — net zero sideways displacement, and the instantaneous horizontal motion right at that instant is actually reversing back toward the launch point, not continuing outward. There's no usable "direction of travel" to continue from under the current math.
+- [ ] **Requested change, confirmed with the user:**
+  1. Fill alpha → 1.0 (fully opaque), replacing the current 0.95.
+  2. During the initial bounce arc (first touchdown → stone returns to ground level), stay fully opaque — no fade at all during this phase. Vertical motion keeps its current up-then-down `ease` curve.
+  3. Horizontal motion during that same arc changes from the out-and-back `ease`-scaled version to a straight, one-directional linear drift, so the stone is net-displaced sideways by `bounceHorizontal` when it reaches the ground again (rather than returning to its original x) — user confirmed this change.
+  4. The instant the stone touches the ground the second time, start a rapid fade-out (alpha 1 → 0) — and during that fade, keep the stone moving in the same horizontal direction/rate it was already drifting at, rather than freezing in place like the current code does. Once fully faded, reset to a new falling stone at the top as today.
+- [ ] **Open question for whoever builds this:** exact duration of the post-touchdown fade (current code allots ~4-5 frames after the arc before reset) and the exact horizontal rate to continue at during the fade (e.g., same per-frame rate as the arc's linear drift) aren't yet pinned to specific numbers — reasonable defaults can be chosen at build time and adjusted after visual testing, consistent with how prior hail tuning passes worked.
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
