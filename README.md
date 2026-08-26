@@ -365,3 +365,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 _Empty — nothing currently queued._
 
+## Build Planner
+
+_Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
+
+### Add a favicon
+
+- [ ] No `<link rel="icon">` is declared in `index.html` and no `favicon.ico` file exists in the repo, so browsers automatically request `/favicon.ico` on every load and it 404s. Purely cosmetic (console/server-log noise only), unrelated to any widget functionality. Low priority — planned for the final build stage.
+
