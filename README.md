@@ -409,6 +409,7 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [ ] **User feedback:** the hail animation is currently far too fast — stones "bouncing all over the place, filling the screen," reading more like a snow flurry than discrete hail.
 - [ ] **Requested change, confirmed with the user:** cut `baseSpeed` to 25% of its current value: `14 + Math.random() * 4` → `3.5 + Math.random() * 1`, so the range becomes 3.5-4.5 (boosted stones 7-9 — notably now *lower* than the pre-doubling original 7-9/14-18 baseline, since this is a 75% cut applied on top of the earlier doubling, not a reversion to the old value).
 - [ ] **Explicitly confirmed consequence:** since `HAIL_GRAVITY` stays unchanged and both bounce height (`vy0²/2g`) and flight time (`2vy0/g`) scale with the launch speed, this cut shrinks bounce arcs proportionally too (roughly to 1/16 the peak height, 1/4 the flight time, at a given angle) — not just the fall speed. The user chose this (full proportional cut) over the alternative (slowing fall speed only, decoupling bounce scale) when asked directly.
+- [ ] **Also requested: cut the hailstone count to 75% of current.** Current count is 30 (`for (let i = 0; i < 30; i++)`, script.js:1058); 75% of 30 is 22.5, rounded to 22.
 
 ## Build Planner
 
