@@ -369,12 +369,6 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [ ] **User feedback:** the double-speed 25% of stones aren't visually distinguishable from the rest — they all blend together — and overall the bounce doesn't look realistic enough.
 - [ ] **Requested change:** double the starting `baseSpeed` value itself (7-9 → 14-18), so every stone's bounce height doubles from where it is now. Since the boosted tier is `baseSpeed * 2`, doubling the base cascades automatically — boosted stones become 28-36. No other change to the angle/trig model.
 
-### Wire up dead Testing Panel checkboxes: Partly Cloudy / Cloudy / Overcast
-
-- [ ] **Current behavior (confirmed via grep):** index.html has `.test-condition-skin` checkboxes with `value="partlyCloudy"` and `value="overcast"` (labeled "Partly Cloudy" and "Overcast/Cloudy"), but neither value is referenced anywhere in script.js — checking them does nothing at all. (Live weather's condition icon already handles these correctly via `WX_WEATHER_ICON_MAP` at script.js:521 — ☀️/⛅/☁️/☁️ for codes 1000/1003/1006/1009 — so this is a Testing Panel-only gap, not a live-data bug.)
-- [ ] **Requested change:** split the existing "Overcast/Cloudy" checkbox into two separate ones — "Cloudy" and "Overcast" — keeping "Partly Cloudy", for three checkboxes total. Checking one should preview its weather icon (`weatherEmojiBtn`) using an updated icon map: partly cloudy → 🌤️ / code 1003, cloudy → 🌥️ / code 1006, overcast → ☁️ / code 1009. These checkboxes must **not** touch cloud %/opacity/overlay in any way — icon preview only, cloud coverage stays governed solely by the existing cloud % override slider.
-- [ ] **Icons finalized by the user:** Partly Cloudy = 🌤️, Cloudy = 🌥️, Overcast = ☁️. This also updates `WX_WEATHER_ICON_MAP`'s existing entries for codes 1003 (was ⛅) and 1006 (was ☁️, same as 1009) so live weather picks up the same distinct icons — code 1009 (Overcast) keeps its current ☁️.
-
 ### Hail opacity: full opacity through the bounce arc, fade only after the second touchdown
 
 - [ ] **Current behavior (confirmed in script.js:1063-1098):** Fill color is `rgba(230,235,240,0.95)` (95%, not 100%). During the bounce, `globalAlpha = Math.max(0, 1 - p.bounceT/14)` fades the stone from full opacity down to invisible starting at the very first frame of the bounce (`bounceT=0`) — the fade runs across the *entire* bounce, including the initial up-arc, not just after landing again.
@@ -407,17 +401,6 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [ ] **Current default (confirmed in script.js:789 and 1380):** `WX_FOG_TUNABLES.blobCount = 4`, and the Testing Panel's reset button also restores it to 4.
 - [ ] **Requested change:** change the default (and the reset-button value) from 4 to 5.
 
-### All Testing Panel condition checkboxes should also drive the weather condition icon
-
-- [ ] **Current behavior:** `weatherEmojiBtn`'s icon is only ever set from real live data (`weatherIconForCode(weatherState.conditionCode)` in `renderWeatherExtras()`). None of the 8 `.test-condition-skin` checkboxes (Partly Cloudy, Overcast/Cloudy, Light Rain, Heavy Rain, Thunderstorm, Snow, Fog/Mist, Hail) touch the icon at all when checked in the Testing Panel — only the visual precip/skin effect changes.
-- [ ] **Requested change:** checking a condition checkbox should also preview that condition's icon on `weatherEmojiBtn`, overriding the live icon while any test condition is active; unchecking all of them (or Reset) reverts to the real live-data icon as today.
-- [ ] **Icon per condition (mostly unambiguous, reusing `WX_WEATHER_ICON_MAP`'s existing emoji):**
-  - Light Rain → 🌦️, Heavy Rain → 🌧️, Thunderstorm → ⛈️, Fog/Mist → 🌫️ (each already has exactly one matching icon in the live map).
-  - Partly Cloudy → 🌤️, Cloudy → 🌥️, Overcast → ☁️ (per the icon choices already finalized in the queue item above, once that checkbox split is built).
-  - Hail → 🧊 (confirmed with the user — reuses the existing ice-pellet icon; hail has no dedicated code/icon in the live map).
-  - Snow → 🌨️ (the live map has three snow-severity icons — 🌨️ light, ❄️ heavy, 🧊 ice pellets; user had no preference between them, so 🌨️ is picked here as a reasonable single default for the one "Snow" checkbox — happy to swap if it doesn't look right once built).
-- [ ] **Open question for whoever builds this:** the Testing Panel allows multiple condition checkboxes at once (e.g. Overcast + Rain). Not yet specified which icon should win when more than one is checked — a severity-based priority order consistent with how the rest of the code already prioritizes conditions (e.g. `conditionShiftPct` checks thunderstorm, then heavyRain, then lightRain, in that order) would be a reasonable default: thunderstorm → hail → heavyRain → lightRain → snow → fog → overcast → cloudy → partlyCloudy. Confirm or adjust before/at build time.
-
 ### Weather icon corrections: drizzle and blowing snow
 
 - [ ] **Current behavior (confirmed in `WX_WEATHER_ICON_MAP`, script.js:521-530):**
@@ -426,6 +409,69 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [ ] **Requested change, confirmed with the user:**
   - All drizzle conditions use 🌦️ uniformly — move 1072, 1168, and 1171 from 🌧️ to 🌦️, joining 1150/1153.
   - Blowing snow (1114) gets its own distinct icon, 🌬️, separated out from the general 🌨️ snow group.
+
+### Replace the 8 broad Testing Panel condition checkboxes with one checkbox per exact WeatherAPI condition (48 total)
+
+- [ ] **Scope:** supersedes and replaces two now-removed queue items — an earlier "split Overcast/Cloudy into 3 checkboxes, icon preview only" item, and an earlier "wire all 8 existing checkboxes to the icon" item — with full per-code granularity instead. Each of the 48 WeatherAPI condition codes gets its own checkbox, each wired to show the matching icon **and** trigger the matching precipitation/effect animation (not just the icon, per this request).
+- [ ] **This requires reworking `WX_CONDITION_MAP` (the code→animation map), not just extending it** — several of its existing assignments conflict with the decisions confirmed below (e.g. it currently maps sleet and ice-pellet codes to `snow`, and code 1072 to `snow` as well) and need to change.
+- [ ] **Full code → icon → animation table (animation values: `lightRain`, `heavyRain`, `thunderstorm`, `snow`, `hail`, `fog`, `thunderSnow` (new), or "cloud-only / none" for clear/cloud states):**
+
+  | Code | Condition | Icon | Animation |
+  |------|-----------|------|-----------|
+  | 1000 | Sunny / Clear | ☀️ | none (clear) |
+  | 1003 | Partly cloudy | 🌤️ | none (cloud-tint only) |
+  | 1006 | Cloudy | 🌥️ | none (cloud-tint only) |
+  | 1009 | Overcast | ☁️ | none (cloud-tint only) |
+  | 1030 | Mist | 🌫️ | fog |
+  | 1135 | Fog | 🌫️ | fog |
+  | 1147 | Freezing fog | 🌫️ | fog |
+  | 1063 | Patchy rain possible | 🌦️ | lightRain |
+  | 1150 | Patchy light drizzle | 🌦️ | lightRain |
+  | 1153 | Light drizzle | 🌦️ | lightRain |
+  | 1180 | Patchy light rain | 🌦️ | lightRain |
+  | 1240 | Light rain shower | 🌦️ | lightRain |
+  | 1183 | Light rain | 🌧️ | lightRain |
+  | 1186 | Moderate rain at times | 🌧️ | lightRain (existing severity split) |
+  | 1189 | Moderate rain | 🌧️ | lightRain (existing severity split) |
+  | 1192 | Heavy rain at times | 🌧️ | heavyRain |
+  | 1195 | Heavy rain | 🌧️ | heavyRain |
+  | 1198 | Light freezing rain | 🌧️ | lightRain (freezing rain/drizzle by severity, confirmed) |
+  | 1201 | Moderate or heavy freezing rain | 🌧️ | heavyRain (by severity) |
+  | 1243 | Moderate or heavy rain shower | 🌧️ | heavyRain |
+  | 1072 | Patchy freezing drizzle possible | 🌦️ (per drizzle fix above) | lightRain (by severity) |
+  | 1168 | Freezing drizzle | 🌦️ | lightRain (by severity) |
+  | 1171 | Heavy freezing drizzle | 🌦️ | heavyRain (by severity) |
+  | 1246 | Torrential rain shower | ⛈️ **(see open question below)** | heavyRain (existing) — icon/animation mismatch flagged |
+  | 1087 | Thundery outbreaks possible | ⛈️ | thunderstorm |
+  | 1273 | Patchy light rain with thunder | ⛈️ | thunderstorm |
+  | 1276 | Moderate or heavy rain with thunder | ⛈️ | thunderstorm |
+  | 1279 | Patchy light snow with thunder | ⛈️ | **thunderSnow (new combined animation, confirmed)** |
+  | 1282 | Moderate or heavy snow with thunder | ⛈️ | **thunderSnow (new)** |
+  | 1066 | Patchy snow possible | 🌨️ | snow |
+  | 1069 | Patchy sleet possible | 🌨️ | **hail (confirmed — sleet reuses hail bounce)** |
+  | 1114 | Blowing snow | 🌬️ (per icon fix above) | snow (assumed default — see open question) |
+  | 1204 | Light sleet | 🌨️ | hail |
+  | 1207 | Moderate or heavy sleet | 🌨️ | hail |
+  | 1210 | Patchy light snow | 🌨️ | snow |
+  | 1213 | Light snow | 🌨️ | snow |
+  | 1216 | Patchy moderate snow | 🌨️ | snow |
+  | 1249 | Light sleet showers | 🌨️ | hail |
+  | 1252 | Moderate or heavy sleet showers | 🌨️ | hail |
+  | 1255 | Light snow showers | 🌨️ | snow |
+  | 1117 | Blizzard | ❄️ | snow (assumed default — see open question) |
+  | 1219 | Moderate snow | ❄️ | snow |
+  | 1222 | Patchy heavy snow | ❄️ | snow |
+  | 1225 | Heavy snow | ❄️ | snow |
+  | 1258 | Moderate or heavy snow showers | ❄️ | snow |
+  | 1237 | Ice pellets | 🧊 | hail (confirmed) |
+  | 1261 | Light showers of ice pellets | 🧊 | hail |
+  | 1264 | Moderate or heavy showers of ice pellets | 🧊 | hail |
+
+- [ ] **New capability needed:** `thunderSnow` doesn't exist yet — it's lightning flashes/bolts (the existing thunderstorm flash system) playing simultaneously with falling snow, instead of the existing thunderstorm behavior which currently forces heavy-rain visuals alongside the lightning. This needs the flash logic decoupled from the `heavy = c.has('heavyRain') || c.has('thunderstorm')` rain-forcing behavior so it can pair with snow instead for these two codes specifically.
+- [ ] **Open questions for whoever builds this:**
+  1. **1246 icon/animation mismatch:** "Torrential rain shower" has a thunderstorm-family icon (⛈️) but a Heavy Rain-only animation (no lightning) in the existing map. Decide whether to change its icon to 🌧️ (matching its actual heavyRain animation) or change its animation to thunderstorm (matching its current icon) — not decided here.
+  2. **Blizzard (1117) / Blowing snow (1114):** defaulted to the plain `snow` animation above (no existing wind-blown variant exists) — confirm this is acceptable, or note if a distinct blowing/wind-driven snow visual is wanted later.
+  3. **Checkbox interaction with 48 items:** the user asked for checkboxes specifically (not radio buttons), but real-world conditions are mutually exclusive — only one code is ever active at once. A priority order is needed for when multiple are checked simultaneously (the earlier 8-category version of this same open question suggested thunderstorm → hail → heavyRain → lightRain → snow → fog → overcast → cloudy → partlyCloudy as a severity-based default); this needs extending to all 48 codes, or the checkboxes could be grouped/organized by category (Clear/Cloud, Rain, Freezing Rain, Thunderstorm, Snow, Sleet/Ice, Fog) to make 48 items manageable in the UI. Neither the priority order nor the UI grouping has been decided yet.
 
 ## Build Planner
 
