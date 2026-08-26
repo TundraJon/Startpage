@@ -361,118 +361,38 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 - [x] Cycled through every condition, clear day/night, a Live Skin off/on toggle, and Reset to defaults — zero errors beyond the pre-existing unrelated favicon 404. Reset correctly restored the night-brightness slider to its new default of 300.
 
+## Build Log 18 (completed)
+
+### Hail bounce height doubled, then rebuilt on true projectile-motion physics
+
+- [x] Doubled the starting `baseSpeed` (7-9 → 14-18), cascading into the existing 25%-boosted tier (28-36) automatically, per the user's report that the boosted stones weren't visually distinguishable from the rest.
+- [x] Replaced the sine-`ease` bounce arc entirely with real constant-acceleration projectile motion on both axes: `heightAboveGround = vy0*t - 0.5*g*t²` for a true gravity parabola, `x = bounceFromX + vx0*t` for constant-velocity horizontal drift (no more snapping back to the launch point — the old shared-`ease`-for-both-axes bug the user caught and pushed back on hard, correctly pointing out that "physics-accurate" has to apply to every part, not just the piece that was easy to fix). `vy0`/`vx0` still come from the existing energy-conservation trig split (`speed × cos/sin(bounceAngle)`), so the physically-correct launch vector work from Build Log 17 is preserved, just now driving real kinematics instead of an eased curve. `HAIL_GRAVITY = 3` px/frame² was the calibration chosen so a typical stone's flight time lands in the widget's visual scale; harder/faster bounces now correctly arc higher **and** stay airborne longer as a direct, intended consequence of the physics (not a fixed duration for every stone).
+- [x] Fill alpha raised to 1.0 (was 0.95). Stones now stay fully opaque for the entire arc — the fade-out starts only at the exact instant `heightAboveGround` returns to ≤0 (the real second touchdown), and during that fade the stone keeps drifting at its already-established constant horizontal velocity rather than freezing in place, fading to invisible over 6 frames before resetting to a new falling stone.
+- [x] Verified with a deterministic `Math.random()` override: hand-calculated `vy0`/`vx0`/height-per-frame values matched the measured canvas trajectory almost exactly across 11 traced arc frames (sub-pixel agreement); fade timing (opaque through the whole arc, fade starting exactly on the touchdown frame, 6-frame fade, reset on schedule) also matched precisely. The one thing the pixel-based test couldn't directly read was the intermediate per-stone alpha values, because the deterministic override makes all 30 hailstones bit-for-bit identical and they stack on the same pixel — 30 overlapping semi-transparent draws composite toward full opacity almost immediately (a measurement artifact of the test, not the code); the fade window's start/duration/end, which is what the spec actually cared about, was confirmed exactly.
+
+### Daytime cloud overlay opacity cap raised from 50% to 75%
+
+- [x] `cloudOverlayOpacity`'s daytime formula changed from `cloudPct / 2 / 100` to `cloudPct * 0.75 / 100`, so 100% cloud cover now reaches 75% opacity instead of 50% — addressing the report that too much sky color was bleeding through at full daytime cloud cover. Nighttime formula unchanged. Verified: 100% cloud cover at midday now measures exactly `0.75`.
+
+### Night cloud tint desaturated toward gray (new tunable slider)
+
+- [x] The night cloud tint was a straight per-channel brightness multiply of the navy night sky color, which preserves hue regardless of tuning — it could never look gray no matter how the brightness percentage was set. Added a new `nightGrayBlendPct` tunable (default 50%) that blends the brightened tint toward a neutral gray (computed as the average of its own R/G/B channels) by that percentage, applied only at night. New "Night gray blend" slider added to the Testing Panel under Cloud Brightness Formula, with reset support.
+- [x] Verified: at 100% blend the resulting tint hex has R=G=B exactly (confirmed genuinely neutral gray, not just "less blue"), and differs from the 50%-default tint as expected.
+
+### Fog blob count default changed to 5
+
+- [x] `WX_FOG_TUNABLES.blobCount` default and the Testing Panel reset value both changed from 4 to 5, along with the HTML slider's default value/label. Verified via the reset button and the slider's initial value.
+
+### Weather icon and animation overhaul: one radio button per exact WeatherAPI condition (48 total)
+
+- [x] Replaced the two separate per-code maps (`WX_WEATHER_ICON_MAP` for icons, `WX_CONDITION_MAP` for the Live Condition Skin animation) with one single source of truth, `WX_CONDITIONS`, keyed by every WeatherAPI condition code WeatherAPI defines, holding that code's display text, icon, and animation together. Fixes several inconsistencies found while building this: all drizzle conditions (including the freezing-drizzle codes, previously grouped with plain rain) now uniformly use 🌦️; Blowing snow gets its own 🌬️ instead of sharing the general snow icon; Partly Cloudy/Cloudy/Overcast now use distinct 🌤️/🌥️/☁️ instead of two of them sharing an icon; Torrential rain shower's icon changed to 🌧️ to match its actual Heavy Rain animation (it previously had a thunderstorm-family icon despite never producing lightning).
+- [x] Added two new composite animations neither of which existed before: `thunderSnow` (lightning flashes/bolts playing simultaneously with falling snow, for the two snow-with-thunder codes) and `snowFog` (falling snow plus the fog effect together, for Blizzard). Both are implemented by decomposing the composite into its base effects (`thunderSnow` → `{thunderstorm, snow}`, `snowFog` → `{snow, fog}`) via a small `WX_ANIM_DECOMPOSE` table, rather than adding dedicated rendering logic — every existing piece of condition-skin code (particle creation, the thunderstorm flash trigger, cloud-tint darkening) already composes correctly from those base effects with no further changes. The one exception: the existing "a thunderstorm forces the heavy-rain visual" rule had to be narrowed to "...unless snow is also active," so `thunderSnow` shows falling snow instead of rain alongside the lightning.
+- [x] Replaced the Testing Panel's 8 broad, mostly-unwired checkboxes with 48 radio buttons — one per exact WeatherAPI condition, grouped under category subheadings (Clear & Cloud, Fog, Rain & Drizzle, Freezing Rain & Drizzle, Thunderstorm, Snow, Sleet & Ice) — plus a "Live / No Override" option, since only one real condition is ever active at once (checkboxes previously allowed nonsensical multi-selects and needed a priority-order scheme this eliminates entirely). Selecting one now sets both the previewed weather icon and the previewed animation together. Sleet and ice-pellet codes now trigger the Hail bounce animation (previously lumped in with Snow); freezing rain/drizzle codes split into Light/Heavy Rain by severity, matching how plain rain already worked.
+- [x] Verified: spot-checked 9 icon corrections across the categories (all matched exactly), confirmed `thunderSnow` produces both a lightning flash within its normal timing window and visible falling-snow pixels with no rain, confirmed `snowFog` (Blizzard) produces both snow and heavy fog coverage simultaneously, confirmed Reset returns to "Live / No Override" and restores all slider defaults, and swept all 49 radio values (48 conditions + Live) with zero real errors (only the pre-existing, unrelated favicon 404 appeared).
+
 ## Build Queue
 
-### Double hail bounce height baseline
-
-- [ ] **Current behavior (confirmed in script.js:980-983):** `baseSpeed = 7 + Math.random() * 2` (7-9). Non-boosted stones (75%) use `speed = baseSpeed` (7-9); the boosted 25% use `speed = baseSpeed * 2` (14-18). This `speed` value feeds the trig split (`bounceVertical = speed * cos(bounceAngle)`, `bounceHorizontal = speed * sin(bounceAngle)`), so it's the number that ultimately sets bounce height/trajectory for every stone.
-- [ ] **User feedback:** the double-speed 25% of stones aren't visually distinguishable from the rest — they all blend together — and overall the bounce doesn't look realistic enough.
-- [ ] **Requested change:** double the starting `baseSpeed` value itself (7-9 → 14-18), so every stone's bounce height doubles from where it is now. Since the boosted tier is `baseSpeed * 2`, doubling the base cascades automatically — boosted stones become 28-36. No other change to the angle/trig model.
-
-### Hail opacity: full opacity through the bounce arc, fade only after the second touchdown
-
-- [ ] **Current behavior (confirmed in script.js:1063-1098):** Fill color is `rgba(230,235,240,0.95)` (95%, not 100%). During the bounce, `globalAlpha = Math.max(0, 1 - p.bounceT/14)` fades the stone from full opacity down to invisible starting at the very first frame of the bounce (`bounceT=0`) — the fade runs across the *entire* bounce, including the initial up-arc, not just after landing again.
-- [ ] **Also discovered while investigating, and flagged as a real physics-accuracy break, not just a display nit:** the bounce arc's horizontal motion (`x = bounceFromX + bounceHorizontal * ease`) reuses the same sine-based `ease` scalar as the vertical motion. Since `ease` rises 0→1→0 over the arc, `x` returns exactly to `bounceFromX` when the stone comes back down (~bounceT=10) — net zero sideways displacement, with the stone's instantaneous horizontal motion actually reversing back toward the launch point right at that instant instead of continuing outward. Separately, the vertical curve itself (`sin(...)`) was only ever a smooth-looking approximation, not real constant-acceleration gravity — so neither axis was true projectile physics, despite the earlier bounce-vector work (energy-conservation trig split into `bounceVertical`/`bounceHorizontal`) getting the *initial* launch velocity components physically correct.
-- [ ] **User's standing rule, established here:** when something is meant to be physics-accurate, every part of it must be — not just the part that happens to be easy to fix. Ask before taking a shortcut that would compromise that, rather than deciding unilaterally.
-- [ ] **Requested change, confirmed with the user — full projectile motion on both axes:**
-  1. Fill alpha → 1.0 (fully opaque), replacing the current 0.95.
-  2. Replace the sine-`ease` arc entirely with true constant-acceleration projectile motion, using the existing `bounceVertical`/`bounceHorizontal` (from the energy-conservation trig split) as the initial launch velocity components `vy0`/`vx0`:
-     - Vertical: `heightAboveGround = vy0 * t - 0.5 * g * t²` (a real gravity parabola, not a sine curve); `p.y = bounceFromY - heightAboveGround`.
-     - Horizontal: `p.x = bounceFromX + vx0 * t` (constant velocity — no deceleration, no reversal).
-     - `t` advances by one unit per frame (matching how `p.speed` is already pixels/frame); `g` is a new gravity constant to calibrate at build time so a typical-speed stone's flight time roughly matches the current bounce's visual scale — needs empirical tuning/verification, but the shape must be a true parabola, not an approximation.
-     - A deliberate, physically-correct consequence: since flight time under gravity is `2*vy0/g`, harder/faster bounces (the 25%-boosted stones, and shallower launch angles with more vertical component) will now arc **higher and stay airborne longer**, not just higher over the same fixed duration as today. This is expected and correct, not a bug to "fix" back to a fixed duration.
-  3. The instant `heightAboveGround` returns to 0 (the real physics-derived second touchdown, not a fixed frame count), stay fully opaque up to that point — no fade at all during the arc.
-  4. At that exact touchdown moment, start a rapid fade-out (alpha 1 → 0) — and during that fade, keep the stone drifting horizontally at the same constant `vx0` rate it was already using (simple continuation of the same linear motion, not a new formula), while `y` stays at ground level. Once fully faded, reset to a new falling stone at the top as today.
-- [ ] **Open question for whoever builds this:** the gravity constant `g` and the post-touchdown fade duration aren't pinned to specific numbers yet — reasonable defaults can be chosen at build time and adjusted after visual testing (deterministic `Math.random()` verification, as used for the original trig bounce model, is the right way to confirm the parabola math matches hand-calculated positions before calling it done).
-
-### Raise daytime cloud overlay opacity cap from 50% to 75% at 100% cloud cover
-
-- [ ] **Current behavior (confirmed in script.js:823-825):** `cloudOverlayOpacity(cloudPct, daytime) { return daytime ? cloudPct / 2 / 100 : cloudPct / 100; }`. Daytime opacity maxes out at 50% (100% cloud cover ÷ 2 ÷ 100), which is why too much sky color still shows through at full daytime cloud cover. Nighttime already scales straight to 100% opacity at 100% cloud cover and is unaffected by this.
-- [ ] **Requested change:** change the daytime scale so 100% cloud cover produces 75% overlay opacity instead of 50% — i.e. replace the `/2` with a `* 0.75` (`cloudPct * 0.75 / 100`), keeping 0% cloud cover still fully transparent. Nighttime formula stays exactly as-is.
-
-### Night cloud tint reads too blue — needs desaturation toward gray
-
-- [ ] **Current behavior (confirmed in script.js:813-821):** `computeCloudTint` takes the night sky color (`DEEP_NIGHT_SKY` = `#020617`, a deep navy — R2 G6 B23) and multiplies every channel by the same scalar (`rgb = skyRgb.map(v => v * multiplier)`, multiplier up to ~4x at night). A per-channel scalar multiply preserves hue exactly — it only changes brightness. So the night cloud tint will always read as blue/navy no matter how the night-brightness percentage is tuned; brightness and "grayness" are two different things this formula conflates.
-- [ ] **User feedback:** night clouds look a little too blue, want them more gray.
-- [ ] **Requested fix, confirmed with the user:** after computing the brightened tint color, blend it toward a neutral gray by a tunable percentage — add a new Testing Panel slider (consistent with the existing cloud-brightness and fog-tunable sliders) for this blend amount so it can be adjusted visually. Suggested approach: compute a neutral gray from the tint's own channels (e.g. average of R/G/B, or luminance) and `lerpRgb(tintRgb, grayRgb, blendPct/100)`; exact target gray calculation and default blend % can be chosen at build time and tuned visually, same as prior cloud/fog formula work. Scope is night only — daytime cloud tint isn't reported as having this problem.
-
-### Set fog density blob count default to 5
-
-- [ ] **Current default (confirmed in script.js:789 and 1380):** `WX_FOG_TUNABLES.blobCount = 4`, and the Testing Panel's reset button also restores it to 4.
-- [ ] **Requested change:** change the default (and the reset-button value) from 4 to 5.
-
-### Weather icon corrections: drizzle and blowing snow
-
-- [ ] **Current behavior (confirmed in `WX_WEATHER_ICON_MAP`, script.js:521-530):**
-  - Drizzle icons are currently split: codes 1150 (Patchy light drizzle) and 1153 (Light drizzle) already use 🌦️, but the freezing-drizzle codes — 1072 (Patchy freezing drizzle possible), 1168 (Freezing drizzle), 1171 (Heavy freezing drizzle) — are grouped with plain rain and use 🌧️ instead.
-  - Blowing snow (code 1114) is grouped with the general snow icon 🌨️, same as patchy/light/moderate snow.
-- [ ] **Requested change, confirmed with the user:**
-  - All drizzle conditions use 🌦️ uniformly — move 1072, 1168, and 1171 from 🌧️ to 🌦️, joining 1150/1153.
-  - Blowing snow (1114) gets its own distinct icon, 🌬️, separated out from the general 🌨️ snow group.
-
-### Replace the 8 broad Testing Panel condition checkboxes with one radio button per exact WeatherAPI condition (48 total)
-
-- [ ] **Scope:** supersedes and replaces two now-removed queue items — an earlier "split Overcast/Cloudy into 3 checkboxes, icon preview only" item, and an earlier "wire all 8 existing checkboxes to the icon" item — with full per-code granularity instead. Each of the 48 WeatherAPI condition codes gets its own selector, each wired to show the matching icon **and** trigger the matching precipitation/effect animation (not just the icon, per this request).
-- [ ] **Control type, confirmed with the user:** these must be **radio buttons, not checkboxes** — only one condition is ever real at a time, so only one selection should be possible. This also fully replaces the need for a multi-select priority order (see removed open question below) — mutual exclusivity is enforced by the control itself.
-- [ ] **This requires reworking `WX_CONDITION_MAP` (the code→animation map), not just extending it** — several of its existing assignments conflict with the decisions confirmed below (e.g. it currently maps sleet and ice-pellet codes to `snow`, and code 1072 to `snow` as well) and need to change.
-- [ ] **Full code → icon → animation table (animation values: `lightRain`, `heavyRain`, `thunderstorm`, `snow`, `hail`, `fog`, `thunderSnow` (new), `snowFog` (new), or "cloud-only / none" for clear/cloud states):**
-
-  | Code | Condition | Icon | Animation |
-  |------|-----------|------|-----------|
-  | 1000 | Sunny / Clear | ☀️ | none (clear) |
-  | 1003 | Partly cloudy | 🌤️ | none (cloud-tint only) |
-  | 1006 | Cloudy | 🌥️ | none (cloud-tint only) |
-  | 1009 | Overcast | ☁️ | none (cloud-tint only) |
-  | 1030 | Mist | 🌫️ | fog |
-  | 1135 | Fog | 🌫️ | fog |
-  | 1147 | Freezing fog | 🌫️ | fog |
-  | 1063 | Patchy rain possible | 🌦️ | lightRain |
-  | 1150 | Patchy light drizzle | 🌦️ | lightRain |
-  | 1153 | Light drizzle | 🌦️ | lightRain |
-  | 1180 | Patchy light rain | 🌦️ | lightRain |
-  | 1240 | Light rain shower | 🌦️ | lightRain |
-  | 1183 | Light rain | 🌧️ | lightRain |
-  | 1186 | Moderate rain at times | 🌧️ | lightRain (existing severity split) |
-  | 1189 | Moderate rain | 🌧️ | lightRain (existing severity split) |
-  | 1192 | Heavy rain at times | 🌧️ | heavyRain |
-  | 1195 | Heavy rain | 🌧️ | heavyRain |
-  | 1198 | Light freezing rain | 🌧️ | lightRain (freezing rain/drizzle by severity, confirmed) |
-  | 1201 | Moderate or heavy freezing rain | 🌧️ | heavyRain (by severity) |
-  | 1243 | Moderate or heavy rain shower | 🌧️ | heavyRain |
-  | 1072 | Patchy freezing drizzle possible | 🌦️ (per drizzle fix above) | lightRain (by severity) |
-  | 1168 | Freezing drizzle | 🌦️ | lightRain (by severity) |
-  | 1171 | Heavy freezing drizzle | 🌦️ | heavyRain (by severity) |
-  | 1246 | Torrential rain shower | 🌧️ (confirmed — resolves the earlier icon/animation mismatch) | heavyRain |
-  | 1087 | Thundery outbreaks possible | ⛈️ | thunderstorm |
-  | 1273 | Patchy light rain with thunder | ⛈️ | thunderstorm |
-  | 1276 | Moderate or heavy rain with thunder | ⛈️ | thunderstorm |
-  | 1279 | Patchy light snow with thunder | ⛈️ | **thunderSnow (new combined animation, confirmed)** |
-  | 1282 | Moderate or heavy snow with thunder | ⛈️ | **thunderSnow (new)** |
-  | 1066 | Patchy snow possible | 🌨️ | snow |
-  | 1069 | Patchy sleet possible | 🌨️ | **hail (confirmed — sleet reuses hail bounce)** |
-  | 1114 | Blowing snow | 🌬️ (per icon fix above) | snow (assumed default — see open question) |
-  | 1204 | Light sleet | 🌨️ | hail |
-  | 1207 | Moderate or heavy sleet | 🌨️ | hail |
-  | 1210 | Patchy light snow | 🌨️ | snow |
-  | 1213 | Light snow | 🌨️ | snow |
-  | 1216 | Patchy moderate snow | 🌨️ | snow |
-  | 1249 | Light sleet showers | 🌨️ | hail |
-  | 1252 | Moderate or heavy sleet showers | 🌨️ | hail |
-  | 1255 | Light snow showers | 🌨️ | snow |
-  | 1117 | Blizzard | ❄️ | **snowFog (new combined animation, confirmed — snow falling plus the fog effect)** |
-  | 1219 | Moderate snow | ❄️ | snow |
-  | 1222 | Patchy heavy snow | ❄️ | snow |
-  | 1225 | Heavy snow | ❄️ | snow |
-  | 1258 | Moderate or heavy snow showers | ❄️ | snow |
-  | 1237 | Ice pellets | 🧊 | hail (confirmed) |
-  | 1261 | Light showers of ice pellets | 🧊 | hail |
-  | 1264 | Moderate or heavy showers of ice pellets | 🧊 | hail |
-
-- [ ] **New capabilities needed — two new combined animations, neither exists yet:**
-  - `thunderSnow`: lightning flashes/bolts (the existing thunderstorm flash system) playing simultaneously with falling snow, instead of the existing thunderstorm behavior which currently forces heavy-rain visuals alongside the lightning. This needs the flash logic decoupled from the `heavy = c.has('heavyRain') || c.has('thunderstorm')` rain-forcing behavior so it can pair with snow instead, for the two thunder+snow codes specifically.
-  - `snowFog` (Blizzard only): the existing snow animation and the existing fog animation running at the same time.
-- [ ] **Open question for whoever builds this:** blowing snow (1114) still defaults to the plain `snow` animation (no existing wind-blown variant) — the user separately floated giving it its own distinct animation (snow falling at an angle) but explicitly asked not to queue that yet; still just `snow` for now, revisit later if/when that's decided.
-- [ ] **Explicitly not queued yet, per the user — for future discussion only:** the user is considering bespoke animation variants for some of these conditions beyond reusing the existing lightRain/heavyRain/snow/hail/fog effects as-is — e.g. blowing snow rendered as snow falling at roughly a 45° angle instead of straight down, torrential rain using larger/denser rain streaks than normal heavy rain, "stuff like that." They're unsure how far to take this, given visual weather effects were never the original intent of this project (a links homepage). Not designed or logged here — noted only so it isn't lost, and only becomes queue work if/when explicitly requested.
+_Empty — nothing currently queued._
 
 ## Build Planner
 

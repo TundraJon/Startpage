@@ -738,6 +738,15 @@ main {
   margin: 0 0 8px;
 }
 
+.testing-subhead {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--fg-muted);
+  opacity: 0.75;
+  margin: 14px 0 4px;
+}
+
 .option-row {
   display: flex;
   align-items: center;
@@ -751,7 +760,8 @@ main {
   border-bottom: none;
 }
 
-.option-row input[type="checkbox"] {
+.option-row input[type="checkbox"],
+.option-row input[type="radio"] {
   width: 20px;
   height: 20px;
   accent-color: var(--home-header-bg);

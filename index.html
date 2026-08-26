@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home</title>
-<link rel="stylesheet" href="styles.css?v=14">
+<link rel="stylesheet" href="styles.css?v=15">
 </head>
 <body>
 
@@ -267,15 +267,70 @@
 
     <section class="options-section">
       <h3>Preview Condition Skins</h3>
-      <p class="testing-note">Overrides the live skin regardless of actual conditions. Multi-select for compound previews (e.g. Thunderstorm + Hail).</p>
-      <label class="option-row"><span>Partly Cloudy</span><input type="checkbox" class="test-condition-skin" value="partlyCloudy"></label>
-      <label class="option-row"><span>Overcast/Cloudy</span><input type="checkbox" class="test-condition-skin" value="overcast"></label>
-      <label class="option-row"><span>Light Rain</span><input type="checkbox" class="test-condition-skin" value="lightRain"></label>
-      <label class="option-row"><span>Heavy Rain</span><input type="checkbox" class="test-condition-skin" value="heavyRain"></label>
-      <label class="option-row"><span>Thunderstorm</span><input type="checkbox" class="test-condition-skin" value="thunderstorm"></label>
-      <label class="option-row"><span>Snow</span><input type="checkbox" class="test-condition-skin" value="snow"></label>
-      <label class="option-row"><span>Fog/Mist</span><input type="checkbox" class="test-condition-skin" value="fog"></label>
-      <label class="option-row"><span>Hail</span><input type="checkbox" class="test-condition-skin" value="hail"></label>
+      <p class="testing-note">One exact WeatherAPI condition at a time, matching how real weather works — pick "Live / No Override" to go back to using real data.</p>
+      <label class="option-row"><span>🔴 Live / No Override</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="live" checked></label>
+
+      <h4 class="testing-subhead">Clear &amp; Cloud</h4>
+      <label class="option-row"><span>☀️ Sunny / Clear</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1000"></label>
+      <label class="option-row"><span>🌤️ Partly cloudy</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1003"></label>
+      <label class="option-row"><span>🌥️ Cloudy</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1006"></label>
+      <label class="option-row"><span>☁️ Overcast</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1009"></label>
+
+      <h4 class="testing-subhead">Fog</h4>
+      <label class="option-row"><span>🌫️ Mist</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1030"></label>
+      <label class="option-row"><span>🌫️ Fog</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1135"></label>
+      <label class="option-row"><span>🌫️ Freezing fog</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1147"></label>
+
+      <h4 class="testing-subhead">Rain &amp; Drizzle</h4>
+      <label class="option-row"><span>🌦️ Patchy rain possible</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1063"></label>
+      <label class="option-row"><span>🌦️ Patchy light drizzle</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1150"></label>
+      <label class="option-row"><span>🌦️ Light drizzle</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1153"></label>
+      <label class="option-row"><span>🌦️ Patchy light rain</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1180"></label>
+      <label class="option-row"><span>🌦️ Light rain shower</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1240"></label>
+      <label class="option-row"><span>🌧️ Light rain</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1183"></label>
+      <label class="option-row"><span>🌧️ Moderate rain at times</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1186"></label>
+      <label class="option-row"><span>🌧️ Moderate rain</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1189"></label>
+      <label class="option-row"><span>🌧️ Heavy rain at times</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1192"></label>
+      <label class="option-row"><span>🌧️ Heavy rain</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1195"></label>
+      <label class="option-row"><span>🌧️ Moderate or heavy rain shower</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1243"></label>
+      <label class="option-row"><span>🌧️ Torrential rain shower</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1246"></label>
+
+      <h4 class="testing-subhead">Freezing Rain &amp; Drizzle</h4>
+      <label class="option-row"><span>🌧️ Light freezing rain</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1198"></label>
+      <label class="option-row"><span>🌧️ Moderate or heavy freezing rain</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1201"></label>
+      <label class="option-row"><span>🌦️ Patchy freezing drizzle possible</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1072"></label>
+      <label class="option-row"><span>🌦️ Freezing drizzle</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1168"></label>
+      <label class="option-row"><span>🌦️ Heavy freezing drizzle</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1171"></label>
+
+      <h4 class="testing-subhead">Thunderstorm</h4>
+      <label class="option-row"><span>⛈️ Thundery outbreaks possible</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1087"></label>
+      <label class="option-row"><span>⛈️ Patchy light rain with thunder</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1273"></label>
+      <label class="option-row"><span>⛈️ Moderate or heavy rain with thunder</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1276"></label>
+      <label class="option-row"><span>⛈️ Patchy light snow with thunder</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1279"></label>
+      <label class="option-row"><span>⛈️ Moderate or heavy snow with thunder</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1282"></label>
+
+      <h4 class="testing-subhead">Snow</h4>
+      <label class="option-row"><span>🌨️ Patchy snow possible</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1066"></label>
+      <label class="option-row"><span>🌬️ Blowing snow</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1114"></label>
+      <label class="option-row"><span>🌨️ Patchy light snow</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1210"></label>
+      <label class="option-row"><span>🌨️ Light snow</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1213"></label>
+      <label class="option-row"><span>🌨️ Patchy moderate snow</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1216"></label>
+      <label class="option-row"><span>🌨️ Light snow showers</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1255"></label>
+      <label class="option-row"><span>❄️ Blizzard</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1117"></label>
+      <label class="option-row"><span>❄️ Moderate snow</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1219"></label>
+      <label class="option-row"><span>❄️ Patchy heavy snow</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1222"></label>
+      <label class="option-row"><span>❄️ Heavy snow</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1225"></label>
+      <label class="option-row"><span>❄️ Moderate or heavy snow showers</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1258"></label>
+
+      <h4 class="testing-subhead">Sleet &amp; Ice</h4>
+      <label class="option-row"><span>🌨️ Patchy sleet possible</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1069"></label>
+      <label class="option-row"><span>🌨️ Light sleet</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1204"></label>
+      <label class="option-row"><span>🌨️ Moderate or heavy sleet</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1207"></label>
+      <label class="option-row"><span>🌨️ Light sleet showers</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1249"></label>
+      <label class="option-row"><span>🌨️ Moderate or heavy sleet showers</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1252"></label>
+      <label class="option-row"><span>🧊 Ice pellets</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1237"></label>
+      <label class="option-row"><span>🧊 Light showers of ice pellets</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1261"></label>
+      <label class="option-row"><span>🧊 Moderate or heavy showers of ice pellets</span><input type="radio" name="test-condition-skin" class="test-condition-skin" value="1264"></label>
 
       <h3>Cloud Brightness Formula</h3>
       <div class="option-row">
@@ -298,6 +353,10 @@
         <span>Thunderstorm shift <span id="test-cloud-thunderstorm-value">40%</span></span>
         <input type="range" id="test-cloud-thunderstorm-slider" min="0" max="100" value="40">
       </div>
+      <div class="option-row">
+        <span>Night gray blend <span id="test-cloud-nightgray-value">50%</span></span>
+        <input type="range" id="test-cloud-nightgray-slider" min="0" max="100" value="50">
+      </div>
       <p class="testing-note" id="test-cloud-readout">Branch: — · Brightness: — of sky · Opacity: —</p>
       <div class="testing-swatch-row">
         <span class="testing-swatch" id="test-cloud-swatch"></span>
@@ -312,8 +371,8 @@
         <input type="range" id="test-fog-opacity-slider" min="0" max="100" value="45">
       </div>
       <div class="option-row">
-        <span>Blob count <span id="test-fog-count-value">4</span></span>
-        <input type="range" id="test-fog-count-slider" min="1" max="8" value="4">
+        <span>Blob count <span id="test-fog-count-value">5</span></span>
+        <input type="range" id="test-fog-count-slider" min="1" max="8" value="5">
       </div>
       <div class="option-row">
         <span>Blob size <span id="test-fog-size-value">40%</span></span>
@@ -441,6 +500,6 @@
   </div>
 </div>
 
-<script src="script.js?v=14"></script>
+<script src="script.js?v=15"></script>
 </body>
 </html>

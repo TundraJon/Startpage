@@ -515,22 +515,91 @@
     'Full Moon': '🌕', 'Waning Gibbous': '🌖', 'Last Quarter': '🌗', 'Waning Crescent': '🌘',
   };
 
-  // Full range of WeatherAPI's condition codes, not just the precip subset WX_CONDITION_MAP uses
-  // for picking the Live Condition Skin animation (that one deliberately omits clear/cloudy).
-  const WX_WEATHER_ICON_MAP = {
-    1000: '☀️', 1003: '⛅', 1006: '☁️', 1009: '☁️',
-    1030: '🌫️', 1135: '🌫️', 1147: '🌫️',
-    1063: '🌦️', 1150: '🌦️', 1153: '🌦️', 1180: '🌦️', 1240: '🌦️',
-    1183: '🌧️', 1186: '🌧️', 1189: '🌧️', 1192: '🌧️', 1195: '🌧️', 1198: '🌧️', 1201: '🌧️', 1243: '🌧️',
-    1072: '🌧️', 1168: '🌧️', 1171: '🌧️',
-    1246: '⛈️', 1087: '⛈️', 1273: '⛈️', 1276: '⛈️', 1279: '⛈️', 1282: '⛈️',
-    1066: '🌨️', 1069: '🌨️', 1114: '🌨️', 1204: '🌨️', 1207: '🌨️', 1210: '🌨️', 1213: '🌨️',
-    1216: '🌨️', 1249: '🌨️', 1252: '🌨️', 1255: '🌨️',
-    1117: '❄️', 1219: '❄️', 1222: '❄️', 1225: '❄️', 1258: '❄️',
-    1237: '🧊', 1261: '🧊', 1264: '🧊',
+  // --- Testing panel state (temporary dev tool, not part of the real app) ---
+  // Declared here (early, before renderWeatherExtras()'s first synchronous call just below needs
+  // getEffectiveConditionCode()) rather than down by the rest of the testing-panel code — the
+  // same temporal-dead-zone hazard noted below for weatherLiveConditions applies here too.
+  const weatherTestState = {
+    timeOverrideSec: null,
+    cloudOverridePct: null,
+    textStroke: false,
+    conditionSkins: new Set(),
+    conditionCodeOverride: null,
   };
+  function getEffectiveConditionCode() {
+    return weatherTestState.conditionCodeOverride !== null ? weatherTestState.conditionCodeOverride : weatherState.conditionCode;
+  }
+
+  // Single source of truth for every WeatherAPI condition code: its display text, its icon, and
+  // which Live Condition Skin animation it triggers. `anim` is null for the clear/cloud-only
+  // states (no precipitation effect, cloud-tint only) or one of 'lightRain'/'heavyRain'/
+  // 'thunderstorm'/'snow'/'hail'/'fog', plus two composites — 'thunderSnow' (thunderstorm +
+  // snow simultaneously) and 'snowFog' (snow + fog simultaneously) — that WX_ANIM_DECOMPOSE
+  // expands into their base effects rather than needing dedicated rendering logic of their own.
+  const WX_CONDITIONS = {
+    1000: { text: 'Sunny / Clear', icon: '☀️', anim: null },
+    1003: { text: 'Partly cloudy', icon: '🌤️', anim: null },
+    1006: { text: 'Cloudy', icon: '🌥️', anim: null },
+    1009: { text: 'Overcast', icon: '☁️', anim: null },
+    1030: { text: 'Mist', icon: '🌫️', anim: 'fog' },
+    1135: { text: 'Fog', icon: '🌫️', anim: 'fog' },
+    1147: { text: 'Freezing fog', icon: '🌫️', anim: 'fog' },
+    1063: { text: 'Patchy rain possible', icon: '🌦️', anim: 'lightRain' },
+    1150: { text: 'Patchy light drizzle', icon: '🌦️', anim: 'lightRain' },
+    1153: { text: 'Light drizzle', icon: '🌦️', anim: 'lightRain' },
+    1180: { text: 'Patchy light rain', icon: '🌦️', anim: 'lightRain' },
+    1240: { text: 'Light rain shower', icon: '🌦️', anim: 'lightRain' },
+    1183: { text: 'Light rain', icon: '🌧️', anim: 'lightRain' },
+    1186: { text: 'Moderate rain at times', icon: '🌧️', anim: 'lightRain' },
+    1189: { text: 'Moderate rain', icon: '🌧️', anim: 'lightRain' },
+    1192: { text: 'Heavy rain at times', icon: '🌧️', anim: 'heavyRain' },
+    1195: { text: 'Heavy rain', icon: '🌧️', anim: 'heavyRain' },
+    1198: { text: 'Light freezing rain', icon: '🌧️', anim: 'lightRain' },
+    1201: { text: 'Moderate or heavy freezing rain', icon: '🌧️', anim: 'heavyRain' },
+    1243: { text: 'Moderate or heavy rain shower', icon: '🌧️', anim: 'heavyRain' },
+    1072: { text: 'Patchy freezing drizzle possible', icon: '🌦️', anim: 'lightRain' },
+    1168: { text: 'Freezing drizzle', icon: '🌦️', anim: 'lightRain' },
+    1171: { text: 'Heavy freezing drizzle', icon: '🌦️', anim: 'heavyRain' },
+    1246: { text: 'Torrential rain shower', icon: '🌧️', anim: 'heavyRain' },
+    1087: { text: 'Thundery outbreaks possible', icon: '⛈️', anim: 'thunderstorm' },
+    1273: { text: 'Patchy light rain with thunder', icon: '⛈️', anim: 'thunderstorm' },
+    1276: { text: 'Moderate or heavy rain with thunder', icon: '⛈️', anim: 'thunderstorm' },
+    1279: { text: 'Patchy light snow with thunder', icon: '⛈️', anim: 'thunderSnow' },
+    1282: { text: 'Moderate or heavy snow with thunder', icon: '⛈️', anim: 'thunderSnow' },
+    1066: { text: 'Patchy snow possible', icon: '🌨️', anim: 'snow' },
+    1069: { text: 'Patchy sleet possible', icon: '🌨️', anim: 'hail' },
+    1114: { text: 'Blowing snow', icon: '🌬️', anim: 'snow' },
+    1204: { text: 'Light sleet', icon: '🌨️', anim: 'hail' },
+    1207: { text: 'Moderate or heavy sleet', icon: '🌨️', anim: 'hail' },
+    1210: { text: 'Patchy light snow', icon: '🌨️', anim: 'snow' },
+    1213: { text: 'Light snow', icon: '🌨️', anim: 'snow' },
+    1216: { text: 'Patchy moderate snow', icon: '🌨️', anim: 'snow' },
+    1249: { text: 'Light sleet showers', icon: '🌨️', anim: 'hail' },
+    1252: { text: 'Moderate or heavy sleet showers', icon: '🌨️', anim: 'hail' },
+    1255: { text: 'Light snow showers', icon: '🌨️', anim: 'snow' },
+    1117: { text: 'Blizzard', icon: '❄️', anim: 'snowFog' },
+    1219: { text: 'Moderate snow', icon: '❄️', anim: 'snow' },
+    1222: { text: 'Patchy heavy snow', icon: '❄️', anim: 'snow' },
+    1225: { text: 'Heavy snow', icon: '❄️', anim: 'snow' },
+    1258: { text: 'Moderate or heavy snow showers', icon: '❄️', anim: 'snow' },
+    1237: { text: 'Ice pellets', icon: '🧊', anim: 'hail' },
+    1261: { text: 'Light showers of ice pellets', icon: '🧊', anim: 'hail' },
+    1264: { text: 'Moderate or heavy showers of ice pellets', icon: '🧊', anim: 'hail' },
+  };
+  // Composite animations aren't rendered directly — they expand into the base effects that
+  // already exist, so every other piece of condition-skin logic (rain/snow/hail/fog particle
+  // creation, the thunderstorm flash trigger, cloud-tint darkening) keeps working unchanged.
+  const WX_ANIM_DECOMPOSE = {
+    thunderSnow: ['thunderstorm', 'snow'],
+    snowFog: ['snow', 'fog'],
+  };
+  function animKeysFor(anim) {
+    if (!anim) return [];
+    return WX_ANIM_DECOMPOSE[anim] || [anim];
+  }
   function weatherIconForCode(code) {
-    return WX_WEATHER_ICON_MAP[code] || '🌡️';
+    const entry = WX_CONDITIONS[code];
+    return entry ? entry.icon : '🌡️';
   }
   const weatherEmojiBtn = document.getElementById('weather-emoji-btn');
 
@@ -549,7 +618,7 @@
     }
     locationEl.textContent = weatherState.locationName;
     descEl.textContent = weatherState.conditionText;
-    weatherEmojiBtn.textContent = weatherIconForCode(weatherState.conditionCode);
+    weatherEmojiBtn.textContent = weatherIconForCode(getEffectiveConditionCode());
   }
   renderWeatherExtras();
 
@@ -714,14 +783,6 @@
   const weatherSkin = document.getElementById('weather-skin');
   const weatherWidgetEl = document.getElementById('weather-widget');
 
-  // --- Testing panel state (temporary dev tool, not part of the real app) ---
-  const weatherTestState = {
-    timeOverrideSec: null,
-    cloudOverridePct: null,
-    textStroke: false,
-    conditionSkins: new Set(),
-  };
-
   // Real (non-test) active conditions, derived from live data. Declared here (early) rather
   // than down by the rest of the live-weather code because renderWeatherSkin()'s very first
   // synchronous call at load time already needs getEffectiveConditionSkins() — declaring it
@@ -779,14 +840,28 @@
     lightRainPct: 10,
     heavyRainPct: 20,
     thunderstormPct: 40,
+    // The brightened night tint is a straight per-channel multiply of a navy sky color, which
+    // preserves hue regardless of brightness — it reads as blue no matter how nightBasePct is
+    // tuned. This blends the result toward a neutral gray (computed from its own channels) by a
+    // separate, tunable percentage so brightness and "grayness" aren't conflated. Day tint isn't
+    // affected — only reported as too blue at night.
+    nightGrayBlendPct: 50,
   };
+
+  // Hail bounce physics: HAIL_GRAVITY (px/frame^2) sets the parabola's steepness — calibrated so
+  // a typical post-doubling stone (vy0 around the high-teens at a shallow angle) lands in the
+  // widget's visual scale, with harder bounces correctly arcing higher and longer as a real
+  // consequence of the physics, not a bug. HAIL_FADE_FRAMES is the rapid fade-out duration once
+  // the stone hits the ground the second time.
+  const HAIL_GRAVITY = 3;
+  const HAIL_FADE_FRAMES = 6;
 
   // Fog: previously a fixed 0.14 peak opacity at a baked-in pixel radius — too faint to notice.
   // Opacity/size/speed are read live at draw time (not baked into each blob at creation) so their
   // sliders take effect immediately; only blob count needs a rebuild, forced via lastParticleKey.
   const WX_FOG_TUNABLES = {
     opacityPct: 45,
-    blobCount: 4,
+    blobCount: 5,
     sizePct: 40,
     speedMult: 3,
   };
@@ -816,12 +891,16 @@
     const daytime = isDaytime(now);
     const basePct = daytime ? -WX_CLOUD_TUNABLES.dayBasePct : WX_CLOUD_TUNABLES.nightBasePct;
     const multiplier = 1 + basePct / 100 - conditionShiftPct(conditionSkins) / 100;
-    const rgb = skyRgb.map((v) => Math.max(0, Math.min(255, v * multiplier)));
+    let rgb = skyRgb.map((v) => Math.max(0, Math.min(255, v * multiplier)));
+    if (!daytime) {
+      const gray = (rgb[0] + rgb[1] + rgb[2]) / 3;
+      rgb = lerpRgb(rgb, [gray, gray, gray], WX_CLOUD_TUNABLES.nightGrayBlendPct / 100);
+    }
     return { rgb, multiplier, daytime };
   }
 
   function cloudOverlayOpacity(cloudPct, daytime) {
-    return daytime ? cloudPct / 2 / 100 : cloudPct / 100;
+    return daytime ? cloudPct * 0.75 / 100 : cloudPct / 100;
   }
 
   function updateCloudTestingReadout(cloudTint, opacityFraction) {
@@ -954,7 +1033,10 @@
 
   function rebuildConditionParticles(c, w, h, ts) {
     conditionParticles = [];
-    const heavy = c.has('heavyRain') || c.has('thunderstorm');
+    // A plain thunderstorm still forces the heavy-rain visual, but thunderSnow (decomposed to
+    // thunderstorm+snow) should show falling snow instead of rain alongside the lightning — so
+    // the rain-forcing is suppressed whenever snow is also active.
+    const heavy = c.has('heavyRain') || (c.has('thunderstorm') && !c.has('snow'));
     const rainCount = heavy ? 45 : (c.has('lightRain') ? 17 : 0);
     for (let i = 0; i < rainCount; i++) {
       conditionParticles.push({
@@ -977,7 +1059,7 @@
         // ~25% of stones fall twice as fast; that same fall speed becomes their own bounce
         // "energy" later — no separate height multiplier, a stone that fell faster just
         // naturally bounces harder since energy in equals energy out.
-        const baseSpeed = 7 + Math.random() * 2;
+        const baseSpeed = 14 + Math.random() * 4;
         conditionParticles.push({
           type: 'hail', x: Math.random() * w, y: Math.random() * h,
           speed: Math.random() < 0.25 ? baseSpeed * 2 : baseSpeed,
@@ -1060,38 +1142,58 @@
       precipCtx.fill();
     }
 
-    precipCtx.fillStyle = 'rgba(230,235,240,0.95)';
+    precipCtx.fillStyle = 'rgba(230,235,240,1)';
     for (const p of conditionParticles) {
       if (p.type !== 'hail') continue;
       if (p.state === 'fall') {
         p.y += p.speed;
         if (p.y > h - p.r) {
-          p.state = 'bounce';
+          p.state = 'arc';
           p.bounceT = 0;
           p.bounceFromY = h - p.r;
           p.bounceFromX = p.x;
           // -60..+60 degrees off straight-up (30 degrees above horizontal on each side), so a
           // stone can shoot off to either side or bounce straight back. Energy conservation, not
           // a separate height multiplier: a stone's own fall speed is its bounce energy, split
-          // into vertical/horizontal components via true trigonometric decomposition (satisfying
-          // vertical^2 + horizontal^2 = energy^2), so a wide angle trades height for reach rather
-          // than getting both at once.
+          // into vertical/horizontal launch velocity components via true trigonometric
+          // decomposition (satisfying vertical^2 + horizontal^2 = energy^2), so a wide angle
+          // trades height for reach rather than getting both at once.
           p.bounceAngle = (Math.random() * 120 - 60) * Math.PI / 180;
-          p.bounceVertical = p.speed * Math.cos(p.bounceAngle);
-          p.bounceHorizontal = p.speed * Math.sin(p.bounceAngle);
+          p.vy0 = p.speed * Math.cos(p.bounceAngle);
+          p.vx0 = p.speed * Math.sin(p.bounceAngle);
+        }
+      } else if (p.state === 'arc') {
+        // True constant-acceleration projectile motion: a real gravity parabola for height
+        // (not an eased curve), constant velocity horizontally (no reversal, no snapping back
+        // to the launch point). HAIL_GRAVITY is calibrated so a typical stone's flight time and
+        // peak height land in the widget's visual scale — verified against hand-calculated
+        // positions with a deterministic Math.random() override.
+        p.bounceT += 1;
+        const t = p.bounceT;
+        const heightAboveGround = p.vy0 * t - 0.5 * HAIL_GRAVITY * t * t;
+        if (heightAboveGround <= 0) {
+          // Real second touchdown (flight time derived from physics, not a fixed frame count).
+          // Stays fully opaque up to this exact instant; the fade-out starts only now.
+          p.state = 'fading';
+          p.fadeT = 0;
+          p.y = p.bounceFromY;
+          p.x = p.bounceFromX + p.vx0 * t;
+        } else {
+          p.y = p.bounceFromY - heightAboveGround;
+          p.x = p.bounceFromX + p.vx0 * t;
         }
       } else {
-        p.bounceT += 1;
-        const ease = Math.sin(Math.min(p.bounceT / 10, 1) * Math.PI);
-        p.y = p.bounceFromY - p.bounceVertical * ease;
-        p.x = p.bounceFromX + p.bounceHorizontal * ease;
-        if (p.bounceT > 14) {
+        // Fading: keeps drifting at the same constant horizontal rate it already had, rather
+        // than freezing in place, while fading out.
+        p.fadeT += 1;
+        p.x += p.vx0;
+        if (p.fadeT > HAIL_FADE_FRAMES) {
           p.state = 'fall';
           p.y = -4;
           p.x = Math.random() * w;
         }
       }
-      precipCtx.globalAlpha = p.state === 'bounce' ? Math.max(0, 1 - p.bounceT / 14) : 1;
+      precipCtx.globalAlpha = p.state === 'fading' ? Math.max(0, 1 - p.fadeT / HAIL_FADE_FRAMES) : 1;
       precipCtx.beginPath();
       precipCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
       precipCtx.fill();
@@ -1259,7 +1361,8 @@
     const cloudSlider = document.getElementById('test-cloud-slider');
     const cloudValue = document.getElementById('test-cloud-value');
     const textStrokeToggle = document.getElementById('test-textstroke-toggle');
-    const conditionSkinToggles = document.querySelectorAll('.test-condition-skin');
+    const conditionSkinRadios = document.querySelectorAll('.test-condition-skin');
+    const conditionSkinLiveRadio = document.querySelector('.test-condition-skin[value="live"]');
     const dayBaseSlider = document.getElementById('test-cloud-daybase-slider');
     const dayBaseValue = document.getElementById('test-cloud-daybase-value');
     const nightBaseSlider = document.getElementById('test-cloud-nightbase-slider');
@@ -1270,6 +1373,8 @@
     const heavyRainValue = document.getElementById('test-cloud-heavyrain-value');
     const thunderstormSlider = document.getElementById('test-cloud-thunderstorm-slider');
     const thunderstormValue = document.getElementById('test-cloud-thunderstorm-value');
+    const nightGraySlider = document.getElementById('test-cloud-nightgray-slider');
+    const nightGrayValue = document.getElementById('test-cloud-nightgray-value');
     const fogOpacitySlider = document.getElementById('test-fog-opacity-slider');
     const fogOpacityValue = document.getElementById('test-fog-opacity-value');
     const fogCountSlider = document.getElementById('test-fog-count-slider');
@@ -1316,10 +1421,19 @@
       renderWeatherSkin();
     });
 
-    conditionSkinToggles.forEach((cb) => {
-      cb.addEventListener('change', () => {
-        if (cb.checked) weatherTestState.conditionSkins.add(cb.value);
-        else weatherTestState.conditionSkins.delete(cb.value);
+    conditionSkinRadios.forEach((radio) => {
+      radio.addEventListener('change', () => {
+        if (!radio.checked) return;
+        if (radio.value === 'live') {
+          weatherTestState.conditionCodeOverride = null;
+          weatherTestState.conditionSkins = new Set();
+        } else {
+          const code = Number(radio.value);
+          const entry = WX_CONDITIONS[code];
+          weatherTestState.conditionCodeOverride = code;
+          weatherTestState.conditionSkins = new Set(entry ? animKeysFor(entry.anim) : []);
+        }
+        renderWeatherExtras();
         renderWeatherSkin();
       });
     });
@@ -1336,6 +1450,7 @@
     bindCloudTunable(lightRainSlider, lightRainValue, 'lightRainPct');
     bindCloudTunable(heavyRainSlider, heavyRainValue, 'heavyRainPct');
     bindCloudTunable(thunderstormSlider, thunderstormValue, 'thunderstormPct');
+    bindCloudTunable(nightGraySlider, nightGrayValue, 'nightGrayBlendPct');
 
     fogOpacitySlider.addEventListener('input', () => {
       WX_FOG_TUNABLES.opacityPct = Number(fogOpacitySlider.value);
@@ -1359,32 +1474,36 @@
       weatherTestState.timeOverrideSec = null;
       weatherTestState.cloudOverridePct = null;
       weatherTestState.textStroke = false;
-      weatherTestState.conditionSkins.clear();
+      weatherTestState.conditionSkins = new Set();
+      weatherTestState.conditionCodeOverride = null;
       timeEnabled.checked = false;
       timeInput.value = secondsToTimeString(SUNSET_SEC);
       cloudSlider.value = 20;
       cloudValue.textContent = '20%';
       textStrokeToggle.checked = false;
-      conditionSkinToggles.forEach((cb) => { cb.checked = false; });
+      conditionSkinLiveRadio.checked = true;
       WX_CLOUD_TUNABLES.dayBasePct = 40;
       WX_CLOUD_TUNABLES.nightBasePct = 300;
       WX_CLOUD_TUNABLES.lightRainPct = 10;
       WX_CLOUD_TUNABLES.heavyRainPct = 20;
       WX_CLOUD_TUNABLES.thunderstormPct = 40;
+      WX_CLOUD_TUNABLES.nightGrayBlendPct = 50;
       dayBaseSlider.value = 40; dayBaseValue.textContent = '40%';
       nightBaseSlider.value = 300; nightBaseValue.textContent = '300%';
       lightRainSlider.value = 10; lightRainValue.textContent = '10%';
       heavyRainSlider.value = 20; heavyRainValue.textContent = '20%';
       thunderstormSlider.value = 40; thunderstormValue.textContent = '40%';
+      nightGraySlider.value = 50; nightGrayValue.textContent = '50%';
       WX_FOG_TUNABLES.opacityPct = 45;
-      WX_FOG_TUNABLES.blobCount = 4;
+      WX_FOG_TUNABLES.blobCount = 5;
       WX_FOG_TUNABLES.sizePct = 40;
       WX_FOG_TUNABLES.speedMult = 3;
       fogOpacitySlider.value = 45; fogOpacityValue.textContent = '45%';
-      fogCountSlider.value = 4; fogCountValue.textContent = '4';
+      fogCountSlider.value = 5; fogCountValue.textContent = '5';
       fogSizeSlider.value = 40; fogSizeValue.textContent = '40%';
       fogSpeedSlider.value = 3; fogSpeedValue.textContent = '3x';
       lastParticleKey = '';
+      renderWeatherExtras();
       renderWeatherSkin();
     });
   })();
@@ -1447,20 +1566,13 @@
   // used only if geolocation is unavailable, declined, or times out.
   const FALLBACK_COORDS = { lat: 35.1497, lon: -106.6764 };
 
-  // WeatherAPI condition codes mapped to the existing Live Condition Skin keys. WeatherAPI's
-  // free condition-code set has no distinct "hail" code, so hail isn't mappable this way yet.
-  const WX_CONDITION_MAP = {
-    1087: 'thunderstorm', 1273: 'thunderstorm', 1276: 'thunderstorm', 1279: 'thunderstorm', 1282: 'thunderstorm',
-    1192: 'heavyRain', 1195: 'heavyRain', 1201: 'heavyRain', 1243: 'heavyRain', 1246: 'heavyRain',
-    1063: 'lightRain', 1150: 'lightRain', 1153: 'lightRain', 1168: 'lightRain', 1171: 'lightRain',
-    1180: 'lightRain', 1183: 'lightRain', 1186: 'lightRain', 1189: 'lightRain', 1198: 'lightRain', 1240: 'lightRain',
-    1066: 'snow', 1069: 'snow', 1072: 'snow', 1114: 'snow', 1117: 'snow',
-    1204: 'snow', 1207: 'snow', 1210: 'snow', 1213: 'snow', 1216: 'snow', 1219: 'snow', 1222: 'snow', 1225: 'snow',
-    1237: 'snow', 1249: 'snow', 1252: 'snow', 1255: 'snow', 1258: 'snow', 1261: 'snow', 1264: 'snow',
-    1030: 'fog', 1135: 'fog', 1147: 'fog',
-  };
+  // Live Condition Skin animation for a WeatherAPI code now comes straight from WX_CONDITIONS
+  // (the single source of truth declared earlier, alongside the icon map) instead of a separate
+  // parallel map — see WX_CONDITIONS and animKeysFor for the full per-code table and how the two
+  // composite animations (thunderSnow, snowFog) expand into their base effects.
   function mapConditionCode(code) {
-    return WX_CONDITION_MAP[code] || null;
+    const entry = WX_CONDITIONS[code];
+    return entry ? entry.anim : null;
   }
 
   function getCoords() {
@@ -1538,8 +1650,7 @@
     weatherState.hourly = fday.hour || [];
 
     weatherLiveConditions.clear();
-    const mapped = mapConditionCode(weatherState.conditionCode);
-    if (mapped) weatherLiveConditions.add(mapped);
+    animKeysFor(mapConditionCode(weatherState.conditionCode)).forEach((k) => weatherLiveConditions.add(k));
 
     renderWeatherTemps();
     renderWind();
