@@ -772,7 +772,10 @@
   // live via the testing panel sliders.
   const WX_CLOUD_TUNABLES = {
     dayBasePct: 40,
-    nightBasePct: 40,
+    // Multiplicative brightening barely moves a night sky's very low RGB values (e.g. rgb(2,6,23))
+    // even at large percentages, which is why the cloud tint used to be nearly invisible at night —
+    // raised well past 100% so the night cloud tint is actually visible against the real widget.
+    nightBasePct: 300,
     lightRainPct: 10,
     heavyRainPct: 20,
     thunderstormPct: 40,
@@ -886,20 +889,26 @@
   const precipCanvas = document.createElement('canvas');
   precipCanvas.className = 'weather-skin-precip';
   const precipCtx = precipCanvas.getContext('2d');
+  // Stars live on their own canvas, behind the cloud overlay (unlike rain/snow/hail/fog/bolt,
+  // which correctly sit in front of it) — so cloud opacity naturally occludes stars via ordinary
+  // alpha compositing, with no separate formula needed.
+  const starsCanvas = document.createElement('canvas');
+  starsCanvas.className = 'weather-skin-stars';
+  const starsCtx = starsCanvas.getContext('2d');
   const flashDiv = document.createElement('div');
   flashDiv.className = 'weather-skin-flash';
 
   let conditionParticles = [];
   let conditionStars = [];
   let conditionFog = [];
-  let flashState = { until: 0, nextAt: 0, opacity: 0, pendingSecondAt: 0, boltPath: null, boltUntil: 0 };
+  let flashState = { active: false, nextFlash: 0, flashUntil: 0, flashAlpha: 0, boltPath: null };
 
   // Procedurally generate a jagged bolt each time it fires — never the same shape twice — as a
-  // zigzag random-walk from a random point along the top edge down to a random depth, with an
-  // occasional small fork partway down.
+  // zigzag random-walk from a random point along the top edge down to a strike point biased
+  // toward the bottom of the widget, with an occasional small fork partway down.
   function generateBoltPath(w, h) {
     const startX = w * (0.15 + Math.random() * 0.7);
-    const endY = h * (0.4 + Math.random() * 0.5);
+    const endY = h * (0.75 + Math.random() * 0.25);
     const segments = 5 + Math.floor(Math.random() * 4);
     const main = [{ x: startX, y: 0 }];
     let x = startX;
@@ -965,9 +974,14 @@
     }
     if (c.has('hail')) {
       for (let i = 0; i < 30; i++) {
+        // ~25% of stones fall twice as fast; that same fall speed becomes their own bounce
+        // "energy" later — no separate height multiplier, a stone that fell faster just
+        // naturally bounces harder since energy in equals energy out.
+        const baseSpeed = 7 + Math.random() * 2;
         conditionParticles.push({
           type: 'hail', x: Math.random() * w, y: Math.random() * h,
-          speed: 7 + Math.random() * 2, r: 2 + Math.random() * 1.2, state: 'fall', bounceT: 0,
+          speed: Math.random() < 0.25 ? baseSpeed * 2 : baseSpeed,
+          r: 2 + Math.random() * 1.2, state: 'fall', bounceT: 0,
         });
       }
     }
@@ -999,6 +1013,7 @@
     const c = getEffectiveConditionSkins();
     if (!weatherSettings.liveSkin) {
       if (precipCanvas.width) precipCtx.clearRect(0, 0, precipCanvas.width, precipCanvas.height);
+      if (starsCanvas.width) starsCtx.clearRect(0, 0, starsCanvas.width, starsCanvas.height);
       flashDiv.style.opacity = '0';
       return;
     }
@@ -1011,9 +1026,13 @@
       precipCanvas.width = Math.round(w * dpr);
       precipCanvas.height = Math.round(h * dpr);
       precipCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      starsCanvas.width = Math.round(w * dpr);
+      starsCanvas.height = Math.round(h * dpr);
+      starsCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
       rebuildConditionParticles(c, w, h, ts);
       lastParticleKey = key;
     }
+    starsCtx.clearRect(0, 0, w, h);
     precipCtx.clearRect(0, 0, w, h);
 
     precipCtx.strokeStyle = (c.has('heavyRain') || c.has('thunderstorm')) ? 'rgba(120,140,170,0.55)' : 'rgba(160,180,200,0.45)';
@@ -1051,16 +1070,21 @@
           p.bounceT = 0;
           p.bounceFromY = h - p.r;
           p.bounceFromX = p.x;
-          // -30..+30 degrees off straight-up, so a stone can shoot off to either side or bounce
-          // straight back. ~75% keep the base height; ~25% bounce 1-100% higher, per user spec.
-          p.bounceAngle = (Math.random() * 60 - 30) * Math.PI / 180;
-          p.bounceHeightMult = Math.random() < 0.25 ? 1 + (0.01 + Math.random() * 0.99) : 1;
+          // -60..+60 degrees off straight-up (30 degrees above horizontal on each side), so a
+          // stone can shoot off to either side or bounce straight back. Energy conservation, not
+          // a separate height multiplier: a stone's own fall speed is its bounce energy, split
+          // into vertical/horizontal components via true trigonometric decomposition (satisfying
+          // vertical^2 + horizontal^2 = energy^2), so a wide angle trades height for reach rather
+          // than getting both at once.
+          p.bounceAngle = (Math.random() * 120 - 60) * Math.PI / 180;
+          p.bounceVertical = p.speed * Math.cos(p.bounceAngle);
+          p.bounceHorizontal = p.speed * Math.sin(p.bounceAngle);
         }
       } else {
         p.bounceT += 1;
-        const hop = Math.sin(Math.min(p.bounceT / 10, 1) * Math.PI) * 8 * p.bounceHeightMult;
-        p.y = p.bounceFromY - hop;
-        p.x = p.bounceFromX + hop * Math.tan(p.bounceAngle);
+        const ease = Math.sin(Math.min(p.bounceT / 10, 1) * Math.PI);
+        p.y = p.bounceFromY - p.bounceVertical * ease;
+        p.x = p.bounceFromX + p.bounceHorizontal * ease;
         if (p.bounceT > 14) {
           p.state = 'fall';
           p.y = -4;
@@ -1114,36 +1138,38 @@
           }
         }
         opacity = Math.max(0, Math.min(1, opacity)) * starVisibility;
-        precipCtx.fillStyle = `rgba(${s.color[0]},${s.color[1]},${s.color[2]},${opacity.toFixed(2)})`;
-        precipCtx.beginPath();
-        precipCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-        precipCtx.fill();
+        starsCtx.fillStyle = `rgba(${s.color[0]},${s.color[1]},${s.color[2]},${opacity.toFixed(2)})`;
+        starsCtx.beginPath();
+        starsCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        starsCtx.fill();
       }
     }
 
     if (c.has('thunderstorm')) {
-      // Most flashes stay single, as before. Occasionally (~32%) a flash schedules a quick
-      // second one right after it, rather than always waiting for the normal long gap. Each
-      // flash independently has up to a 10% chance of also drawing a random bolt.
-      const dueForSecond = flashState.pendingSecondAt > 0 && ts >= flashState.pendingSecondAt;
-      const dueForNext = flashState.pendingSecondAt === 0 && ts > flashState.nextAt;
-      if (dueForSecond || dueForNext) {
-        flashState.until = ts + 100 + Math.random() * 50;
-        flashState.opacity = 0.2 + Math.random() * 0.1;
-        flashState.boltPath = Math.random() < 0.10 ? generateBoltPath(w, h) : null;
-        flashState.boltUntil = flashState.until;
-        if (dueForNext && Math.random() < 0.32) {
-          flashState.pendingSecondAt = flashState.until + 80 + Math.random() * 100;
+      // Flat 5-10s between flashes — no intensity concept, no separate double-flash roll. Each
+      // flash lasts 100-1000ms with its alpha re-rolled every frame for the whole lifetime, so it
+      // flickers throughout rather than holding one steady brightness (this alone reads as
+      // multiple quick pulses when a flash runs long, without needing extra scheduling state).
+      if (!flashState.active && ts >= flashState.nextFlash) {
+        flashState.active = true;
+        flashState.flashUntil = ts + 100 + Math.random() * 900;
+        flashState.flashAlpha = 0.85 + Math.random() * 0.15;
+        // Most flashes are ambient-only (a distant/off-screen strike); 25% also show a bolt.
+        flashState.boltPath = Math.random() < 0.25 ? generateBoltPath(w, h) : null;
+      }
+      if (flashState.active) {
+        if (ts >= flashState.flashUntil) {
+          flashState.active = false;
+          flashState.nextFlash = ts + 5000 + Math.random() * 5000;
+          flashDiv.style.opacity = '0';
         } else {
-          flashState.pendingSecondAt = 0;
-          flashState.nextAt = ts + 8000 + Math.random() * 12000;
+          flashDiv.style.opacity = String(flashState.flashAlpha * (0.4 + Math.random() * 0.6));
+          if (flashState.boltPath) drawBoltPath(flashState.boltPath);
         }
       }
-      flashDiv.style.opacity = ts < flashState.until ? String(flashState.opacity) : '0';
-      if (flashState.boltPath && ts < flashState.boltUntil) drawBoltPath(flashState.boltPath);
     } else {
+      flashState.active = false;
       flashDiv.style.opacity = '0';
-      flashState.boltPath = null;
     }
   }
   requestAnimationFrame(stepConditionSkin);
@@ -1176,12 +1202,15 @@
     let cloudTint = null;
     if (weatherSettings.liveSkin) {
       cloudTint = computeCloudTint(getEffectiveSkyTime(), getEffectiveConditionSkins());
+      // Fixed layer order: gradient -> stars -> cloud overlay -> precipitation (rain/snow/hail/
+      // fog/bolt) -> floating clouds -> lightning flash. Stars sit behind the cloud overlay so
+      // cloud opacity occludes them for free; everything else correctly stays in front of it.
+      weatherSkin.appendChild(starsCanvas);
       const overlay = document.createElement('div');
       overlay.className = 'weather-skin-overlay';
       overlay.style.background = rgbToHex(cloudTint.rgb);
       overlay.style.opacity = String(cloudOverlayOpacity(cloudPct, cloudTint.daytime));
       weatherSkin.appendChild(overlay);
-      // Fixed layer order: gradient -> cloud overlay -> precipitation -> floating clouds -> lightning flash.
       weatherSkin.appendChild(precipCanvas);
 
       const cloudCount = Math.floor(cloudPct / 10);
@@ -1195,6 +1224,7 @@
       weatherSkin.appendChild(flashDiv);
       updateCloudTestingReadout(cloudTint, cloudOverlayOpacity(cloudPct, cloudTint.daytime));
     } else {
+      starsCanvas.remove();
       precipCanvas.remove();
       flashDiv.remove();
       updateCloudTestingReadout(null, 0);
@@ -1337,12 +1367,12 @@
       textStrokeToggle.checked = false;
       conditionSkinToggles.forEach((cb) => { cb.checked = false; });
       WX_CLOUD_TUNABLES.dayBasePct = 40;
-      WX_CLOUD_TUNABLES.nightBasePct = 40;
+      WX_CLOUD_TUNABLES.nightBasePct = 300;
       WX_CLOUD_TUNABLES.lightRainPct = 10;
       WX_CLOUD_TUNABLES.heavyRainPct = 20;
       WX_CLOUD_TUNABLES.thunderstormPct = 40;
       dayBaseSlider.value = 40; dayBaseValue.textContent = '40%';
-      nightBaseSlider.value = 40; nightBaseValue.textContent = '40%';
+      nightBaseSlider.value = 300; nightBaseValue.textContent = '300%';
       lightRainSlider.value = 10; lightRainValue.textContent = '10%';
       heavyRainSlider.value = 20; heavyRainValue.textContent = '20%';
       thunderstormSlider.value = 40; thunderstormValue.textContent = '40%';
