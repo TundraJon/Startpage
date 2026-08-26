@@ -391,6 +391,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
   4. At that exact touchdown moment, start a rapid fade-out (alpha 1 → 0) — and during that fade, keep the stone drifting horizontally at the same constant `vx0` rate it was already using (simple continuation of the same linear motion, not a new formula), while `y` stays at ground level. Once fully faded, reset to a new falling stone at the top as today.
 - [ ] **Open question for whoever builds this:** the gravity constant `g` and the post-touchdown fade duration aren't pinned to specific numbers yet — reasonable defaults can be chosen at build time and adjusted after visual testing (deterministic `Math.random()` verification, as used for the original trig bounce model, is the right way to confirm the parabola math matches hand-calculated positions before calling it done).
 
+### Raise daytime cloud overlay opacity cap from 50% to 75% at 100% cloud cover
+
+- [ ] **Current behavior (confirmed in script.js:823-825):** `cloudOverlayOpacity(cloudPct, daytime) { return daytime ? cloudPct / 2 / 100 : cloudPct / 100; }`. Daytime opacity maxes out at 50% (100% cloud cover ÷ 2 ÷ 100), which is why too much sky color still shows through at full daytime cloud cover. Nighttime already scales straight to 100% opacity at 100% cloud cover and is unaffected by this.
+- [ ] **Requested change:** change the daytime scale so 100% cloud cover produces 75% overlay opacity instead of 50% — i.e. replace the `/2` with a `* 0.75` (`cloudPct * 0.75 / 100`), keeping 0% cloud cover still fully transparent. Nighttime formula stays exactly as-is.
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
