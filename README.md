@@ -416,6 +416,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [ ] **Current behavior:** all five sleet codes (1069 Patchy sleet possible, 1204 Light sleet, 1207 Moderate or heavy sleet, 1249 Light sleet showers, 1252 Moderate or heavy sleet showers) currently use plain `anim: 'hail'`.
 - [ ] **Requested change, confirmed with the user:** scoped to the two "showers" codes only — 1069/1204/1207 (plain sleet, no "showers" in the name) stay plain `hail`, unchanged. Add two new composites, following the same `WX_ANIM_DECOMPOSE` pattern as `thunderSnow`/`snowFog`/`snowRain`: `hailLightRain: ['hail', 'lightRain']` and `hailHeavyRain: ['hail', 'heavyRain']`. Set 1249 (Light sleet showers) to `anim: 'hailLightRain'` and 1252 (Moderate or heavy sleet showers) to `anim: 'hailHeavyRain'` — split by severity, matching how freezing rain/drizzle already splits Light/Heavy Rain by severity.
 
+### Condition description text doesn't follow the Testing Panel override (stuck on real live data)
+
+- [ ] **Current behavior (confirmed in script.js:620):** `descEl.textContent = weatherState.conditionText;` — this only ever reflects real live-data text (set in `applyLiveWeatherData`, script.js:1639, from `cur.condition.text`), never the Testing Panel's selected radio. The weather emoji icon was already fixed to follow the override (`weatherIconForCode(getEffectiveConditionCode())`, from Build Log 18), but the description line underneath was missed in that pass — it stays fixed on whatever the real live weather happens to be, regardless of which condition is being previewed.
+- [ ] **Requested fix:** make the description text follow the same effective-condition logic as the icon — read from `WX_CONDITIONS[getEffectiveConditionCode()].text` (falling back to `weatherState.conditionText` if the code isn't found, matching `weatherIconForCode`'s fallback pattern) instead of `weatherState.conditionText` directly.
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
