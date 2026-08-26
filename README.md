@@ -427,7 +427,14 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
-_Empty — nothing currently queued._
+### Hail revamp: faster base speed, smaller boost multiplier, lower gravity
+
+- [ ] **Current values (confirmed in script.js:861, 1069, 1072):** `HAIL_GRAVITY = 3`; `baseSpeed = 3.5 + Math.random() * 1` (3.5-4.5); the 25%-boosted tier uses `baseSpeed * 2` (7-9).
+- [ ] **Requested changes, confirmed with the user:**
+  1. Increase `baseSpeed` by 25%: `3.5 + Math.random() * 1` → `4.375 + Math.random() * 1.25` (4.375-5.625).
+  2. Reduce the boosted tier's multiplier from `× 2` to `× 1.5`: `baseSpeed * 2` → `baseSpeed * 1.5` (boosted range becomes ~6.6-8.4, versus the new unboosted 4.375-5.625).
+  3. Reduce `HAIL_GRAVITY` by 50%: `3` → `1.5`.
+- [ ] **Expected/intended consequences of this combination, worth confirming look right once built:** since bounce height is `vy0²/(2g)` and flight time is `2vy0/g`, halving gravity alone roughly doubles both height and duration for a given launch speed; the 25% speed increase adds further height/duration on top of that — together this should produce the higher bounces the user wants. Separately, shrinking the boost multiplier from 2× to 1.5× directly narrows the height gap between boosted and unboosted stones from a 4× ratio (2²) down to a 2.25× ratio (1.5²), which is the specific lever for "not such a massive difference in bounce heights." The user also described wanting "smooth falling down, without a long trail" as the overall goal of this pass — noted here as intent/context for whoever builds it, not a separate mechanism to design; the numeric changes above are the full extent of what's being requested.
 
 ## Build Planner
 
