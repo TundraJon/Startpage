@@ -396,6 +396,12 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [ ] **Current behavior (confirmed in script.js:823-825):** `cloudOverlayOpacity(cloudPct, daytime) { return daytime ? cloudPct / 2 / 100 : cloudPct / 100; }`. Daytime opacity maxes out at 50% (100% cloud cover ÷ 2 ÷ 100), which is why too much sky color still shows through at full daytime cloud cover. Nighttime already scales straight to 100% opacity at 100% cloud cover and is unaffected by this.
 - [ ] **Requested change:** change the daytime scale so 100% cloud cover produces 75% overlay opacity instead of 50% — i.e. replace the `/2` with a `* 0.75` (`cloudPct * 0.75 / 100`), keeping 0% cloud cover still fully transparent. Nighttime formula stays exactly as-is.
 
+### Night cloud tint reads too blue — needs desaturation toward gray
+
+- [ ] **Current behavior (confirmed in script.js:813-821):** `computeCloudTint` takes the night sky color (`DEEP_NIGHT_SKY` = `#020617`, a deep navy — R2 G6 B23) and multiplies every channel by the same scalar (`rgb = skyRgb.map(v => v * multiplier)`, multiplier up to ~4x at night). A per-channel scalar multiply preserves hue exactly — it only changes brightness. So the night cloud tint will always read as blue/navy no matter how the night-brightness percentage is tuned; brightness and "grayness" are two different things this formula conflates.
+- [ ] **User feedback:** night clouds look a little too blue, want them more gray.
+- [ ] **Requested fix, confirmed with the user:** after computing the brightened tint color, blend it toward a neutral gray by a tunable percentage — add a new Testing Panel slider (consistent with the existing cloud-brightness and fog-tunable sliders) for this blend amount so it can be adjusted visually. Suggested approach: compute a neutral gray from the tint's own channels (e.g. average of R/G/B, or luminance) and `lerpRgb(tintRgb, grayRgb, blendPct/100)`; exact target gray calculation and default blend % can be chosen at build time and tuned visually, same as prior cloud/fog formula work. Scope is night only — daytime cloud tint isn't reported as having this problem.
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
