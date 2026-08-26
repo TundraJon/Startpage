@@ -336,6 +336,13 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
+### Investigate: hailstones appear to trail when not visually tracked (likely a display/perception effect, not a code bug)
+
+- [ ] **Investigated, no code bug found.** Hail is drawn as a single filled circle per frame with no persistent trail geometry (unlike rain, which intentionally draws a streak). Verified the canvas is fully cleared every frame — tracked bright-pixel overlap between consecutive frames, which stayed low during the fall phase, consistent with clean clear-and-redraw rather than accumulating residue.
+- [ ] **User's own diagnostics point to a phantom-array (stroboscopic) effect, not a rendering bug:** a screenshot looks perfect (no trail baked into any single frame); tracking a stone with the eyes shows no trail; staring at the screen without tracking shows a consistent trail of ~7 stones. This is the textbook signature of the phantom array effect on a sample-and-hold display (phone LCD/OLED) — a moving object only exists at discrete per-refresh positions, and a fixed (non-tracking) gaze lands each of those positions on a different retinal spot, perceived as multiple copies rather than one smooth blur.
+- [ ] **Possible contributing factor, unconfirmed:** how consistent the actual frame-to-frame timing of `stepConditionSkin`'s rAF loop is on a real device — more jitter/inconsistency in frame pacing could make the phantom-array effect more pronounced than on a perfectly smooth 60/120fps cadence. This might explain why the user hasn't noticed the effect with hail in other (likely natively-rendered) apps. Not yet measured on a real device.
+- [ ] **Not clearly "fixable" in the traditional sense** — the underlying phenomenon is a display/perception effect, not a logic error. If revisited, the actionable angle would be checking real frame-pacing consistency (e.g., logging `ts` deltas between `stepConditionSkin` calls on the user's actual phone) rather than anything about the drawing code itself, which has already been verified correct.
+
 ### Hail bounce: wider angle + energy-conserving vertical/horizontal split (replaces the earlier height-boost/decoupling plan)
 
 - [ ] **Context:** this fully replaces the previous version of this entry after further discussion — the "flat heightMult + decoupled horizontal drift" approach is out, in favor of a physically-grounded energy model the user specifically wants, using real trigonometric vector decomposition ("the Pythagorean relationship for vector magnitudes").
