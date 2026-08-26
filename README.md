@@ -402,6 +402,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [ ] **User feedback:** night clouds look a little too blue, want them more gray.
 - [ ] **Requested fix, confirmed with the user:** after computing the brightened tint color, blend it toward a neutral gray by a tunable percentage — add a new Testing Panel slider (consistent with the existing cloud-brightness and fog-tunable sliders) for this blend amount so it can be adjusted visually. Suggested approach: compute a neutral gray from the tint's own channels (e.g. average of R/G/B, or luminance) and `lerpRgb(tintRgb, grayRgb, blendPct/100)`; exact target gray calculation and default blend % can be chosen at build time and tuned visually, same as prior cloud/fog formula work. Scope is night only — daytime cloud tint isn't reported as having this problem.
 
+### Set fog density blob count default to 5
+
+- [ ] **Current default (confirmed in script.js:789 and 1380):** `WX_FOG_TUNABLES.blobCount = 4`, and the Testing Panel's reset button also restores it to 4.
+- [ ] **Requested change:** change the default (and the reset-button value) from 4 to 5.
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
