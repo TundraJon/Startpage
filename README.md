@@ -407,6 +407,17 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [ ] **Current default (confirmed in script.js:789 and 1380):** `WX_FOG_TUNABLES.blobCount = 4`, and the Testing Panel's reset button also restores it to 4.
 - [ ] **Requested change:** change the default (and the reset-button value) from 4 to 5.
 
+### All Testing Panel condition checkboxes should also drive the weather condition icon
+
+- [ ] **Current behavior:** `weatherEmojiBtn`'s icon is only ever set from real live data (`weatherIconForCode(weatherState.conditionCode)` in `renderWeatherExtras()`). None of the 8 `.test-condition-skin` checkboxes (Partly Cloudy, Overcast/Cloudy, Light Rain, Heavy Rain, Thunderstorm, Snow, Fog/Mist, Hail) touch the icon at all when checked in the Testing Panel — only the visual precip/skin effect changes.
+- [ ] **Requested change:** checking a condition checkbox should also preview that condition's icon on `weatherEmojiBtn`, overriding the live icon while any test condition is active; unchecking all of them (or Reset) reverts to the real live-data icon as today.
+- [ ] **Icon per condition (mostly unambiguous, reusing `WX_WEATHER_ICON_MAP`'s existing emoji):**
+  - Light Rain → 🌦️, Heavy Rain → 🌧️, Thunderstorm → ⛈️, Fog/Mist → 🌫️ (each already has exactly one matching icon in the live map).
+  - Partly Cloudy → 🌤️, Cloudy → 🌥️, Overcast → ☁️ (per the icon choices already finalized in the queue item above, once that checkbox split is built).
+  - Hail → 🧊 (confirmed with the user — reuses the existing ice-pellet icon; hail has no dedicated code/icon in the live map).
+  - Snow → 🌨️ (the live map has three snow-severity icons — 🌨️ light, ❄️ heavy, 🧊 ice pellets; user had no preference between them, so 🌨️ is picked here as a reasonable single default for the one "Snow" checkbox — happy to swap if it doesn't look right once built).
+- [ ] **Open question for whoever builds this:** the Testing Panel allows multiple condition checkboxes at once (e.g. Overcast + Rain). Not yet specified which icon should win when more than one is checked — a severity-based priority order consistent with how the rest of the code already prioritizes conditions (e.g. `conditionShiftPct` checks thunderstorm, then heavyRain, then lightRain, in that order) would be a reasonable default: thunderstorm → hail → heavyRain → lightRain → snow → fog → overcast → cloudy → partlyCloudy. Confirm or adjust before/at build time.
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
