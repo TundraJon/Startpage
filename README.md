@@ -336,6 +336,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
+### Fog/Mist should drift consistently left-to-right
+
+- [ ] **Current behavior, checked precisely — not quite what it looked like.** Each fog blob's direction is independently randomized at creation (`dir: Math.random() < 0.5 ? 1 : -1`, script.js), so it's not actually a uniform right-to-left drift — it's a per-blob coin flip. With the default of only 4 blobs, it's easy to see mostly (or by chance all) right-moving ones and read that as the whole layer's direction.
+- [ ] **Fix:** drop the per-blob randomization — all fog blobs should drift the same way, left to right (`dir` fixed to `1` for every blob, or the `dir` field removed entirely and the `+1` baked directly into the drift calculation).
+
 ### Replace the thunderstorm flash/bolt system (supersedes the Build Log 16 version) — fully reconciled spec
 
 - [ ] **Context:** the user shared a more detailed reference lightning system and we went through every point where it diverges from what's currently built (Build Log 16), deciding each individually. This entry is the fully reconciled result — a straight replacement of the current `flashState`/`generateBoltPath`/`drawBoltPath` implementation, not an addition to it.
