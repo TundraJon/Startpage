@@ -336,6 +336,12 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
+### Hail bounce angle is half the width the user intended
+
+- [ ] **Current behavior, confirmed live (Build Log 16, committed):** `p.bounceAngle = (Math.random() * 60 - 30) * Math.PI / 180` — a random angle measured from vertical, ±30°, so a 60° total arc centered on straight up.
+- [ ] **Intended per the user's clarification:** the boundary should be 30° *above horizontal* on each side, not 30° from vertical. Since horizontal is 90° from vertical, that means each boundary is 60° from vertical, for a 120° total arc (double the current width).
+- [ ] Fix: change the angle roll to `(Math.random() * 120 - 60) * Math.PI / 180` (±60° from vertical instead of ±30°). The rest of the mechanism (height variance, `hop * Math.tan(angle)` horizontal drift, everything rolled together at the start of each bounce) stays exactly as already built — only the angle range changes.
+
 ### Replace the thunderstorm flash/bolt system (supersedes the Build Log 16 version) — fully reconciled spec
 
 - [ ] **Context:** the user shared a more detailed reference lightning system and we went through every point where it diverges from what's currently built (Build Log 16), deciding each individually. This entry is the fully reconciled result — a straight replacement of the current `flashState`/`generateBoltPath`/`drawBoltPath` implementation, not an addition to it.
