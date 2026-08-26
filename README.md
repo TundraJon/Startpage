@@ -336,11 +336,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
-### Hail bounce angle is half the width the user intended
+### Hail bounce: wider angle, flat height boost, and decoupled horizontal drift
 
-- [ ] **Current behavior, confirmed live (Build Log 16, committed):** `p.bounceAngle = (Math.random() * 60 - 30) * Math.PI / 180` — a random angle measured from vertical, ±30°, so a 60° total arc centered on straight up.
-- [ ] **Intended per the user's clarification:** the boundary should be 30° *above horizontal* on each side, not 30° from vertical. Since horizontal is 90° from vertical, that means each boundary is 60° from vertical, for a 120° total arc (double the current width).
-- [ ] Fix: change the angle roll to `(Math.random() * 120 - 60) * Math.PI / 180` (±60° from vertical instead of ±30°). The rest of the mechanism (height variance, `hop * Math.tan(angle)` horizontal drift, everything rolled together at the start of each bounce) stays exactly as already built — only the angle range changes.
+- [ ] **Angle is half the width intended.** Currently live (Build Log 16): `p.bounceAngle = (Math.random() * 60 - 30) * Math.PI / 180` — ±30° from vertical, a 60° total arc. The user meant the boundary to be 30° *above horizontal* on each side, not 30° from vertical — since horizontal is 90° from vertical, each boundary is actually 60° from vertical, for a 120° total arc (double the current width). Fix: `(Math.random() * 120 - 60) * Math.PI / 180`.
+- [ ] **Height boost simplified to a flat value, not a random range.** Currently live: `p.bounceHeightMult = Math.random() < 0.25 ? 1 + (0.01 + Math.random() * 0.99) : 1` — the 25% that get a bonus get a *random* 1–100% extra, which the user found too subtle to notice (many rolls land near the low end). Fix: flat `heightMult = 2` for that 25%, `1` for the rest — no range, just double or normal.
+- [ ] **Horizontal drift must not scale with the height boost — root cause of a "shot out of a gun" look, caught before building.** The existing formula computes horizontal drift as `hop * Math.tan(angle)`, i.e., directly off the same (possibly boosted) vertical hop value — so a stone with both a wide angle *and* a height bonus would also fly proportionally further sideways, which would look like it ricocheted off a wall rather than just bounced higher. Fix: compute an *unboosted* reference hop (`baseHop`, using `heightMult = 1` always) purely for the horizontal drift calculation (`baseHop * Math.tan(angle)`), while the vertical position keeps using the actual (possibly doubled) `hop`. This way angle alone governs how far sideways a stone travels, completely independent of whether that stone got the height bonus — a boosted stone bounces visibly higher in place, at exactly the same sideways reach as an unboosted stone at the same angle.
 
 ### Replace the thunderstorm flash/bolt system (supersedes the Build Log 16 version) — fully reconciled spec
 
