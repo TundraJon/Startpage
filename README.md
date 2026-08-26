@@ -418,6 +418,15 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
   - Snow → 🌨️ (the live map has three snow-severity icons — 🌨️ light, ❄️ heavy, 🧊 ice pellets; user had no preference between them, so 🌨️ is picked here as a reasonable single default for the one "Snow" checkbox — happy to swap if it doesn't look right once built).
 - [ ] **Open question for whoever builds this:** the Testing Panel allows multiple condition checkboxes at once (e.g. Overcast + Rain). Not yet specified which icon should win when more than one is checked — a severity-based priority order consistent with how the rest of the code already prioritizes conditions (e.g. `conditionShiftPct` checks thunderstorm, then heavyRain, then lightRain, in that order) would be a reasonable default: thunderstorm → hail → heavyRain → lightRain → snow → fog → overcast → cloudy → partlyCloudy. Confirm or adjust before/at build time.
 
+### Weather icon corrections: drizzle and blowing snow
+
+- [ ] **Current behavior (confirmed in `WX_WEATHER_ICON_MAP`, script.js:521-530):**
+  - Drizzle icons are currently split: codes 1150 (Patchy light drizzle) and 1153 (Light drizzle) already use 🌦️, but the freezing-drizzle codes — 1072 (Patchy freezing drizzle possible), 1168 (Freezing drizzle), 1171 (Heavy freezing drizzle) — are grouped with plain rain and use 🌧️ instead.
+  - Blowing snow (code 1114) is grouped with the general snow icon 🌨️, same as patchy/light/moderate snow.
+- [ ] **Requested change, confirmed with the user:**
+  - All drizzle conditions use 🌦️ uniformly — move 1072, 1168, and 1171 from 🌧️ to 🌦️, joining 1150/1153.
+  - Blowing snow (1114) gets its own distinct icon, 🌬️, separated out from the general 🌨️ snow group.
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
