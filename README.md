@@ -363,7 +363,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
-_Empty — nothing currently queued._
+### Double hail bounce height baseline
+
+- [ ] **Current behavior (confirmed in script.js:980-983):** `baseSpeed = 7 + Math.random() * 2` (7-9). Non-boosted stones (75%) use `speed = baseSpeed` (7-9); the boosted 25% use `speed = baseSpeed * 2` (14-18). This `speed` value feeds the trig split (`bounceVertical = speed * cos(bounceAngle)`, `bounceHorizontal = speed * sin(bounceAngle)`), so it's the number that ultimately sets bounce height/trajectory for every stone.
+- [ ] **User feedback:** the double-speed 25% of stones aren't visually distinguishable from the rest — they all blend together — and overall the bounce doesn't look realistic enough.
+- [ ] **Requested change:** double the starting `baseSpeed` value itself (7-9 → 14-18), so every stone's bounce height doubles from where it is now. Since the boosted tier is `baseSpeed * 2`, doubling the base cascades automatically — boosted stones become 28-36. No other change to the angle/trig model.
 
 ## Build Planner
 
