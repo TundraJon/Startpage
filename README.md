@@ -421,6 +421,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [ ] **Current behavior (confirmed in script.js:620):** `descEl.textContent = weatherState.conditionText;` — this only ever reflects real live-data text (set in `applyLiveWeatherData`, script.js:1639, from `cur.condition.text`), never the Testing Panel's selected radio. The weather emoji icon was already fixed to follow the override (`weatherIconForCode(getEffectiveConditionCode())`, from Build Log 18), but the description line underneath was missed in that pass — it stays fixed on whatever the real live weather happens to be, regardless of which condition is being previewed.
 - [ ] **Requested fix:** make the description text follow the same effective-condition logic as the icon — read from `WX_CONDITIONS[getEffectiveConditionCode()].text` (falling back to `weatherState.conditionText` if the code isn't found, matching `weatherIconForCode`'s fallback pattern) instead of `weatherState.conditionText` directly.
 
+### Change night gray blend default from 50% to 75%
+
+- [ ] **Current default (confirmed in script.js:848 and 1490; index.html:357-358):** `WX_CLOUD_TUNABLES.nightGrayBlendPct = 50`, matching the reset value and the slider's initial `value="50"`/label.
+- [ ] **Requested change:** change the default (script.js:848), the reset-button value (script.js:1490), and the HTML slider's initial value/label (index.html:357-358) from 50 to 75.
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
