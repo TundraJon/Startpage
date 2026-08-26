@@ -390,41 +390,44 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [x] Replaced the Testing Panel's 8 broad, mostly-unwired checkboxes with 48 radio buttons — one per exact WeatherAPI condition, grouped under category subheadings (Clear & Cloud, Fog, Rain & Drizzle, Freezing Rain & Drizzle, Thunderstorm, Snow, Sleet & Ice) — plus a "Live / No Override" option, since only one real condition is ever active at once (checkboxes previously allowed nonsensical multi-selects and needed a priority-order scheme this eliminates entirely). Selecting one now sets both the previewed weather icon and the previewed animation together. Sleet and ice-pellet codes now trigger the Hail bounce animation (previously lumped in with Snow); freezing rain/drizzle codes split into Light/Heavy Rain by severity, matching how plain rain already worked.
 - [x] Verified: spot-checked 9 icon corrections across the categories (all matched exactly), confirmed `thunderSnow` produces both a lightning flash within its normal timing window and visible falling-snow pixels with no rain, confirmed `snowFog` (Blizzard) produces both snow and heavy fog coverage simultaneously, confirmed Reset returns to "Live / No Override" and restores all slider defaults, and swept all 49 radio values (48 conditions + Live) with zero real errors (only the pre-existing, unrelated favicon 404 appeared).
 
+## Build Log 19 (completed)
+
+### Heavy freezing drizzle (1171) moved from Heavy Rain to Light Rain
+
+- [x] `WX_CONDITIONS[1171].anim` changed from `'heavyRain'` to `'lightRain'`.
+
+### Snow showers (1255, 1258) now show snow + light rain together
+
+- [x] Added a new `snowRain: ['snow', 'lightRain']` composite to `WX_ANIM_DECOMPOSE`, following the same pattern as `thunderSnow`/`snowFog`. Set both 1255 (Light snow showers) and 1258 (Moderate or heavy snow showers) to `anim: 'snowRain'`. No changes needed to the rain-forcing guard — `lightRain` was never part of it, so both effects compose automatically.
+- [x] Verified: both codes render visible snow (white) pixels alongside additional non-white pixels (the rain streaks), confirming both effects are active simultaneously.
+
+### Hail slowed to 25% of its (already-doubled) speed, count cut to 22
+
+- [x] `baseSpeed` changed from `14 + Math.random() * 4` to `3.5 + Math.random() * 1` (25% of the Build Log 18 value), and the hailstone loop count from 30 to 22 (75% of the original), per the report that hail was "bouncing all over the place, filling the screen" and reading more like a snow flurry. Bounce height and flight time shrink proportionally along with the fall speed, as confirmed with the user beforehand — an intended consequence of the speed cut, not decoupled.
+- [x] Verified with a deterministic `Math.random()` override: measured fall speed came out to exactly 4.0px/frame across three frames, matching the hand-calculated `3.5 + 0.5×1 = 4.0` precisely.
+
+### Sleet showers (1249, 1252) now show hail + rain, split by severity
+
+- [x] Added `hailLightRain: ['hail', 'lightRain']` and `hailHeavyRain: ['hail', 'heavyRain']` to `WX_ANIM_DECOMPOSE`. Set 1249 (Light sleet showers) to `hailLightRain` and 1252 (Moderate or heavy sleet showers) to `hailHeavyRain`. Plain sleet (1069, 1204, 1207 — no "showers" in the name) left unchanged as plain `hail`, per the confirmed scope.
+- [x] Verified: both codes render a substantial mix of hail-bounce and rain-streak pixels together.
+
+### Condition description text now follows the Testing Panel override
+
+- [x] `descEl.textContent` was hardcoded to `weatherState.conditionText` (real live data only) even after the icon was fixed to follow the effective condition in Build Log 18 — the description line underneath was missed in that pass and stayed stuck on whatever the real weather happened to be. Now reads `WX_CONDITIONS[getEffectiveConditionCode()].text`, falling back to `weatherState.conditionText` if the code isn't found, matching `weatherIconForCode`'s own fallback pattern.
+- [x] Verified: description text now updates correctly across multiple previewed conditions (e.g. "Sunny / Clear", "Blizzard", "Heavy freezing drizzle"), matching whichever radio is selected.
+
+### Night gray blend default raised from 50% to 75%
+
+- [x] `WX_CLOUD_TUNABLES.nightGrayBlendPct` default, the reset-button value, and the Testing Panel slider's initial value/label all changed from 50 to 75.
+- [x] Verified: slider defaults to 75 on load and correctly restores to 75 after Reset.
+
+### Regression check
+
+- [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
+
 ## Build Queue
 
-### Heavy freezing drizzle (1171): change animation from Heavy Rain to Light Rain
-
-- [ ] **Current behavior (confirmed in script.js WX_CONDITIONS):** code 1171 "Heavy freezing drizzle" has `anim: 'heavyRain'`, set per the earlier "freezing rain/drizzle by severity" rule.
-- [ ] **Requested change, confirmed with the user:** change 1171's `anim` to `'lightRain'`. No other freezing-rain/drizzle codes affected — this is specifically about 1171.
-
-### Snow showers (1255, 1258): new combined snow + light rain animation
-
-- [ ] **Current behavior:** "Light snow showers" (1255) and "Moderate or heavy snow showers" (1258) both have `anim: 'snow'` (plain snow, no rain).
-- [ ] **Requested change, confirmed with the user:** both codes get a new composite animation — snow falling together with the Light Rain effect. Following the same pattern already used for `thunderSnow`/`snowFog` (decomposing a composite key into existing base effects via `WX_ANIM_DECOMPOSE` rather than new rendering logic), add `snowRain: ['snow', 'lightRain']` and set both 1255 and 1258 to `anim: 'snowRain'`.
-- [ ] **Note for whoever builds this:** double-check whether the existing `heavy = c.has('heavyRain') || (c.has('thunderstorm') && !c.has('snow'))` rain-forcing guard needs any adjustment for this new composite — `lightRain` isn't part of that heavy-rain-forcing logic at all (it's driven by the separate `c.has('lightRain') ? 17 : 0` branch), so decomposing `snowRain` into `{snow, lightRain}` should just work by simply having both flags active simultaneously, same as the other two composites — but verify this is actually the case once built, the same way `thunderSnow`/`snowFog` were verified.
-
-### Hail: cut baseSpeed to 25% of its current value
-
-- [ ] **Current behavior (confirmed in script.js:1062):** `const baseSpeed = 14 + Math.random() * 4;` (14-18, boosted 25% of stones to 28-36) — this is already-doubled from the pre-Build-Log-18 baseline (7-9/14-18) at the user's earlier request.
-- [ ] **User feedback:** the hail animation is currently far too fast — stones "bouncing all over the place, filling the screen," reading more like a snow flurry than discrete hail.
-- [ ] **Requested change, confirmed with the user:** cut `baseSpeed` to 25% of its current value: `14 + Math.random() * 4` → `3.5 + Math.random() * 1`, so the range becomes 3.5-4.5 (boosted stones 7-9 — notably now *lower* than the pre-doubling original 7-9/14-18 baseline, since this is a 75% cut applied on top of the earlier doubling, not a reversion to the old value).
-- [ ] **Explicitly confirmed consequence:** since `HAIL_GRAVITY` stays unchanged and both bounce height (`vy0²/2g`) and flight time (`2vy0/g`) scale with the launch speed, this cut shrinks bounce arcs proportionally too (roughly to 1/16 the peak height, 1/4 the flight time, at a given angle) — not just the fall speed. The user chose this (full proportional cut) over the alternative (slowing fall speed only, decoupling bounce scale) when asked directly.
-- [ ] **Also requested: cut the hailstone count to 75% of current.** Current count is 30 (`for (let i = 0; i < 30; i++)`, script.js:1058); 75% of 30 is 22.5, rounded to 22.
-
-### Sleet showers (1249, 1252): new combined hail + rain animation, split by severity
-
-- [ ] **Current behavior:** all five sleet codes (1069 Patchy sleet possible, 1204 Light sleet, 1207 Moderate or heavy sleet, 1249 Light sleet showers, 1252 Moderate or heavy sleet showers) currently use plain `anim: 'hail'`.
-- [ ] **Requested change, confirmed with the user:** scoped to the two "showers" codes only — 1069/1204/1207 (plain sleet, no "showers" in the name) stay plain `hail`, unchanged. Add two new composites, following the same `WX_ANIM_DECOMPOSE` pattern as `thunderSnow`/`snowFog`/`snowRain`: `hailLightRain: ['hail', 'lightRain']` and `hailHeavyRain: ['hail', 'heavyRain']`. Set 1249 (Light sleet showers) to `anim: 'hailLightRain'` and 1252 (Moderate or heavy sleet showers) to `anim: 'hailHeavyRain'` — split by severity, matching how freezing rain/drizzle already splits Light/Heavy Rain by severity.
-
-### Condition description text doesn't follow the Testing Panel override (stuck on real live data)
-
-- [ ] **Current behavior (confirmed in script.js:620):** `descEl.textContent = weatherState.conditionText;` — this only ever reflects real live-data text (set in `applyLiveWeatherData`, script.js:1639, from `cur.condition.text`), never the Testing Panel's selected radio. The weather emoji icon was already fixed to follow the override (`weatherIconForCode(getEffectiveConditionCode())`, from Build Log 18), but the description line underneath was missed in that pass — it stays fixed on whatever the real live weather happens to be, regardless of which condition is being previewed.
-- [ ] **Requested fix:** make the description text follow the same effective-condition logic as the icon — read from `WX_CONDITIONS[getEffectiveConditionCode()].text` (falling back to `weatherState.conditionText` if the code isn't found, matching `weatherIconForCode`'s fallback pattern) instead of `weatherState.conditionText` directly.
-
-### Change night gray blend default from 50% to 75%
-
-- [ ] **Current default (confirmed in script.js:848 and 1490; index.html:357-358):** `WX_CLOUD_TUNABLES.nightGrayBlendPct = 50`, matching the reset value and the slider's initial `value="50"`/label.
-- [ ] **Requested change:** change the default (script.js:848), the reset-button value (script.js:1490), and the HTML slider's initial value/label (index.html:357-358) from 50 to 75.
+_Empty — nothing currently queued._
 
 ## Build Planner
 

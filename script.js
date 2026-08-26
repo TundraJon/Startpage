@@ -533,9 +533,10 @@
   // Single source of truth for every WeatherAPI condition code: its display text, its icon, and
   // which Live Condition Skin animation it triggers. `anim` is null for the clear/cloud-only
   // states (no precipitation effect, cloud-tint only) or one of 'lightRain'/'heavyRain'/
-  // 'thunderstorm'/'snow'/'hail'/'fog', plus two composites — 'thunderSnow' (thunderstorm +
-  // snow simultaneously) and 'snowFog' (snow + fog simultaneously) — that WX_ANIM_DECOMPOSE
-  // expands into their base effects rather than needing dedicated rendering logic of their own.
+  // 'thunderstorm'/'snow'/'hail'/'fog', plus five composites — 'thunderSnow' (thunderstorm +
+  // snow), 'snowFog' (snow + fog), 'snowRain' (snow + light rain), 'hailLightRain' and
+  // 'hailHeavyRain' (hail + light/heavy rain) — that WX_ANIM_DECOMPOSE expands into their base
+  // effects rather than needing dedicated rendering logic of their own.
   const WX_CONDITIONS = {
     1000: { text: 'Sunny / Clear', icon: '☀️', anim: null },
     1003: { text: 'Partly cloudy', icon: '🌤️', anim: null },
@@ -559,7 +560,7 @@
     1243: { text: 'Moderate or heavy rain shower', icon: '🌧️', anim: 'heavyRain' },
     1072: { text: 'Patchy freezing drizzle possible', icon: '🌦️', anim: 'lightRain' },
     1168: { text: 'Freezing drizzle', icon: '🌦️', anim: 'lightRain' },
-    1171: { text: 'Heavy freezing drizzle', icon: '🌦️', anim: 'heavyRain' },
+    1171: { text: 'Heavy freezing drizzle', icon: '🌦️', anim: 'lightRain' },
     1246: { text: 'Torrential rain shower', icon: '🌧️', anim: 'heavyRain' },
     1087: { text: 'Thundery outbreaks possible', icon: '⛈️', anim: 'thunderstorm' },
     1273: { text: 'Patchy light rain with thunder', icon: '⛈️', anim: 'thunderstorm' },
@@ -574,14 +575,14 @@
     1210: { text: 'Patchy light snow', icon: '🌨️', anim: 'snow' },
     1213: { text: 'Light snow', icon: '🌨️', anim: 'snow' },
     1216: { text: 'Patchy moderate snow', icon: '🌨️', anim: 'snow' },
-    1249: { text: 'Light sleet showers', icon: '🌨️', anim: 'hail' },
-    1252: { text: 'Moderate or heavy sleet showers', icon: '🌨️', anim: 'hail' },
-    1255: { text: 'Light snow showers', icon: '🌨️', anim: 'snow' },
+    1249: { text: 'Light sleet showers', icon: '🌨️', anim: 'hailLightRain' },
+    1252: { text: 'Moderate or heavy sleet showers', icon: '🌨️', anim: 'hailHeavyRain' },
+    1255: { text: 'Light snow showers', icon: '🌨️', anim: 'snowRain' },
     1117: { text: 'Blizzard', icon: '❄️', anim: 'snowFog' },
     1219: { text: 'Moderate snow', icon: '❄️', anim: 'snow' },
     1222: { text: 'Patchy heavy snow', icon: '❄️', anim: 'snow' },
     1225: { text: 'Heavy snow', icon: '❄️', anim: 'snow' },
-    1258: { text: 'Moderate or heavy snow showers', icon: '❄️', anim: 'snow' },
+    1258: { text: 'Moderate or heavy snow showers', icon: '❄️', anim: 'snowRain' },
     1237: { text: 'Ice pellets', icon: '🧊', anim: 'hail' },
     1261: { text: 'Light showers of ice pellets', icon: '🧊', anim: 'hail' },
     1264: { text: 'Moderate or heavy showers of ice pellets', icon: '🧊', anim: 'hail' },
@@ -592,6 +593,9 @@
   const WX_ANIM_DECOMPOSE = {
     thunderSnow: ['thunderstorm', 'snow'],
     snowFog: ['snow', 'fog'],
+    snowRain: ['snow', 'lightRain'],
+    hailLightRain: ['hail', 'lightRain'],
+    hailHeavyRain: ['hail', 'heavyRain'],
   };
   function animKeysFor(anim) {
     if (!anim) return [];
@@ -617,7 +621,8 @@
       uvBadge.dataset.uv = String(Math.round(weatherState.uv));
     }
     locationEl.textContent = weatherState.locationName;
-    descEl.textContent = weatherState.conditionText;
+    const effectiveEntry = WX_CONDITIONS[getEffectiveConditionCode()];
+    descEl.textContent = effectiveEntry ? effectiveEntry.text : weatherState.conditionText;
     weatherEmojiBtn.textContent = weatherIconForCode(getEffectiveConditionCode());
   }
   renderWeatherExtras();
@@ -845,7 +850,7 @@
     // tuned. This blends the result toward a neutral gray (computed from its own channels) by a
     // separate, tunable percentage so brightness and "grayness" aren't conflated. Day tint isn't
     // affected — only reported as too blue at night.
-    nightGrayBlendPct: 50,
+    nightGrayBlendPct: 75,
   };
 
   // Hail bounce physics: HAIL_GRAVITY (px/frame^2) sets the parabola's steepness — calibrated so
@@ -1055,11 +1060,13 @@
       }
     }
     if (c.has('hail')) {
-      for (let i = 0; i < 30; i++) {
+      for (let i = 0; i < 22; i++) {
         // ~25% of stones fall twice as fast; that same fall speed becomes their own bounce
         // "energy" later — no separate height multiplier, a stone that fell faster just
-        // naturally bounces harder since energy in equals energy out.
-        const baseSpeed = 14 + Math.random() * 4;
+        // naturally bounces harder since energy in equals energy out. baseSpeed is cut to 25%
+        // of its Build Log 18 value (which had doubled it), so both fall speed and bounce
+        // height/duration read calmer rather than blanketing the widget.
+        const baseSpeed = 3.5 + Math.random() * 1;
         conditionParticles.push({
           type: 'hail', x: Math.random() * w, y: Math.random() * h,
           speed: Math.random() < 0.25 ? baseSpeed * 2 : baseSpeed,
@@ -1487,13 +1494,13 @@
       WX_CLOUD_TUNABLES.lightRainPct = 10;
       WX_CLOUD_TUNABLES.heavyRainPct = 20;
       WX_CLOUD_TUNABLES.thunderstormPct = 40;
-      WX_CLOUD_TUNABLES.nightGrayBlendPct = 50;
+      WX_CLOUD_TUNABLES.nightGrayBlendPct = 75;
       dayBaseSlider.value = 40; dayBaseValue.textContent = '40%';
       nightBaseSlider.value = 300; nightBaseValue.textContent = '300%';
       lightRainSlider.value = 10; lightRainValue.textContent = '10%';
       heavyRainSlider.value = 20; heavyRainValue.textContent = '20%';
       thunderstormSlider.value = 40; thunderstormValue.textContent = '40%';
-      nightGraySlider.value = 50; nightGrayValue.textContent = '50%';
+      nightGraySlider.value = 75; nightGrayValue.textContent = '75%';
       WX_FOG_TUNABLES.opacityPct = 45;
       WX_FOG_TUNABLES.blobCount = 5;
       WX_FOG_TUNABLES.sizePct = 40;
