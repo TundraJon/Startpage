@@ -488,6 +488,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
+### Night sky stars: make them a little bigger
+
+- [ ] **Current behavior (confirmed in script.js:1234):** each star's radius is `0.4 + Math.random() * 0.6`, a random 0.4-1.0px range (shrunk from 0.8-1.8px back in Build Log 15 as part of the event-driven-flicker star rewrite).
+- [ ] **Proposed change:** bump the range up ~50%, to `0.6 + Math.random() * 0.9` (0.6-1.5px) — same random spread and color/flicker logic untouched, just larger dots. Adjust up/down once seen live if "a little bigger" needs to be more or less than that.
+
 ### Hail bounce: narrow the random angle range from ±60° to ±45°
 
 - [ ] **Current behavior (confirmed in script.js:1305-1313):** each stone's bounce angle is drawn from a continuous random range of -60° to +60° off straight up (`(Math.random() * 120 - 60) * Math.PI / 180`), then split into vertical/horizontal launch velocity via true trig decomposition (`vy0 = speed*cos(angle)`, `vx0 = speed*sin(angle)`) so energy is conserved — a wide angle trades height for reach rather than getting both.
