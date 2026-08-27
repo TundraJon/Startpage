@@ -735,8 +735,118 @@
   }
   renderWeatherExtras();
 
+  // --- Hourly Forecast panel: a popover anchored to the row directly below the clock+weather
+  // widgets (see .hourly-panel in styles.css), not a pushed-down block — floats over the tile
+  // row beneath it rather than displacing it, per explicit user direction.
+  const hourlyPanel = document.getElementById('hourly-panel');
+  const hourlyStrip = document.getElementById('hourly-strip');
+  const hourlyPrecipGraph = document.getElementById('hourly-precip-graph');
+
+  // WeatherAPI's hour.time is "YYYY-MM-DD HH:MM" in 24-hour format.
+  function formatHourLabel(timeStr) {
+    const hh = parseInt(timeStr.slice(11, 13), 10);
+    const ap = hh >= 12 ? 'PM' : 'AM';
+    const h12 = hh % 12 === 0 ? 12 : hh % 12;
+    return h12 + ap;
+  }
+
+  function hourlyPrecipPct(hour) {
+    return Math.max(hour.chance_of_rain || 0, hour.chance_of_snow || 0);
+  }
+
+  function renderHourlyPrecipGraph(hours) {
+    const w = 100;
+    const h = 20;
+    hourlyPrecipGraph.innerHTML = '';
+    if (!hours.length) return;
+    const values = hours.map(hourlyPrecipPct);
+    const maxVal = Math.max(...values, 1); // avoid divide-by-zero; renders flat at the bottom when all 0
+    const step = w / Math.max(values.length - 1, 1);
+    const points = values.map((v, i) => {
+      const x = i * step;
+      const y = h - (v / maxVal) * (h - 2) - 1;
+      return x + ',' + y.toFixed(1);
+    }).join(' ');
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    line.setAttribute('points', points);
+    line.setAttribute('fill', 'none');
+    line.setAttribute('stroke', '#3b82f6');
+    line.setAttribute('stroke-width', '1.5');
+    line.setAttribute('vector-effect', 'non-scaling-stroke');
+    hourlyPrecipGraph.appendChild(line);
+  }
+
+  function renderHourlyPanel() {
+    hourlyStrip.innerHTML = '';
+    const hours = weatherState.hourly;
+    const conv = displayTempUnit === 'F' ? toF : toC;
+    const currentHourEpoch = Math.floor(Date.now() / 1000 / 3600) * 3600;
+    hours.forEach((hour) => {
+      const isNow = hour.time_epoch === currentHourEpoch;
+      const col = document.createElement('div');
+      col.className = 'hourly-col' + (isNow ? ' now' : '');
+
+      const time = document.createElement('span');
+      time.className = 'hourly-time';
+      time.textContent = isNow ? 'Now' : formatHourLabel(hour.time);
+      col.appendChild(time);
+
+      const emoji = document.createElement('span');
+      emoji.className = 'hourly-emoji';
+      emoji.textContent = weatherIconForCode(hour.condition && hour.condition.code);
+      col.appendChild(emoji);
+
+      const temp = document.createElement('span');
+      temp.className = 'hourly-temp';
+      temp.textContent = conv(hour.temp_f) + '°';
+      col.appendChild(temp);
+
+      const precipPct = hourlyPrecipPct(hour);
+      if (precipPct > 0) {
+        const precip = document.createElement('span');
+        precip.className = 'hourly-precip';
+        precip.textContent = precipPct + '%';
+        col.appendChild(precip);
+      }
+
+      hourlyStrip.appendChild(col);
+    });
+    hourlyStrip.scrollLeft = 0;
+    renderHourlyPrecipGraph(hours);
+  }
+
+  function closeHourlyPanel() {
+    hourlyPanel.classList.remove('open');
+    document.removeEventListener('click', handleHourlyOutsideClick, true);
+  }
+  function handleHourlyOutsideClick(e) {
+    if (hourlyPanel.contains(e.target) || e.target === weatherEmojiBtn) return;
+    closeHourlyPanel();
+  }
+  function openHourlyPanel() {
+    renderHourlyPanel();
+    hourlyPanel.classList.add('open');
+    document.addEventListener('click', handleHourlyOutsideClick, true);
+  }
+
   weatherEmojiBtn.addEventListener('click', () => {
-    showComingSoon('Hourly forecast', 'The hourly forecast view is coming in a later pass.');
+    if (hourlyPanel.classList.contains('open')) closeHourlyPanel();
+    else openHourlyPanel();
+  });
+
+  // Swipe-up dismiss on the panel itself (distinct from the strip's own horizontal scroll).
+  let hourlySwipeStartY = null;
+  hourlyPanel.addEventListener('pointerdown', (e) => {
+    hourlySwipeStartY = e.clientY;
+    // Without capture, a pointerup after the cursor has moved outside the panel's bounds
+    // (exactly what an upward swipe does) would never reach this element's own listener.
+    hourlyPanel.setPointerCapture(e.pointerId);
+  });
+  hourlyPanel.addEventListener('pointerup', (e) => {
+    if (hourlySwipeStartY === null) return;
+    const deltaUp = hourlySwipeStartY - e.clientY;
+    hourlySwipeStartY = null;
+    if (deltaUp > 40) closeHourlyPanel();
   });
 
   function applyWeatherToggles() {
@@ -1918,6 +2028,7 @@
     const loc = data.location || {};
     const cur = data.current || {};
     const fday = (data.forecast && data.forecast.forecastday && data.forecast.forecastday[0]) || {};
+    const fday2 = (data.forecast && data.forecast.forecastday && data.forecast.forecastday[1]) || {};
     const day = fday.day || {};
     const astro = fday.astro || {};
 
@@ -1944,7 +2055,12 @@
     if (parsedSunrise !== null) SUNRISE_SEC = parsedSunrise;
     if (parsedSunset !== null) SUNSET_SEC = parsedSunset;
     weatherState.alerts = (data.alerts && data.alerts.alert) || [];
-    weatherState.hourly = fday.hour || [];
+    // Next 12 hours starting at the current hour, spanning into tomorrow's data (fday2) when
+    // needed so this always has 12 entries regardless of what time of day it is.
+    const allHours = [].concat(fday.hour || [], fday2.hour || []);
+    const currentHourEpoch = Math.floor(Date.now() / 1000 / 3600) * 3600;
+    const startIdx = allHours.findIndex((h) => h.time_epoch >= currentHourEpoch);
+    weatherState.hourly = startIdx >= 0 ? allHours.slice(startIdx, startIdx + 12) : [];
 
     weatherLiveConditions.clear();
     animKeysFor(mapConditionCode(weatherState.conditionCode)).forEach((k) => weatherLiveConditions.add(k));
@@ -1954,6 +2070,7 @@
     renderWeatherExtras();
     renderWeatherSkin();
     applyAlertTicker();
+    if (hourlyPanel.classList.contains('open')) renderHourlyPanel();
 
     if (weatherState.tzId) {
       const abbr = tzAbbreviation(weatherState.tzId);
@@ -1988,7 +2105,9 @@
     const coords = await getCoords();
     weatherDebugState.coords = coords;
     try {
-      const url = `https://api.weatherapi.com/v1/forecast.json?key=${encodeURIComponent(key)}&q=${coords.lat},${coords.lon}&days=1&aqi=no&alerts=yes`;
+      // days=2 (not 1): the Hourly Forecast panel needs the next 12 hours from "now" at any time
+      // of day — with only today's 24 hours, fewer than 12 would remain late in the day.
+      const url = `https://api.weatherapi.com/v1/forecast.json?key=${encodeURIComponent(key)}&q=${coords.lat},${coords.lon}&days=2&aqi=no&alerts=yes`;
       const res = await fetch(url);
       if (!res.ok) throw new Error('WeatherAPI request failed: ' + res.status);
       const data = await res.json();
