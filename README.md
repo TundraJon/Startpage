@@ -638,6 +638,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [ ] **User's reasoning:** WeatherAPI sometimes reports a token 1% (or similarly negligible) chance that isn't meaningfully useful to show.
 - [ ] **Requested change:** `if (pct > 0)` → `if (pct >= 20)`. No other behavior changes — the cell still renders empty (reserved space, unchanged) below that threshold.
 
+### Main weather widget: swap the feels-like direction icons to 📉/📈
+
+- [ ] **Current behavior (confirmed in script.js:592-595, `renderWeatherTemps`):** `diff = feelsF - tempF`; when shown (`|diff| >= 3`), the feels-like readout is prefixed with `diff > 0 ? '🌡️' : '🌬️'` — thermometer when feels-like reads warmer than actual, wind gust when cooler.
+- [ ] **Requested change:** swap the two emoji only, same condition and threshold logic unchanged: `diff > 0 ? '📈' : '📉'` — 📈 (feels warmer than actual) and 📉 (feels colder than actual).
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
