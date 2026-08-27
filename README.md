@@ -566,7 +566,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
-_Empty — nothing currently queued._
+### Drifting clouds: newly-added clouds enter in a synchronized vertical line, not staggered
+
+- [ ] **User feedback:** raised cloud cover to 100% (10 clouds); the 8 newly-added ones all appeared lined up vertically at the left edge instead of staggered.
+- [ ] **Root cause — the exact simplification flagged (and wrongly built as-is) in Build 26's queue item:** the "cloud count increased" branch (script.js:1520-1523) spawns each new cloud via a plain `spawnCloud()` with no delay override, so every new cloud in that batch starts its drift animation at the same instant, from the same off-canvas-left position — visually a vertical line at the left edge until differing per-cloud speeds spread them out. This is different from the true first-load batch (script.js:1508-1512), which already staggers correctly via a random negative delay, and from an ordinary wrap-around respawn (`spawnCloud(oldCloud)`, script.js:1064-1086), which gets the random 0.1-5s positive hold-delay from Build 20 ("start delay") — the newly-added-cloud path was the one case left with no stagger at all.
+- [ ] **Requested fix:** give each newly-added cloud in that branch the same random positive hold-delay treatment as an ordinary respawn (`0.1 + Math.random() * 4.9` seconds), rather than leaving it at the default 0s delay — `spawnCloud()` already returns the created element, so this is just capturing it and setting `cloud.style.animationDelay` explicitly in that loop, without needing to touch `spawnCloud`'s own `oldCloud`-gated logic.
 
 ## Build Planner
 
