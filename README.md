@@ -551,7 +551,10 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
-_Empty — nothing currently queued._
+### Drifting clouds: raise the smallest size from 0.5rem to 0.75rem
+
+- [ ] **Current behavior (confirmed in script.js:1049-1053, `randomizeCloud`):** `size = 3 - 2.5 * f`, where `f = topPct / 66` — 3rem at the top edge down to 0.5rem at the 66% line (the bottom of the spawn band).
+- [ ] **Requested change:** raise the smallest size from 0.5rem to 0.75rem, keeping the largest (3rem at the top edge) and the duration/speed formula (`17 + 43*f` seconds) unchanged: `size = 3 - 2.25 * f` (3rem at `f=0` down to 0.75rem at `f=1`).
 
 ## Build Planner
 
