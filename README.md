@@ -627,6 +627,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [ ] **Temperature and condition icons 1.25× larger:** `.hourly-graph-icon` (condition icon on the graph, currently `font-size: 14px`) → `17.5px`; `.hourly-graph-label` (temperature label, currently `font-size: 9px`) → `11.25px`.
 - [ ] **Worth flagging before building, not just noting after:** this shrinks the graph's vertical room (×0.6) at the same time the icons get 1.25× bigger — the combination could cause icons to visually crowd or overlap each other more than before, especially for hours with close temperatures. Build it as specified and check live rather than guessing a different compromise unasked.
 
+### Hazard-alert row: increase icon size 20%
+
+- [ ] **Current behavior (confirmed in styles.css):** `.hourly-alert-icon` (the hazard icon in the top "warnings" row, paired with the colored dot, from Build 31) is `font-size: 0.45rem`. The row itself (`.hourly-row-alert .hourly-cell`) is 16px tall, per the user's own observation there's extra unused vertical space at that size.
+- [ ] **Requested change:** increase to `0.54rem` (0.45 × 1.2).
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
