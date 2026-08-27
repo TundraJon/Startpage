@@ -734,7 +734,12 @@ _Note: these two were live regressions from Build 36 actively breaking real usag
 
 ## Build Queue
 
-_Empty — nothing queued._
+### Tile 2-line name: second line partially cut off (top ~1/3 visible only)
+
+- [ ] **User feedback:** renamed a tile to something long enough to wrap to 2 lines; the second line was cut off about 2/3 of the way down, only the top third visible. Asked whether there's space above the icon (~5px worth) that could be reclaimed by nudging things up.
+- [ ] **Checked the proposed mechanism directly — doesn't quite match reality:** measured `.tile`'s actual layout with a real icon + a long 2-line name at several viewport widths (320-412px). There is only about **1px** of space between the tile's top padding and the icon at every size tested — nowhere near 5px to reclaim by moving the icon up. So "space above the icon" isn't really the available slack here.
+- [ ] **More likely root cause (styles.css, `.tile span`):** the rule uses `-webkit-line-clamp: 2` to cap the name at 2 lines, but never sets an explicit `line-height` (it's left at the default `normal`). `-webkit-line-clamp`'s clamp-box height is computed as `line-height × line count`, and leaving it at `normal` is a well-known source of that calculation coming out slightly short on some browsers/platforms — producing exactly this symptom (a partially-visible last line, not a phantom extra line or a cleanly-hidden one). This wasn't reproducible in this sandbox's browser (rendered cleanly with ~3px to spare), consistent with it being a platform/font-rendering-dependent rounding gap rather than a flat, everywhere-reproducible bug.
+- [ ] **Requested fix:** set an explicit numeric `line-height` (e.g. `1.2`) on `.tile span` so the line-clamp calculation is precise and consistent instead of relying on the imprecise default. Combine with a small trim to the icon's fill size (`.tile img`, currently `width/height: 75%`) — maybe to ~68-70% — to give the 2-line text a bit more real vertical room in the tight overall budget (measured total slack between icon+text and the tile's bottom edge is only ~3px currently), rather than just repositioning within an already-tight space.
 
 ## Build Planner
 
