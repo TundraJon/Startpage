@@ -520,6 +520,18 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
+### Weather widget: reduce phone heating from the Live Condition Skin animation loop
+
+- [ ] **User feedback:** their phone gets warm while using the app, asked what's causing it and what can be done.
+- [ ] **Root cause diagnosed in `stepConditionSkin` (script.js:1243-onward):** the animation loop runs on an uncapped `requestAnimationFrame`, so it fires at the device's full display refresh rate (up to 90Hz on a Pixel 7) continuously from page load, since `liveSkin` defaults to `true` (script.js:576) — it runs at full speed even on a plain "Clear" sky with only stars drawn, not just during precipitation. Three specific per-frame costs identified, confirmed with the user to fix:
+  1. **Forced synchronous layout read every frame:** `weatherSkin.getBoundingClientRect()` (script.js:1252) runs unconditionally each frame just to build a cache key — one of the more expensive calls a browser can do per frame.
+  2. **Two full canvas clears at native device pixel ratio every frame** (script.js:1258, 1261-1268: `precipCanvas`/`starsCanvas` sized at `devicePixelRatio`, both `clearRect`'d every frame) — on a ~2.6-3x DPR phone screen this multiplies the raw pixel-fill work several times over what the CSS size suggests.
+  3. **No pause when the effect is scrolled out of view** — only page-hidden throttling exists (already automatic in browsers); nothing stops the loop when the weather widget itself isn't visible on screen.
+- [ ] **Requested fixes (DPR-cap option was presented but not selected — leave canvas resolution untouched):**
+  - **Frame-rate cap (~30fps):** track elapsed time since the last drawn frame inside `stepConditionSkin` and skip the draw work (but still schedule the next `requestAnimationFrame`) until roughly 33ms have passed — halves per-frame work on a 60Hz screen, cuts it further on 90Hz+ displays. Keep the loop itself still requesting every rAF tick (needed to keep timing accurate), just gate the actual clear/draw work behind the elapsed-time check.
+  - **Remove the per-frame layout read:** cache `weatherSkin`'s measured width/height instead of calling `getBoundingClientRect()` every frame; only re-measure on a `resize`/orientation-change event (and once on setup), not on every animation tick.
+  - **Pause via visibility:** add an `IntersectionObserver` on the weather widget that stops calling into the per-frame draw work (early-return, similar to the existing `!weatherSettings.liveSkin` gate) whenever the widget isn't intersecting the viewport — resume automatically when it scrolls back into view. Complements (doesn't replace) the existing `visibilitychange` cloud re-stagger logic, which handles a different case (tab backgrounded/restored, not on-page scroll position).
+
 ### Moon-dial clock: remove the four center badges entirely
 
 - [ ] **Current behavior (confirmed in script.js:287-308, `renderMoonDialFace`):** the moon-dial style draws four rounded-square badges (month, day, weather emoji, weekday) at radius 18 between the center and the inner number ring, via `renderClockBadge` (script.js:275-285).
