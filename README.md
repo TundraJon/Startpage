@@ -682,7 +682,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
-_Empty — nothing queued._
+### Add-tile URL field should hint mobile keyboards that it's a URL, not prose
+
+- [ ] **User feedback:** typing a URL into the Add Tile modal's URL field lets the keyboard auto-insert a space after a period and auto-insert punctuation, since it's being treated as regular text.
+- [ ] **Root cause confirmed (index.html:563):** `#add-tile-url` is `<input type="text" ... autocomplete="off" ...>` — no `type="url"`/`inputmode="url"` to switch mobile keyboards to their URL layout (no auto-space-after-period, dedicated "." key), and no `autocapitalize="off"` / `autocorrect="off"` / `spellcheck="false"` to stop autocorrect from inserting punctuation.
+- [ ] **Requested fix:** change to `<input type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off" ...>`.
 
 ## Build Planner
 
@@ -691,6 +695,10 @@ _Backlog of items to get to eventually — not being actively worked on. Promote
 ### Add a favicon
 
 - [ ] No `<link rel="icon">` is declared in `index.html` and no `favicon.ico` file exists in the repo, so browsers automatically request `/favicon.ico` on every load and it 404s. Purely cosmetic (console/server-log noise only), unrelated to any widget functionality. Low priority — planned for the final build stage.
+
+### Tile edit/delete (Phase 2 long-press menu)
+
+- [ ] User expected a long-press menu on tiles to delete/edit them; confirmed none exists yet — the Tile Grid System spec explicitly deferred rename/reorder/delete to a separate "Phase 2" document not yet supplied. User's explicit call: wait for that document rather than building a minimal delete-only version now. Promote to Build Queue once that spec arrives.
 
 ### Possibly reduce HAIL_GRAVITY for a calmer bounce
 
