@@ -270,12 +270,12 @@
     }
   }
 
-  // A small black rounded-square badge with centered white content (emoji or text), positioned
+  // A small dark-gray rounded-square badge with centered white content (emoji or text), positioned
   // radially between the inner number ring and the center — used by the 'moon-dial' style.
   function renderClockBadge(svg, cx, cy, angleDeg, radius, size, content) {
     const p = polarPoint(cx, cy, radius, angleDeg);
     svg.appendChild(svgEl('rect', {
-      x: p.x - size / 2, y: p.y - size / 2, width: size, height: size, rx: size * 0.25, fill: '#000',
+      x: p.x - size / 2, y: p.y - size / 2, width: size, height: size, rx: size * 0.25, fill: '#333',
     }));
     const t = svgEl('text', {
       x: p.x, y: p.y, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': size * 0.55, fill: '#fff',
@@ -299,7 +299,7 @@
 
     renderDualRingNumbers(svg, cx, cy);
 
-    const badgeR = 12;
+    const badgeR = 18;
     const badgeSize = 15;
     renderClockBadge(svg, cx, cy, 0, badgeR, badgeSize, now.toLocaleDateString(undefined, { month: 'short' }));
     renderClockBadge(svg, cx, cy, 90, badgeR, badgeSize, String(now.getDate()));
@@ -1061,9 +1061,9 @@
   }
 
   function randomizeCloud(cloud) {
-    const topPct = Math.random() * 50;
-    const f = topPct / 50;
-    const size = 2.5 - 1.5 * f;
+    const topPct = Math.random() * 66;
+    const f = topPct / 66;
+    const size = 3 - 2.5 * f;
     const duration = 17 + 43 * f;
     cloud.style.fontSize = size + 'rem';
     cloud.style.top = topPct + '%';

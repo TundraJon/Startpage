@@ -504,19 +504,23 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 - [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
 
+## Build Log 23 (completed)
+
+### Moon-dial clock: badges moved further from center, recolored to dark gray
+
+- [x] `badgeR` (script.js:302) changed from 12 to 18 — moved the four badges outward, still clear of both center and the radius-30 inner number ring. Badge fill (script.js:278) changed from `#000` to `#333`; white text unchanged. Verified: all 4 badges render at exactly radius 18 from center, and no `#000`-filled badge rects remain in the SVG.
+
+### Drifting-cloud spawn band extended from top 50% to top 66%, with new size endpoints
+
+- [x] `randomizeCloud` (script.js:1063-1072): `topPct = Math.random() * 66` (was 50), `f = topPct / 66`, and the size formula's endpoints changed to `size = 3 - 2.5*f` rem (3rem at the top edge → 0.5rem at the 66% line, was 2.5rem→1.0rem). Duration/speed formula (`17 + 43*f` seconds) is unchanged, just now stretched over the wider band. Verified against the shipped formula string and by sampling live cloud elements at 100% cloud cover: top% values reached up to 65.2% (against the new 66% cap), and sampled top/size pairs matched the formula exactly (e.g. top 8.5% → size 2.68rem, top 59.1% → size 0.76rem).
+
+### Regression check
+
+- [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
+
 ## Build Queue
 
-### Moon-dial clock: move the four badges further from center, change to dark gray
-
-- [ ] **Current behavior (confirmed in script.js:273-285, `renderClockBadge`, and 302-307):** the four rounded-square badges (month, day, weather, weekday) are drawn at radius 12 from center, fill `#000` (pure black). Room to move outward exists — the inner red-number ring now sits at radius 30 (per the Build 22 spacing fix), so the badges have space between them and it before any overlap.
-- [ ] **Requested changes:**
-  - Move the badges outward: `badgeR` (script.js:302) from 12 to roughly 18 — leaves clear space to both the center and the radius-30 inner number ring. Adjust once seen live if it needs to go further or not as far.
-  - Recolor from pure black to dark gray: `fill: '#000'` → `fill: '#333'` (script.js:278) for the badge background. White text (`fill: '#fff'`) stays unchanged for contrast.
-
-### Extend the drifting-cloud spawn band from the top 50% to the top 66%, with new size endpoints
-
-- [ ] **Current behavior (confirmed in script.js:1063-1072, `randomizeCloud`):** `topPct = Math.random() * 50` confines clouds to the top half of the widget. Size and speed both scale off the same `f = topPct / 50` fraction: `size = 2.5 - 1.5*f` rem (2.5rem at the top edge down to 1.0rem at the 50% line) and `duration = 17 + 43*f` seconds (17s/fastest at the top edge up to 60s/slowest at the 50% line) — already exactly the "further down = smaller and slower" relationship the user described, just currently capped at 50%.
-- [ ] **Requested change, updated with new size endpoints:** widen the spawn band to the top 66% of the widget (`topPct = Math.random() * 66`, so `f = topPct / 66`) **and** change the size formula's endpoints from 2.5rem→1.0rem to **3rem (top edge) → 0.5rem (66% line)**: `size = 3 - 2.5*f` rem. The duration/speed formula is unchanged (`duration = 17 + 43*f` seconds, still 17s fastest at the top edge up to 60s slowest at the new 66% line) — only size endpoints were requested to change, not speed.
+_Empty — nothing currently queued._
 
 ## Build Planner
 
