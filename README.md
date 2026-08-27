@@ -520,6 +520,12 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
+### Moon-dial clock: remove the four center badges entirely
+
+- [ ] **Current behavior (confirmed in script.js:287-308, `renderMoonDialFace`):** the moon-dial style draws four rounded-square badges (month, day, weather emoji, weekday) at radius 18 between the center and the inner number ring, via `renderClockBadge` (script.js:275-285).
+- [ ] **User feedback:** doesn't want those badges cluttering the moon-phase emoji at the center — remove them from the moon-dial face entirely.
+- [ ] **Requested change:** delete the 4 `renderClockBadge(...)` calls and the `badgeR`/`badgeSize` locals from `renderMoonDialFace` (script.js:302-307), leaving just the moon emoji background and dual-ring numbers. Since `renderClockBadge` (script.js:275-285) has no other caller, remove that function too rather than leaving unused code behind. Update the comment above `renderMoonDialFace` (script.js:289-290, "Four info badges sit between...") to drop the now-inaccurate mention.
+
 ### Testing Panel: slider for lightning flash opacity re-roll rate
 
 - [ ] **Current behavior (confirmed in script.js:1400-1421, `stepConditionSkin`):** while a thunderstorm flash is active, its opacity is re-rolled on *every* `requestAnimationFrame` callback (`flashDiv.style.opacity = String(flashState.flashAlpha * (0.4 + Math.random() * 0.6))`), i.e. once per rendered frame — there's no existing concept of "every N frames."
