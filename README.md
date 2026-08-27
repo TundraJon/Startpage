@@ -647,6 +647,15 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [ ] **Root cause confirmed (script.js:948):** the label's y-offset from its point (`p.y + 8`) was never adjusted when `.hourly-graph-icon` grew from 14px to 17.5px in Build 32 — the offset only accounts for the label's own spacing, not the larger icon now sitting above it (which uses `dominant-baseline: central`, so it extends roughly half its font-size above *and* below `p.y`).
 - [ ] **Requested fix:** move the label down by the icon's height (17.5px): offset becomes `p.y + 8 + 17.5` = `p.y + 25.5`.
 
+### Weather widget: temperature-unit change doesn't update dew point (or the open Hourly panel's graph)
+
+- [ ] **User feedback:** tapping the temperature to change scale doesn't change the dew point temperature — those need to be linked. All temperatures need to stay linked when the unit changes, whether by tapping or by the default set in the Weather Options settings menu.
+- [ ] **Root cause confirmed (script.js:599-602):** the `tempUnitBtn` tap-to-peek click handler flips `displayTempUnit` but only calls `renderWeatherTemps()`.
+- [ ] **Root cause confirmed (script.js:1034-1047):** the Weather Options settings-menu `tempUnit` segmented-button handler has the identical bug — it sets `weatherSettings.tempUnit`/`displayTempUnit` but also only calls `renderWeatherTemps()`. This confirms the persistent-default path is affected too, not just the tap-to-peek path.
+- [ ] **Root cause confirmed (script.js:718-736):** `renderWeatherExtras()` is the function that actually renders dew point (`dewPointValEl.textContent = conv(weatherState.dewPointF) + '°'`) and already correctly derives its conversion from `displayTempUnit` — it's simply never called by either handler above.
+- [ ] **Root cause confirmed (script.js:896-962):** the Hourly Forecast panel's temperature graph (`renderHourlyTempGraph`) independently reads `displayTempUnit` too, but is only invoked from `renderHourlyPanel()`, which neither handler calls — so if the panel is open when the unit is toggled, its graph temps also go stale. (An existing guard elsewhere in the code, `if (hourlyPanel.classList.contains('open')) renderHourlyPanel();`, already handles this same class of refresh for other state changes.)
+- [ ] **Requested fix:** add `renderWeatherExtras()` and `if (hourlyPanel.classList.contains('open')) renderHourlyPanel();` to both the `tempUnitBtn` click handler (script.js:599-602) and the Weather Options `tempUnit` segmented-button handler (script.js:1034-1047).
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
