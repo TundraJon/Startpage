@@ -589,13 +589,18 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 - [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
 
+## Build Log 29 (completed)
+
+### Fixed the Hourly Forecast panel rendering pinned to the top of the page
+
+- [x] Added `position: relative` to the Home category's grid container (`.category--home .tile-grid`, scoped narrowly so other categories' identically-classed grids are untouched) — makes it the actual containing block for `.hourly-panel`'s `position: absolute` + explicit `grid-column`/`grid-row` placement, which previously had nothing to anchor to and fell back to the viewport itself (landing at the page's literal top-left corner, ignoring the grid entirely).
+- [x] Verified precisely this time, not just assumed correct: `getBoundingClientRect()` on the live page now shows the panel's top edge (308.6px) sitting flush against the weather widget's bottom edge (305.6px), spanning the same left/right bounds as the clock+weather widget row — matching the intended anchor point exactly.
+- [x] Re-ran the full Build 28 functional suite against the corrected position: open/close toggle, 12 columns with the current hour first and highlighted, temp/emoji/precip% rendering, the precip graph, and all three dismiss paths (tap again, tap outside, swipe up) all verified correct. One of those (tap-outside) had actually been a false positive in Build 28's original verification — my test's "outside" click coordinate had accidentally landed inside the panel because the panel was mispositioned at that exact spot; with the position now fixed, that same click is genuinely outside the panel and correctly dismisses it.
+- [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
+
 ## Build Queue
 
-### Hourly Forecast panel renders pinned to the top of the entire page, not anchored to the widgets
-
-- [ ] **User feedback, with screenshot:** on the live deployed page, opening the panel shows it floating at the very top of the viewport (above the search bar and Home header), completely disconnected from the weather/clock widgets it's supposed to anchor to.
-- [ ] **Root cause, confirmed with Playwright (`getBoundingClientRect`/`getComputedStyle`):** `.hourly-panel { position: absolute; grid-column: 1/6; grid-row: 3/4; }` (styles.css, Build 28) assumed a CSS Grid container automatically becomes the containing block for its own absolutely-positioned children, even without `position` set on the container itself — **that assumption was wrong.** The Home `.tile-grid` (the panel's parent) computes to `position: static`, so the browser falls back to the nearest actually-positioned ancestor for the containing block — finding none, it uses the viewport itself. That's why the panel's `top:0; left:0; right:0` (from its `inset: 0 0 auto 0` rule) pins it to the page's literal top-left corner, and why its `grid-column`/`grid-row` values have no effect at all (confirmed: they're set in computed style but produce no positioning effect, since the element was never actually placed by the grid once absolutely positioned against a non-grid containing block).
-- [ ] **Fix:** add `position: relative` to the Home category's `.tile-grid` (scoped narrowly, e.g. `.category--home .tile-grid`, rather than every category's `.tile-grid`, to avoid touching unrelated categories). This makes the Home grid itself the containing block, at which point `.hourly-panel`'s existing `position: absolute` + explicit `grid-column: 1/6; grid-row: 3/4` should correctly anchor it to the row directly beneath the clock+weather widgets, matching the originally intended behavior — needs to be re-verified live (via `getBoundingClientRect`) once built, not just assumed correct this time.
+_Empty — nothing currently queued._
 
 ## Build Planner
 

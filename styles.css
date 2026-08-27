@@ -213,6 +213,13 @@ main {
   color: var(--home-header-fg);
 }
 
+.category--home .tile-grid {
+  /* Establishes this grid as the containing block for .hourly-panel's position:absolute +
+     explicit grid-column/grid-row placement — without this, an absolutely-positioned grid item
+     falls back to the viewport as its containing block, ignoring the grid entirely. */
+  position: relative;
+}
+
 .tile-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
