@@ -712,6 +712,26 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
 - [x] Re-verified all Build 34/35 tile functionality (add-tile flow, favicon fallback, long-press dismiss of the Hourly panel) still works correctly on top of the new id-based data model.
 
+## Build Log 37 (completed)
+
+_Note: these two were live regressions from Build 36 actively breaking real usage, and the first was reported with directive language ("that needs to be blocked") — fixed immediately rather than logged-then-queued, per the standing exception for hotfixing an active regression vs. a new feature request._
+
+### Long-press on a tile triggered the native browser image context menu ("open image in new window" / "download icon")
+
+- [x] **Root cause confirmed:** `.tile img` had no protection against the browser's native long-press/right-click image context menu (separate from the custom in-app tile menu). Fixed with two layers: `.tile img { pointer-events: none; }` (styles.css) so long-press/right-click always targets the `<a>` tile, never the `<img>` directly, and `a.addEventListener('contextmenu', (e) => e.preventDefault())` in `buildTileElement` (script.js) as a universal backstop against any native context menu on the tile itself.
+- [x] Verified: a `contextmenu` event dispatched at a tile has `defaultPrevented === true`.
+
+### Only manually-added tiles were showing — none of the original 20
+
+- [x] **Root cause confirmed:** `loadCategoryTiles`'s migration check only seeded the original tiles when a category's `category-tiles-<id>` localStorage key was completely absent (`=== null`). Anyone who'd already used the "+" mechanic before Build 36 shipped (i.e., exactly what happened here) already had that key populated with just their added tile(s) — so the check saw a non-null key and skipped seeding entirely, leaving the 20 originals (which only ever existed as static HTML pre-Build-36) permanently unrecovered.
+- [x] **Fix:** migration is now tracked by its own explicit flag (`category-tiles-migrated-<id>`) instead of overloading "does the key exist." On first run per category, whatever's already stored gets the seed data prepended (preserving existing custom tiles) and the flag is set; every load after that is a no-op for migration. Also added a safety net: any stored tile missing an `id` (the old Build 34/35 schema didn't have one) gets one generated and re-saved.
+- [x] Verified directly: seeded a browser with the exact pre-existing-user state (one old-schema tile, no migration flag) — after load, all 5 originals + the 1 custom tile appear (6 total), all with valid ids, and a second reload doesn't duplicate anything.
+
+### Regression check
+
+- [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
+- [x] Re-verified all Build 36 tile-action functionality (rename, remove, the 10% easter egg both directions, persistence) still works correctly on top of the migration fix.
+
 ## Build Queue
 
 _Empty — nothing queued._

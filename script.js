@@ -189,18 +189,40 @@
     return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2);
   }
 
+  const TILE_MIGRATION_FLAG_PREFIX = 'category-tiles-migrated-';
+
   function loadCategoryTiles(categoryId) {
-    const raw = localStorage.getItem(TILE_STORAGE_PREFIX + categoryId);
-    if (raw === null) {
-      const seeded = (TILE_SEED_DATA[categoryId] || []).map((t) => Object.assign({}, t));
-      localStorage.setItem(TILE_STORAGE_PREFIX + categoryId, JSON.stringify(seeded));
-      return seeded;
-    }
+    let tiles;
     try {
-      return JSON.parse(raw) || [];
+      tiles = JSON.parse(localStorage.getItem(TILE_STORAGE_PREFIX + categoryId) || '[]');
     } catch (e) {
-      return [];
+      tiles = [];
     }
+    if (!Array.isArray(tiles)) tiles = [];
+
+    let changed = false;
+
+    // One-time merge of the original seed tiles into whatever's already stored — tracked by its
+    // own flag rather than "does the key exist", since anyone who used the "+" mechanic before
+    // this migration shipped already had a (seed-less) key, which would otherwise skip seeding
+    // entirely and leave only their added tiles visible.
+    if (localStorage.getItem(TILE_MIGRATION_FLAG_PREFIX + categoryId) !== 'true') {
+      const seed = (TILE_SEED_DATA[categoryId] || []).map((t) => Object.assign({}, t));
+      tiles = seed.concat(tiles);
+      localStorage.setItem(TILE_MIGRATION_FLAG_PREFIX + categoryId, 'true');
+      changed = true;
+    }
+
+    // Safety net: any pre-migration tile saved without an id (old {name,url}-only schema) gets one now.
+    tiles.forEach((t) => {
+      if (!t.id) {
+        t.id = newTileId();
+        changed = true;
+      }
+    });
+
+    if (changed) saveCategoryTiles(categoryId, tiles);
+    return tiles;
   }
 
   function saveCategoryTiles(categoryId, tiles) {
@@ -244,6 +266,7 @@
     span.textContent = name;
     a.appendChild(span);
 
+    a.addEventListener('contextmenu', (e) => e.preventDefault());
     attachLongPress(a, () => openTileMenu(a));
 
     return a;
