@@ -262,6 +262,7 @@ main {
 
 .tile span {
   font-size: 0.6rem;
+  line-height: 1.2;
   text-align: center;
   overflow: hidden;
   display: -webkit-box;
@@ -269,6 +270,11 @@ main {
   -webkit-box-orient: vertical;
   max-width: 100%;
   color: var(--fg-muted);
+}
+
+.tile span.tile-name-wrap {
+  font-size: 0.475rem;
+  line-height: 0.595rem;
 }
 
 .tile-add {
@@ -408,7 +414,7 @@ main {
 
 .hourly-temp-graph {
   display: block;
-  height: 70px;
+  height: 80px;
 }
 
 .hourly-graph-now-bg {

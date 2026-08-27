@@ -207,7 +207,10 @@
     // this migration shipped already had a (seed-less) key, which would otherwise skip seeding
     // entirely and leave only their added tiles visible.
     if (localStorage.getItem(TILE_MIGRATION_FLAG_PREFIX + categoryId) !== 'true') {
-      const seed = (TILE_SEED_DATA[categoryId] || []).map((t) => Object.assign({}, t));
+      const existingIds = new Set(tiles.map((t) => t.id));
+      const seed = (TILE_SEED_DATA[categoryId] || [])
+        .filter((t) => !existingIds.has(t.id))
+        .map((t) => Object.assign({}, t));
       tiles = seed.concat(tiles);
       localStorage.setItem(TILE_MIGRATION_FLAG_PREFIX + categoryId, 'true');
       changed = true;
@@ -259,6 +262,7 @@
     img.addEventListener('error', () => {
       img.remove();
       a.classList.add('tile-fallback');
+      span.classList.remove('tile-name-wrap');
     });
     a.appendChild(img);
 
@@ -270,6 +274,16 @@
     attachLongPress(a, () => openTileMenu(a));
 
     return a;
+  }
+
+  function updateTileNameWrapClass(tileEl) {
+    const span = tileEl.querySelector('span');
+    if (!span || tileEl.classList.contains('tile-fallback')) return;
+    span.classList.remove('tile-name-wrap');
+    const singleLineHeight = parseFloat(getComputedStyle(span).lineHeight);
+    if (span.scrollHeight > singleLineHeight * 1.4) {
+      span.classList.add('tile-name-wrap');
+    }
   }
 
   const addTileOverlay = document.getElementById('add-tile-overlay');
@@ -308,6 +322,7 @@
     const id = newTileId();
     const tile = buildTileElement(id, name, url);
     addTileTargetGrid.insertBefore(tile, addTileTargetGrid.querySelector('.tile-add'));
+    updateTileNameWrapClass(tile);
     const tiles = loadCategoryTiles(addTileTargetCategoryId);
     tiles.push({ id, name, url });
     saveCategoryTiles(addTileTargetCategoryId, tiles);
@@ -318,7 +333,9 @@
     const categoryId = grid.closest('.category').dataset.categoryId;
     const addBtn = grid.querySelector('.tile-add');
     loadCategoryTiles(categoryId).forEach((t) => {
-      grid.insertBefore(buildTileElement(t.id, t.name, t.url), addBtn);
+      const tile = buildTileElement(t.id, t.name, t.url);
+      grid.insertBefore(tile, addBtn);
+      updateTileNameWrapClass(tile);
     });
     if (addBtn) {
       addBtn.addEventListener('click', () => openAddTile(grid, categoryId));
@@ -435,6 +452,7 @@
       saveCategoryTiles(categoryId, tiles);
     }
     tileEl.querySelector('span').textContent = newName;
+    updateTileNameWrapClass(tileEl);
     closeTileRename();
   });
 
@@ -1186,7 +1204,7 @@
     hourlyTempGraph.innerHTML = '';
     if (!hours.length) return;
     const width = hours.length * HOURLY_COL_WIDTH;
-    const height = 70;
+    const height = 80;
     hourlyTempGraph.setAttribute('width', width);
     hourlyTempGraph.setAttribute('height', height);
     hourlyTempGraph.setAttribute('viewBox', `0 0 ${width} ${height}`);
@@ -1233,7 +1251,7 @@
 
       const label = document.createElementNS(svgNS, 'text');
       label.setAttribute('x', p.x);
-      label.setAttribute('y', p.y + 25.5);
+      label.setAttribute('y', p.y + 21.5);
       label.setAttribute('class', 'hourly-graph-label');
       label.textContent = conv(p.hour.temp_f) + '°';
       hourlyTempGraph.appendChild(label);

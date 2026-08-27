@@ -732,30 +732,31 @@ _Note: these two were live regressions from Build 36 actively breaking real usag
 - [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
 - [x] Re-verified all Build 36 tile-action functionality (rename, remove, the 10% easter egg both directions, persistence) still works correctly on top of the migration fix.
 
+## Build Log 38 (completed)
+
+### Tile 2-line name: second line partially cut off — fixed
+
+- [x] `.tile span` now sets an explicit `line-height: 1.2` instead of the imprecise default `normal`, fixing the `-webkit-line-clamp` calculation.
+- [x] Added `updateTileNameWrapClass()`, called after a tile is built (initial render + "+"-added) and after a rename: measures whether the name actually wraps to 2 lines against the base size, and only then applies `.tile-name-wrap` (`font-size: 0.475rem` / `line-height: 0.595rem`, both ~2px smaller than base, per the user's revised fallback plan). Short, non-wrapping names are untouched. Fallback (no-favicon) tiles are excluded — the class gets removed if a tile's icon later fails to load.
+- [x] Verified directly: a long renamed name gets the wrap class (7.6px font, 9.52px line-height) with 3px of clean clearance to the tile's bottom edge; a short renamed name stays at the base 9.6px with no wrap class.
+
+### Hourly panel temperature graph: bottom-row labels no longer clipped
+
+- [x] Graph height raised from 70px to 80px (both `renderHourlyTempGraph`'s SVG height/viewBox, script.js:1192, and `.hourly-temp-graph`'s CSS height, styles.css:411); label offset changed from `p.y + 25.5` to `p.y + 21.5` (4px closer to the icon, per the user's revised request). `ICON_TOP`/`ICON_BOTTOM` untouched — the curve's shape is unaffected. Verified directly with real 12-hour weather data: 12 labels rendered, worst-case clearance -3.5px (clean, no overflow).
+- [x] Confirmed no other container changes were needed — `.hourly-panel.open`'s existing `max-height: 190px` absorbs the extra 10px with room to spare.
+
+### Tile grid: duplicate tiles after a refresh — fixed
+
+- [x] The one-time seed migration in `loadCategoryTiles` now dedupes by `id` before prepending seed entries, so it's safe to run more than once regardless of why the migration flag might go missing. Verified directly: clearing only the migration flag on already-migrated data and reloading now produces exactly 5 Home tiles (previously reproduced 10, "two of each," before this fix).
+
+### Regression check
+
+- [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
+- [x] Re-verified all prior tile-action functionality (add, remove with the 10% easter egg both directions, rename, blank-name blocking, persistence across reload) still works correctly on top of these changes.
+
 ## Build Queue
 
-### Tile 2-line name: second line partially cut off (top ~1/3 visible only)
-
-- [ ] **User feedback:** renamed a tile to something long enough to wrap to 2 lines; the second line was cut off about 2/3 of the way down, only the top third visible. Asked whether there's space above the icon (~5px worth) that could be reclaimed by nudging things up.
-- [ ] **Checked the proposed mechanism directly — doesn't quite match reality:** measured `.tile`'s actual layout with a real icon + a long 2-line name at several viewport widths (320-412px). There is only about **1px** of space between the tile's top padding and the icon at every size tested — nowhere near 5px to reclaim by moving the icon up. So "space above the icon" isn't really the available slack here.
-- [ ] **More likely root cause (styles.css, `.tile span`):** the rule uses `-webkit-line-clamp: 2` to cap the name at 2 lines, but never sets an explicit `line-height` (it's left at the default `normal`). `-webkit-line-clamp`'s clamp-box height is computed as `line-height × line count`, and leaving it at `normal` is a well-known source of that calculation coming out slightly short on some browsers/platforms — producing exactly this symptom (a partially-visible last line, not a phantom extra line or a cleanly-hidden one). This wasn't reproducible in this sandbox's browser (rendered cleanly with ~3px to spare), consistent with it being a platform/font-rendering-dependent rounding gap rather than a flat, everywhere-reproducible bug.
-- [ ] **User correction:** don't touch the icon's fill size (`.tile img`, `width/height: 75%`) — that value was deliberately tuned already. Set an explicit numeric `line-height` (e.g. `1.2`) on `.tile span` so the line-clamp calculation is precise instead of relying on the imprecise `normal` default — that part stands.
-- [ ] **Feasibility note (superseded below):** the user's original 3-step technique (shrink font 1px, tighten spacing 1px, shrink *just the second line's* font another 1px) can't be done literally in CSS — there's no way to target only the second line of auto-wrapped text without JS splitting the name into separate elements, a much bigger change than a style tweak.
-- [ ] **User's revised fallback plan:** when a tile's name is long enough that it's actually going to wrap to 2 lines, reduce the font-size by ~2px *and* reduce the line spacing by ~2px, applied uniformly (not per-line) — only for names that wrap, not short single-line ones. User's own framing: "I don't know if that will fix it but... you're going to be close" — treat the exact 2px figures as a starting point to verify against, not a locked-in final number.
-- [ ] **Implementation shape:** needs JS to detect whether a given tile's name will wrap to 2 lines (e.g. compare `span.scrollHeight` to a single line's height, or measure text width against the tile's available width) and conditionally apply a modifier class (smaller font-size + tighter line-height) only to those tiles. The exact final px values should be tuned and verified with real measurements at build time — same approach as the hourly-graph fix above — rather than applied blindly.
-
-### Hourly panel temperature graph: bottom-row labels clipped by the SVG's fixed height
-
-- [ ] **User feedback (with screenshot):** the numbers below the graph's condition icons were getting cut off for the coldest hours in the 12-hour window; also requested the numbers sit ~5px closer to their icons.
-- [ ] **Root cause confirmed (script.js:1184-1241, `renderHourlyTempGraph`):** the SVG's height is fixed at 70px. A label's y-position is `icon_y + 25.5` (script.js:1236), and the coldest hour's icon sits at `ICON_BOTTOM = 53` (script.js:1199) — worst case, the label lands at `53 + 25.5 = 78.5`, **8.5px past the SVG's own bottom edge**, silently clipped since SVG content outside its viewBox is cut off by default. This offset was tuned in Build 33 purely to stop the label overlapping the icon above it, without checking it against the container's fixed height — only the coldest hour(s) are affected since they're the only ones positioned low enough to hit the edge.
-- [ ] **Superseded approach:** originally planned to shrink `ICON_BOTTOM` (53→44) to fit the taller label offset within the existing 70px height. User reconsidered — okay with the panel growing ~10px since nothing below it would be covered.
-- [ ] **Final approach, verified precisely with real `getBBox()` measurements across all 12 condition icons used in the graph:** reduce the label offset by 4px, not 5 — `p.y + 25.5` → `p.y + 21.5` (revised: user wants a bit more breathing room between icon and number, since there's spare room at the bottom anyway) — and grow the graph's height from 70px to 80px — both the SVG's `height`/`viewBox` in `renderHourlyTempGraph` (script.js:1189) and `.hourly-temp-graph`'s CSS `height` (styles.css:411) need to change together to the same value. `ICON_TOP`/`ICON_BOTTOM` stay completely untouched — the temperature curve's geometry is unaffected, only the container grows. Gives **3.2px of clean clearance** in the worst case, verified against every icon glyph — and as a bonus, this also removes the ~0.5px icon/label overlap the original 5px-closer version had (gap is now a clean +0.36px). Confirmed no other change is needed: `.hourly-panel.open`'s `max-height: 190px` (styles.css:339) already has ~90px of unused slack over the current 90px of actual content, comfortably absorbing the 10px growth (new content height ~100px) without adjustment.
-
-### Tile grid: duplicate tiles ("two of each") after a refresh
-
-- [ ] **User feedback:** after refreshing, every tile under every category showed up twice.
-- [ ] **Root cause confirmed and reproduced (script.js, `loadCategoryTiles`):** the one-time seed migration is gated purely on `localStorage.getItem('category-tiles-migrated-<id>') !== 'true'` — if that flag is ever missing on a load where the tile data was *already* migrated (for any reason: a write that didn't stick, the flag key specifically getting cleared while the data key survives, or something else storage-related), the seed set gets prepended a second time, duplicating every original tile. Reproduced directly: clearing only the migration flag (leaving the already-migrated data alone) and reloading produces exactly 10 Home tiles (5 originals × 2) — matching "two of each" precisely. Could not pin down *why* the flag would go missing on a real device (not reproducible from a fresh, non-tampered load in this sandbox across repeated reloads) — this is a defensive fix for the failure mode itself, not a confirmed trigger.
-- [ ] **Requested/verified fix:** make the seed-merge step dedupe by `id` — only prepend seed entries whose `id` isn't already present in the stored array — so the migration step is safe to run any number of times, regardless of why the flag might not have stuck. Verified directly: running the merge 3 times in a row against the same data produces zero duplicates either way, vs. the current code's linear duplication with each repeat.
+_Empty — nothing queued._
 
 ## Build Planner
 
