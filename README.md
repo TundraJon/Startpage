@@ -598,8 +598,6 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [x] Re-ran the full Build 28 functional suite against the corrected position: open/close toggle, 12 columns with the current hour first and highlighted, temp/emoji/precip% rendering, the precip graph, and all three dismiss paths (tap again, tap outside, swipe up) all verified correct. One of those (tap-outside) had actually been a false positive in Build 28's original verification — my test's "outside" click coordinate had accidentally landed inside the panel because the panel was mispositioned at that exact spot; with the position now fixed, that same click is genuinely outside the panel and correctly dismisses it.
 - [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
 
-## Build Queue
-
 ## Build Log 30 (completed)
 
 ### Hourly Forecast panel: redesigned layout — hazard-alert icon, temperature graph, precip %
@@ -613,7 +611,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
-_Empty — nothing currently queued._
+### Hourly panel: shrink graph height, fix alert icon+dot layout, fit all 12 hours without scrolling
+
+- [ ] **Graph height:** `renderHourlyTempGraph`'s SVG height (script.js:900, currently `const height = 200;`) changes from 200 to 100. The icon/label vertical positions (`ICON_TOP`/`ICON_BOTTOM` constants, currently 26/150) need to scale down proportionally too, not just the outer `height` value, or the icons/labels would clip against the new shorter box.
+- [ ] **Alert row icon+dot orientation:** currently `.hourly-cell` (styles.css) is `flex-direction: column`, stacking the hazard icon above the dot. Change `.hourly-row-alert .hourly-cell` specifically to `flex-direction: row` so the icon sits to the left and the dot to the right, side by side, without affecting the time/precip rows (which should stay as single centered text, unaffected by this change).
+- [ ] **Fit all 12 hours without horizontal scrolling — real width trade-off worth confirming, not just an obvious shrink:** `HOURLY_COL_WIDTH` (script.js:747) is currently 56px; with the panel's usable width around 394px (406px panel minus `.hourly-strip`'s 12px combined left/right padding), only ~7 columns fit before requiring a scroll, matching what the user observed. Fitting all 12 in that same ~394px means shrinking `HOURLY_COL_WIDTH` down to roughly **33px** (394/12) — a Testing Panel-tunable-sized column is not the ask here since the user asked for exactly 12 visible, not "as many as fit." At 33px, the current font sizes (0.72rem time label, 0.65rem precip %, 0.5rem alert icon, 12px graph temp label) will likely be too cramped to stay legible and may need to shrink further and/or drop unnecessary padding — this should be tuned visually once built rather than assumed correct on the first pass, the same way the graph height itself was flagged as "a rough starting point" in Build 30.
 
 ## Build Planner
 
