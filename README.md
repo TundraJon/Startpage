@@ -641,7 +641,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
-_Empty — nothing currently queued._
+### Hourly panel: temperature labels overlapping the graph icons above them
+
+- [ ] **User feedback:** since the icon size increase in Build 32, the temp label's top edge sits exactly at the icon's vertical center, overlapping it — needs to move down by the icon's height.
+- [ ] **Root cause confirmed (script.js:948):** the label's y-offset from its point (`p.y + 8`) was never adjusted when `.hourly-graph-icon` grew from 14px to 17.5px in Build 32 — the offset only accounts for the label's own spacing, not the larger icon now sitting above it (which uses `dominant-baseline: central`, so it extends roughly half its font-size above *and* below `p.y`).
+- [ ] **Requested fix:** move the label down by the icon's height (17.5px): offset becomes `p.y + 8 + 17.5` = `p.y + 25.5`.
 
 ## Build Planner
 
