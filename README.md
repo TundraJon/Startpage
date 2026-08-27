@@ -506,7 +506,10 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
-_Empty — nothing currently queued._
+### Extend the drifting-cloud spawn band from the top 50% to the top 66%
+
+- [ ] **Current behavior (confirmed in script.js:1063-1072, `randomizeCloud`):** `topPct = Math.random() * 50` confines clouds to the top half of the widget. Size and speed both scale off the same `f = topPct / 50` fraction: `size = 2.5 - 1.5*f` rem (2.5rem at the top edge down to 1.0rem at the 50% line) and `duration = 17 + 43*f` seconds (17s/fastest at the top edge up to 60s/slowest at the 50% line) — already exactly the "further down = smaller and slower" relationship the user described, just currently capped at 50%.
+- [ ] **Requested change:** widen the spawn band to the top 66% of the widget (`topPct = Math.random() * 66`), stretching the existing size/speed formulas over the new range rather than changing their endpoints — i.e. `f = topPct / 66`, keeping `size = 2.5 - 1.5*f` and `duration = 17 + 43*f` as-is. This keeps the same largest (2.5rem/17s, top edge) and smallest (1.0rem/60s) clouds, just spread further down the widget instead of stopping at the halfway line. Flag if a different largest/smallest pair was actually wanted instead of a pure range stretch.
 
 ## Build Planner
 
