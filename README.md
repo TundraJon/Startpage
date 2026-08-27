@@ -451,7 +451,15 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
-_Empty — nothing currently queued._
+### Two new digital clock color schemes: green and orange
+
+- [ ] **Existing pattern (confirmed in styles.css:299-302, 836-839 and index.html:453-465):** the digital clock's color is a `data-scheme` attribute with 4 existing values (`red-black`, `blue-black`, `black-white`, `white-black`), each needing three things — a `.clock-face[data-scheme="..."]` rule (actual clock colors), a matching `.mini-clock[data-scheme="..."]` rule (Settings preview swatch), and a `<button class="scheme-swatch" data-scheme="...">` in the Settings panel's `.scheme-grid`. `red-black`/`blue-black` both use plain colored digits directly on a black background (`background:#000; color:<hex>`) for both the real clock and the mini preview — the simplest of the four existing patterns, and the one these two new colors should follow (not `black-white`'s extra pill-background override).
+- [ ] **Requested addition:** two new schemes, `green-black` and `orange-black`, each adding:
+  - `.clock-face[data-scheme="green-black"] { background: #000; color: #22c55e; }` and `.clock-face[data-scheme="orange-black"] { background: #000; color: #f97316; }` (styles.css, next to the existing 4 `.clock-face[data-scheme=...]` rules).
+  - `.mini-clock[data-scheme="green-black"] { background: #000; color: #22c55e; }` and `.mini-clock[data-scheme="orange-black"] { background: #000; color: #f97316; }` (styles.css, next to the existing 4 `.mini-clock[data-scheme=...]` rules).
+  - Two new swatch buttons in index.html's `.scheme-grid`, matching the existing markup pattern exactly (a `<button class="scheme-swatch" data-scheme="green-black">` wrapping a `<span class="mini-clock" data-scheme="green-black">` with the placeholder `--`/`--` digit spans, and the same for `orange-black`).
+- [ ] **Colors chosen (adjust if a different shade is wanted):** green `#22c55e`, orange `#f97316` — picked to roughly match the saturation/vividness of the existing `red-black` (`#e6293f`) and `blue-black` (`#3b82f6`) schemes against the same pure-black background, rather than a muted or pastel tone.
+- [ ] **No JS changes needed:** `clockSettings.scheme` is already a free-form string read/written generically (script.js:201, 316, 373-374, 411-413) — adding new valid values requires no logic changes, only the CSS rules and the new swatch buttons above.
 
 ## Build Planner
 
