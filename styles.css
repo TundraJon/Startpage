@@ -301,6 +301,28 @@ main {
   -webkit-line-clamp: 3;
 }
 
+/* --- Phase 2 Editing System, Part 2: Move Entry (drag-and-drop) --- */
+
+.tile-grid.move-mode .tile:not(.tile-add) {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  touch-action: none;
+}
+
+.tile.move-grabbed {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45), 0 0 0 2px var(--stripe-color, #3B82C4);
+  transform: rotate(-3deg) scale(1.05);
+  z-index: 10;
+}
+
+.tile.move-dragging {
+  transition: none;
+}
+
+.category-header.move-drop-target {
+  outline: 2px dashed var(--stripe-color, #3B82C4);
+  outline-offset: -2px;
+}
+
 .widget {
   border-radius: 8px;
   overflow: hidden;

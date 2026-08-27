@@ -131,6 +131,11 @@
     localStorage.setItem('searchEngine', searchEngine.value);
   });
 
+  // categoryId -> { setExpanded(bool), get expanded() } — used by the accordion itself and, later,
+  // by Move Entry's cross-category cascading hover-to-expand (which needs to open a subcategory's
+  // header on hover without going through a real click / without persisting that as the user's choice).
+  const categoryToggles = new Map();
+
   document.querySelectorAll('.category:not(.category--home) .category-header').forEach((btn) => {
     const section = btn.closest('.category');
     const id = section.dataset.categoryId;
@@ -145,6 +150,13 @@
       content.hidden = !expanded;
       btn.setAttribute('aria-expanded', String(expanded));
     }
+
+    categoryToggles.set(id, {
+      setExpanded,
+      get expanded() {
+        return btn.getAttribute('aria-expanded') === 'true';
+      },
+    });
 
     btn.addEventListener('click', () => {
       const expanded = btn.getAttribute('aria-expanded') === 'true';
@@ -319,7 +331,22 @@
     a.appendChild(span);
 
     a.addEventListener('contextmenu', (e) => e.preventDefault());
-    attachLongPress(a, () => openTileMenu(a));
+    attachLongPress(a, () => openTileMenu(a), () => moveMode && moveMode.grid === a.parentElement);
+
+    // While this tile's grid is in move mode, a plain tap must not navigate away — pointerdown
+    // (below, wired once move mode is entered) already handles grabbing/dragging it.
+    a.addEventListener('click', (e) => {
+      if (moveMode && moveMode.grid === a.parentElement) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, true);
+
+    a.addEventListener('pointerdown', (e) => {
+      if (moveMode && moveMode.grid === a.parentElement) {
+        startTileDrag(a, e);
+      }
+    });
 
     return a;
   }
@@ -377,8 +404,13 @@
     closeAddTile();
   });
 
+  // categoryId -> its own .tile-grid element — used by Move Entry to resolve a cross-category
+  // drop target's grid directly, without re-querying the DOM on every drag.
+  const categoryGrids = new Map();
+
   document.querySelectorAll('.tile-grid').forEach((grid) => {
     const categoryId = grid.closest('.category').dataset.categoryId;
+    categoryGrids.set(categoryId, grid);
     const addBtn = grid.querySelector('.tile-add');
     loadCategoryTiles(categoryId).forEach((t) => {
       const tile = buildTileElement(t.id, t.name, t.url);
@@ -504,7 +536,7 @@
     closeTileRename();
   });
 
-  function attachLongPress(el, callback) {
+  function attachLongPress(el, callback, shouldSuppress) {
     const LONG_PRESS_MS = 550;
     const MOVE_CANCEL_PX = 20;
     let pressTimer = null;
@@ -520,6 +552,7 @@
     }
 
     el.addEventListener('pointerdown', (e) => {
+      if (shouldSuppress && shouldSuppress()) return;
       startX = e.clientX;
       startY = e.clientY;
       cancelPress();
@@ -549,6 +582,274 @@
       }
     }, true);
   }
+
+  // --- Phase 2 Editing System, Part 2: Move Entry (drag-and-drop) ---
+  // moveMode: { grid } — the single .tile-grid currently in move mode, or null.
+  // dragInfo: state for the tile actively being dragged within moveMode.grid, or null when idle
+  // (move mode can be active with no active drag — e.g. right after entry, before the first pointerdown).
+  let moveMode = null;
+  let moveModeTimeoutId = null;
+  let dragInfo = null;
+  let justFinishedDrag = false;
+
+  function resetMoveModeTimeout() {
+    if (!moveMode) return;
+    clearTimeout(moveModeTimeoutId);
+    moveModeTimeoutId = setTimeout(exitMoveMode, 5000);
+  }
+
+  function setGrabbedTile(tileEl) {
+    if (!moveMode) return;
+    moveMode.grid.querySelectorAll('.tile.move-grabbed').forEach((t) => {
+      if (t !== tileEl) t.classList.remove('move-grabbed');
+    });
+    tileEl.classList.add('move-grabbed');
+  }
+
+  function onDocumentClickDuringMoveMode(e) {
+    if (!moveMode || justFinishedDrag) return;
+    const tile = e.target.closest && e.target.closest('.tile:not(.tile-add)');
+    if (tile && tile.parentElement === moveMode.grid) return;
+    exitMoveMode();
+  }
+
+  function enterMoveMode(tileEl) {
+    const grid = tileEl.parentElement;
+    if (moveMode && moveMode.grid !== grid) exitMoveMode();
+    if (!moveMode) {
+      moveMode = { grid };
+      grid.classList.add('move-mode');
+      // Deferred so the click that opened Move Entry (still bubbling to document right now)
+      // doesn't immediately trip the tap-away exit check above.
+      setTimeout(() => document.addEventListener('click', onDocumentClickDuringMoveMode), 0);
+    }
+    setGrabbedTile(tileEl);
+    resetMoveModeTimeout();
+  }
+
+  function exitMoveMode() {
+    if (!moveMode) return;
+    if (dragInfo) cancelTileDrag();
+    clearTimeout(moveModeTimeoutId);
+    moveModeTimeoutId = null;
+    moveMode.grid.classList.remove('move-mode');
+    moveMode.grid.querySelectorAll('.tile.move-grabbed').forEach((t) => t.classList.remove('move-grabbed'));
+    document.removeEventListener('click', onDocumentClickDuringMoveMode);
+    moveMode = null;
+  }
+
+  function handleHeaderHover(headerEl) {
+    if (dragInfo.lastHeaderEl === headerEl) return;
+    if (dragInfo.lastHeaderEl) dragInfo.lastHeaderEl.classList.remove('move-drop-target');
+    dragInfo.lastHeaderEl = null;
+    dragInfo.crossTargetId = null;
+    const section = headerEl.closest('.category');
+    if (!section) return;
+    const id = section.dataset.categoryId;
+    const sourceCategoryId = dragInfo.grid.closest('.category').dataset.categoryId;
+    if (id === sourceCategoryId) return; // hovering the tile's own category header: no-op
+    const toggle = categoryToggles.get(id);
+    if (toggle && !toggle.expanded) toggle.setExpanded(true);
+    headerEl.classList.add('move-drop-target');
+    dragInfo.lastHeaderEl = headerEl;
+    dragInfo.crossTargetId = id;
+  }
+
+  function clearHeaderHover() {
+    if (dragInfo.lastHeaderEl) dragInfo.lastHeaderEl.classList.remove('move-drop-target');
+    dragInfo.lastHeaderEl = null;
+    dragInfo.crossTargetId = null;
+  }
+
+  function startTileDrag(tileEl, e) {
+    if (dragInfo) return;
+    e.preventDefault();
+    const grid = tileEl.parentElement;
+    const rect = tileEl.getBoundingClientRect();
+    dragInfo = {
+      tileEl,
+      grid,
+      pointerId: e.pointerId,
+      grabDX: e.clientX - rect.left,
+      grabDY: e.clientY - rect.top,
+      crossTargetId: null,
+      lastHeaderEl: null,
+      originalNextSibling: tileEl.nextSibling,
+    };
+    setGrabbedTile(tileEl);
+    tileEl.classList.add('move-dragging');
+    tileEl.style.zIndex = '50';
+    tileEl.style.pointerEvents = 'none';
+    resetMoveModeTimeout();
+
+    // Listening on document (filtered by pointerId) rather than using setPointerCapture on the
+    // tile itself: same-category reorder reparents the tile mid-drag (.after()/.before()), and
+    // moving a captured element in the DOM silently releases its pointer capture in Chromium —
+    // which would otherwise strand the drag with no pointerup ever reaching it.
+    document.addEventListener('pointermove', onTileDragMove);
+    document.addEventListener('pointerup', onTileDragUp);
+    document.addEventListener('pointercancel', onTileDragUp);
+    dragInfo.cleanup = () => {
+      document.removeEventListener('pointermove', onTileDragMove);
+      document.removeEventListener('pointerup', onTileDragUp);
+      document.removeEventListener('pointercancel', onTileDragUp);
+    };
+  }
+
+  function onTileDragMove(e) {
+    if (!dragInfo || e.pointerId !== dragInfo.pointerId) return;
+    handleTileDragMove(e);
+  }
+
+  function onTileDragUp(e) {
+    if (!dragInfo || e.pointerId !== dragInfo.pointerId) return;
+    finishTileDrag();
+  }
+
+  function findNearestTile(grid, excludeEl, x, y) {
+    const tiles = Array.from(grid.children).filter(
+      (c) => c.classList.contains('tile') && !c.classList.contains('tile-add') && c !== excludeEl
+    );
+    let nearest = null;
+    let nearestDist = Infinity;
+    tiles.forEach((t) => {
+      const r = t.getBoundingClientRect();
+      const dx = r.left + r.width / 2 - x;
+      const dy = r.top + r.height / 2 - y;
+      const dist = dx * dx + dy * dy;
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearest = t;
+      }
+    });
+    return nearest;
+  }
+
+  function handleTileDragMove(e) {
+    if (!dragInfo) return;
+    resetMoveModeTimeout();
+
+    if (e.clientX < 0 || e.clientY < 0 || e.clientX > window.innerWidth || e.clientY > window.innerHeight) {
+      cancelTileDrag();
+      return;
+    }
+
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    const headerUnder = under && under.closest && under.closest('.category-header');
+
+    if (headerUnder) {
+      handleHeaderHover(headerUnder);
+    } else {
+      clearHeaderHover();
+      // Nearest-tile-center (rather than exact hit-test under the cursor) so a fast or
+      // coalesced drag still resolves to the correct slot even if intermediate pointermove
+      // events over specific sibling tiles never actually get dispatched.
+      const nearest = findNearestTile(dragInfo.grid, dragInfo.tileEl, e.clientX, e.clientY);
+      if (nearest) {
+        dragInfo.tileEl.style.transform = 'none';
+        const ownRect = dragInfo.tileEl.getBoundingClientRect();
+        const ownCx = ownRect.left + ownRect.width / 2;
+        const ownCy = ownRect.top + ownRect.height / 2;
+        const distToOwnSq = (ownCx - e.clientX) * (ownCx - e.clientX) + (ownCy - e.clientY) * (ownCy - e.clientY);
+        const nr = nearest.getBoundingClientRect();
+        const ncx = nr.left + nr.width / 2;
+        const ncy = nr.top + nr.height / 2;
+        const distToNearestSq = (ncx - e.clientX) * (ncx - e.clientX) + (ncy - e.clientY) * (ncy - e.clientY);
+        // Only reorder when the pointer is genuinely closer to the candidate's slot than to the
+        // dragged tile's own current slot. With very few siblings (e.g. exactly one other tile in
+        // the category), "nearest" is otherwise trivially always that same tile regardless of real
+        // proximity, which would flip the order back and forth on every single move event.
+        if (distToNearestSq < distToOwnSq) {
+          const siblings = Array.from(dragInfo.grid.children).filter(
+            (c) => c.classList.contains('tile') && !c.classList.contains('tile-add')
+          );
+          const draggedIndex = siblings.indexOf(dragInfo.tileEl);
+          const targetIndex = siblings.indexOf(nearest);
+          if (draggedIndex !== -1 && targetIndex !== -1 && draggedIndex !== targetIndex) {
+            if (draggedIndex < targetIndex) nearest.after(dragInfo.tileEl);
+            else nearest.before(dragInfo.tileEl);
+          }
+        }
+      }
+    }
+
+    dragInfo.tileEl.style.transform = 'none';
+    const rect = dragInfo.tileEl.getBoundingClientRect();
+    const dx = e.clientX - dragInfo.grabDX - rect.left;
+    const dy = e.clientY - dragInfo.grabDY - rect.top;
+    dragInfo.tileEl.style.transform = 'translate(' + dx + 'px, ' + dy + 'px) rotate(-3deg) scale(1.05)';
+  }
+
+  function markDragJustFinished() {
+    justFinishedDrag = true;
+    setTimeout(() => { justFinishedDrag = false; }, 0);
+  }
+
+  function finishTileDrag() {
+    if (!dragInfo) return;
+    const info = dragInfo;
+    const crossTargetId = info.crossTargetId;
+    info.cleanup();
+    info.tileEl.style.transform = '';
+    info.tileEl.style.zIndex = '';
+    info.tileEl.style.pointerEvents = '';
+    info.tileEl.classList.remove('move-dragging');
+    if (info.lastHeaderEl) info.lastHeaderEl.classList.remove('move-drop-target');
+
+    const sourceCategoryId = info.grid.closest('.category').dataset.categoryId;
+    const tileId = info.tileEl.dataset.tileId;
+
+    if (crossTargetId && crossTargetId !== sourceCategoryId) {
+      const destGrid = categoryGrids.get(crossTargetId);
+      if (destGrid) {
+        const sourceTiles = loadCategoryTiles(sourceCategoryId);
+        const idx = sourceTiles.findIndex((t) => t.id === tileId);
+        if (idx !== -1) {
+          const [moved] = sourceTiles.splice(idx, 1);
+          saveCategoryTiles(sourceCategoryId, sourceTiles);
+          const destTiles = loadCategoryTiles(crossTargetId);
+          destTiles.push(moved);
+          saveCategoryTiles(crossTargetId, destTiles);
+          const destAddBtn = destGrid.querySelector('.tile-add');
+          destGrid.insertBefore(info.tileEl, destAddBtn);
+        }
+      }
+    } else {
+      const orderedIds = Array.from(info.grid.children)
+        .filter((c) => c.classList.contains('tile') && !c.classList.contains('tile-add'))
+        .map((c) => c.dataset.tileId);
+      const tiles = loadCategoryTiles(sourceCategoryId);
+      const byId = new Map(tiles.map((t) => [t.id, t]));
+      const reordered = orderedIds.map((id) => byId.get(id)).filter(Boolean);
+      saveCategoryTiles(sourceCategoryId, reordered);
+    }
+
+    dragInfo = null;
+    markDragJustFinished();
+    resetMoveModeTimeout();
+  }
+
+  function cancelTileDrag() {
+    if (!dragInfo) return;
+    const info = dragInfo;
+    info.cleanup();
+    info.tileEl.style.transform = '';
+    info.tileEl.style.zIndex = '';
+    info.tileEl.style.pointerEvents = '';
+    info.tileEl.classList.remove('move-dragging');
+    if (info.lastHeaderEl) info.lastHeaderEl.classList.remove('move-drop-target');
+    info.grid.insertBefore(info.tileEl, info.originalNextSibling);
+    dragInfo = null;
+    markDragJustFinished();
+  }
+
+  const tileMenuMoveBtn = document.getElementById('tile-menu-move');
+  tileMenuMoveBtn.addEventListener('click', () => {
+    const tileEl = tileMenuTargetEl;
+    closeTileMenu();
+    if (!tileEl) return;
+    enterMoveMode(tileEl);
+  });
 
   const CLOCK_SETTINGS_KEY = 'clockSettings';
   const defaultClockSettings = { mode: 'digital', scheme: 'red-black', hour12: true, analogStyle: 'classic' };
