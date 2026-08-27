@@ -488,6 +488,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
+### Hail bounce: narrow the random angle range from ±60° to ±45°
+
+- [ ] **Current behavior (confirmed in script.js:1305-1313):** each stone's bounce angle is drawn from a continuous random range of -60° to +60° off straight up (`(Math.random() * 120 - 60) * Math.PI / 180`), then split into vertical/horizontal launch velocity via true trig decomposition (`vy0 = speed*cos(angle)`, `vx0 = speed*sin(angle)`) so energy is conserved — a wide angle trades height for reach rather than getting both.
+- [ ] **Confirmed with user:** this is a range narrowing, not a switch to two fixed values — keep the same continuous random draw and trig decomposition, just change the bound from 60 to 45: `(Math.random() * 90 - 45) * Math.PI / 180`. No other part of the bounce physics (gravity, energy conservation, projectile motion) changes.
+
 ### Dual-ring analog styles: inner red numbers sit too far from the outer black numbers
 
 - [ ] **User feedback, with screenshot of the moon-dial style:** the red inner-ring numbers (13-23/00) need to be closer to the black outer-ring numbers (1-12) — not touching, just closer.
