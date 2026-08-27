@@ -529,11 +529,10 @@
 
   const uvBadge = document.querySelector('.uv-badge');
   function uvSeverityClass(uv) {
-    if (uv <= 2) return 'uv-low';
-    if (uv <= 5) return 'uv-moderate';
-    if (uv <= 7) return 'uv-high';
-    if (uv <= 10) return 'uv-veryhigh';
-    return 'uv-extreme';
+    if (uv >= 10) return 'uv-extreme';
+    if (uv >= 8) return 'uv-veryhigh';
+    if (uv >= 6) return 'uv-moderate';
+    return 'uv-low';
   }
   if (uvBadge) {
     uvBadge.classList.add(uvSeverityClass(Number(uvBadge.dataset.uv)));
@@ -599,6 +598,8 @@
   tempUnitBtn.addEventListener('click', () => {
     displayTempUnit = displayTempUnit === 'F' ? 'C' : 'F';
     renderWeatherTemps();
+    renderWeatherExtras();
+    if (hourlyPanel.classList.contains('open')) renderHourlyPanel();
   });
 
   function renderWind() {
@@ -945,7 +946,7 @@
 
       const label = document.createElementNS(svgNS, 'text');
       label.setAttribute('x', p.x);
-      label.setAttribute('y', p.y + 8);
+      label.setAttribute('y', p.y + 25.5);
       label.setAttribute('class', 'hourly-graph-label');
       label.textContent = conv(p.hour.temp_f) + '°';
       hourlyTempGraph.appendChild(label);
@@ -1040,6 +1041,8 @@
       if (setting === 'tempUnit') {
         displayTempUnit = weatherSettings.tempUnit;
         renderWeatherTemps();
+        renderWeatherExtras();
+        if (hourlyPanel.classList.contains('open')) renderHourlyPanel();
       } else if (setting === 'windUnit') {
         renderWind();
       }

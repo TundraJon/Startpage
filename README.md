@@ -639,30 +639,30 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 - [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
 
-## Build Queue
+## Build Log 33 (completed)
 
 ### Hourly panel: temperature labels overlapping the graph icons above them
 
-- [ ] **User feedback:** since the icon size increase in Build 32, the temp label's top edge sits exactly at the icon's vertical center, overlapping it — needs to move down by the icon's height.
-- [ ] **Root cause confirmed (script.js:948):** the label's y-offset from its point (`p.y + 8`) was never adjusted when `.hourly-graph-icon` grew from 14px to 17.5px in Build 32 — the offset only accounts for the label's own spacing, not the larger icon now sitting above it (which uses `dominant-baseline: central`, so it extends roughly half its font-size above *and* below `p.y`).
-- [ ] **Requested fix:** move the label down by the icon's height (17.5px): offset becomes `p.y + 8 + 17.5` = `p.y + 25.5`.
+- [x] Label y-offset in `renderHourlyTempGraph` changed from `p.y + 8` to `p.y + 25.5` (icon height 17.5px added). Verified: icon `y=9`, label `y=34.5`, diff exactly 25.5.
 
-### Weather widget: temperature-unit change doesn't update dew point (or the open Hourly panel's graph)
+### Weather widget: temperature-unit change now updates dew point and the open Hourly panel's graph
 
-- [ ] **User feedback:** tapping the temperature to change scale doesn't change the dew point temperature — those need to be linked. All temperatures need to stay linked when the unit changes, whether by tapping or by the default set in the Weather Options settings menu.
-- [ ] **Root cause confirmed (script.js:599-602):** the `tempUnitBtn` tap-to-peek click handler flips `displayTempUnit` but only calls `renderWeatherTemps()`.
-- [ ] **Root cause confirmed (script.js:1034-1047):** the Weather Options settings-menu `tempUnit` segmented-button handler has the identical bug — it sets `weatherSettings.tempUnit`/`displayTempUnit` but also only calls `renderWeatherTemps()`. This confirms the persistent-default path is affected too, not just the tap-to-peek path.
-- [ ] **Root cause confirmed (script.js:718-736):** `renderWeatherExtras()` is the function that actually renders dew point (`dewPointValEl.textContent = conv(weatherState.dewPointF) + '°'`) and already correctly derives its conversion from `displayTempUnit` — it's simply never called by either handler above.
-- [ ] **Root cause confirmed (script.js:896-962):** the Hourly Forecast panel's temperature graph (`renderHourlyTempGraph`) independently reads `displayTempUnit` too, but is only invoked from `renderHourlyPanel()`, which neither handler calls — so if the panel is open when the unit is toggled, its graph temps also go stale. (An existing guard elsewhere in the code, `if (hourlyPanel.classList.contains('open')) renderHourlyPanel();`, already handles this same class of refresh for other state changes.)
-- [ ] **Requested fix:** add `renderWeatherExtras()` and `if (hourlyPanel.classList.contains('open')) renderHourlyPanel();` to both the `tempUnitBtn` click handler (script.js:599-602) and the Weather Options `tempUnit` segmented-button handler (script.js:1034-1047).
+- [x] Added `renderWeatherExtras()` and `if (hourlyPanel.classList.contains('open')) renderHourlyPanel();` to both the `tempUnitBtn` tap-to-peek click handler (script.js:599-604) and the Weather Options `tempUnit` segmented-button handler (script.js:1042-1047).
+- [x] Verified: tapping the temp toggles dew point (50°F → 10°C → back to 50°F); the Weather Options settings-menu `tempUnit` buttons do the same.
+- [x] **Discovered during testing, not yet fixed:** the Hourly panel's outside-click-to-dismiss handler (`handleHourlyOutsideClick`, pre-existing, unrelated to this build) treats a tap on the main widget's temp toggle as an "outside" click and closes the panel before the new refresh code can run — so in practice the open panel can't currently be caught mid-refresh, since tapping the toggle always closes it first. The added refresh guard is inert until that's addressed, but is harmless and will start working once it is. Flagged for the user to decide whether it's worth fixing.
 
-### Weather widget: UV badge color scale doesn't match the Hourly panel's UV hazard thresholds
+### Weather widget: UV badge color scale now matches the Hourly panel's UV hazard thresholds
 
-- [ ] **User feedback:** main widget shows UV 3 as yellow; it should be green. UV should turn yellow at 6 and red at 8, matching the Hourly panel's hazard definition. Follow-up: user wants to keep purple for UV 10+ as a 4th tier on top of that.
-- [ ] **Root cause confirmed (script.js:531-537):** `uvSeverityClass()` uses the standard 5-tier EPA UV index scale — Low ≤2 (green), Moderate ≤5 (gold/yellow), High ≤7 (orange), Very High ≤10 (red), Extreme >10 (purple), colored via styles.css:746-750 — which is unrelated to the hourly hazard scheme.
-- [ ] **Root cause confirmed (script.js:827-830, `hourlyHazards`):** the Hourly panel's UV hazard uses a 3-tier scheme: red at `uv >= 8`, yellow at `uv >= 6`, otherwise no hazard (green). At UV 3 this is green; the main widget's 5-tier scale instead lands on "Moderate" (gold/yellow), producing the mismatch.
-- [ ] **Checked for other conflicts:** UV is the only color-coded severity display on the main weather widget (no wind/rain/cold/heat badges exist there to compare), so no other definitions conflict with the Hourly panel's hazard scheme.
-- [ ] **Requested fix:** rewrite `uvSeverityClass(uv)` to a 4-tier scheme, reusing existing CSS colors: `uv >= 10` → `'uv-extreme'` (purple), `uv >= 8` → `'uv-veryhigh'` (red), `uv >= 6` → `'uv-moderate'` (gold/yellow), else → `'uv-low'` (green). The now-unreachable `uv-high` (orange) CSS rule (styles.css:748) should be removed as dead code.
+- [x] `uvSeverityClass(uv)` rewritten to a 4-tier scheme: `uv >= 10` → `uv-extreme` (purple), `uv >= 8` → `uv-veryhigh` (red), `uv >= 6` → `uv-moderate` (gold/yellow), else → `uv-low` (green). Removed the now-unreachable `uv-high` (orange) CSS rule.
+- [x] Verified all boundaries directly: UV 3, 5.9 → green; 6, 7.9 → yellow; 8, 9.9 → red; 10, 12 → purple.
+
+### Regression check
+
+- [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
+
+## Build Queue
+
+_Empty — nothing queued._
 
 ## Build Planner
 
