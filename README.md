@@ -551,6 +551,17 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
+### Drifting clouds: stop mid-canvas pop-ins caused by settings-triggered cloud rebuilds
+
+- [ ] **User feedback:** thought they saw a cloud "pop in" mid-canvas when wrapping from the right edge back to the left.
+- [ ] **Real root cause, different from the reported mechanism (confirmed in script.js):** the wrap-around/respawn path (`spawnCloud(oldCloud)`, script.js:1064-1086) is already correct — it gets a *positive* 0.1-5s delay and sits at the off-canvas base `left` position (styles.css:450) the whole time, so it can't be the source. The actual cause: `renderWeatherSkin()` (script.js:1460) **removes and recreates every cloud from scratch** (script.js:1483) on *any* settings change — theme toggle, the cloud slider, a Testing Panel condition pick, the time-override slider, and ~10 total call sites — and each fresh batch is given a *negative* `animation-delay` up to its full duration (script.js:1504, `-Math.random() * duration`), which places it instantly at a random point along its entire drift path, including squarely mid-canvas. That's intentional for avoiding a left-edge clump on a genuinely fresh batch, but it was re-triggering on every settings tweak, not just true page load — confirmed with the user as the real explanation.
+- [ ] **Resolved fix:** only apply the instant-scatter (negative-delay) placement the very first time the cloud layer is created (i.e., when `weatherSkin.querySelectorAll('.wx-skin-cloud')` is empty at the top of the `liveSkin` branch). On every later `renderWeatherSkin()` call:
+  - If the target `cloudCount` (`Math.floor(cloudPct / 10)`) matches the existing cloud count, leave the existing cloud elements completely untouched (don't remove/recreate them at all).
+  - If cloud cover decreased, remove only the excess existing clouds.
+  - If cloud cover increased, add only the new ones via a plain `spawnCloud()` with no delay override — entering cleanly off-canvas from the "from" keyframe, same as a first-load cloud, just without the instant-scatter treatment (not given the wrap-around's positive hold-delay either, since starting immediately from off-canvas is already visually correct — simplification flagged here rather than silently decided).
+  - Since `.weather-skin-overlay`/`precipCanvas`/`flashDiv` are still removed+recreated or re-appended every call (unchanged), and DOM order determines paint order here (none of these elements have an explicit `z-index`), any preserved (untouched) cloud elements must be explicitly re-appended (moved, not recreated) after `precipCanvas` and before `flashDiv` on every call, so they stay correctly layered on top of the overlay/precip canvas — re-appending an existing node via `appendChild` doesn't restart or otherwise disturb its running CSS animation.
+- [ ] Line 1483's combined removal query (`'.weather-skin-overlay, .wx-skin-cloud'`) needs to be split so clouds are no longer unconditionally wiped there — only `.weather-skin-overlay` stays removed unconditionally each call.
+
 ### Drifting clouds: raise the smallest size from 0.5rem to 0.75rem
 
 - [ ] **Current behavior (confirmed in script.js:1049-1053, `randomizeCloud`):** `size = 3 - 2.5 * f`, where `f = topPct / 66` — 3rem at the top edge down to 0.5rem at the 66% line (the bottom of the spawn band).
