@@ -512,6 +512,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [ ] **Resolved:** the weather-emoji badge uses `weatherIconForCode(getEffectiveConditionCode())` — matching the weather widget's icon exactly, including any active Testing Panel override, for consistency and so it can be tested via the same Testing Panel radios rather than only the real live condition.
 - [ ] **Style picker UI:** appears in *both* the 12-hour and 24-hour swatch-grid sections (alongside `'classic'`+`'numbered'` for 12-hour, and `'classic'`+`'dual-ring'` for 24-hour) — so each grid ends up with three options once this is built, not two.
 
+### Change hail gravity default from 1.5 to 0.5
+
+- [ ] **Current default (confirmed in script.js:868 and 1548-1549; index.html:391):** `WX_HAIL_TUNABLES.gravity = 1.5`, matching the reset value and the Testing Panel slider's initial `value="1.5"`/label.
+- [ ] **Requested change:** change the default (script.js:868), the reset-button value (script.js:1548-1549), and the HTML slider's initial value/label (index.html:391) from 1.5 to 0.5. Slider range (0.1–3) is unaffected — 0.5 is already within it.
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
