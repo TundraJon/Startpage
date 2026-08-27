@@ -632,6 +632,12 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [ ] **Current behavior (confirmed in styles.css):** `.hourly-alert-icon` (the hazard icon in the top "warnings" row, paired with the colored dot, from Build 31) is `font-size: 0.45rem`. The row itself (`.hourly-row-alert .hourly-cell`) is 16px tall, per the user's own observation there's extra unused vertical space at that size.
 - [ ] **Requested change:** increase to `0.54rem` (0.45 × 1.2).
 
+### Hourly panel: raise the precip % display threshold from >0% to ≥20%
+
+- [ ] **Current behavior (confirmed in script.js, `renderHourlyPrecipRow`):** the bottom precip-% row shows the value whenever `pct > 0` — so a WeatherAPI-reported 1% chance still displays.
+- [ ] **User's reasoning:** WeatherAPI sometimes reports a token 1% (or similarly negligible) chance that isn't meaningfully useful to show.
+- [ ] **Requested change:** `if (pct > 0)` → `if (pct >= 20)`. No other behavior changes — the cell still renders empty (reserved space, unchanged) below that threshold.
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
