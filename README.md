@@ -461,6 +461,29 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [ ] **Colors chosen (adjust if a different shade is wanted):** green `#22c55e`, orange `#f97316` — picked to roughly match the saturation/vividness of the existing `red-black` (`#e6293f`) and `blue-black` (`#3b82f6`) schemes against the same pure-black background, rather than a muted or pastel tone.
 - [ ] **No JS changes needed:** `clockSettings.scheme` is already a free-form string read/written generically (script.js:201, 316, 373-374, 411-413) — adding new valid values requires no logic changes, only the CSS rules and the new swatch buttons above.
 
+### New analog clock style: colored number badges (12-hour only)
+
+- [ ] **Reference:** user attached a photo of a colorful kids'-style wall clock — burgundy rim, cream face, each hour number 1-12 sitting inside its own colored circular badge with white text, blue hour/minute hands, thin red second hand, navy pivot dot.
+- [ ] **Scope, narrowed by the user after discussion:** this is *not* a full re-skin. Only the colored number badges (colored circle + white number) are wanted, added to the *existing* 12-hour analog face exactly as it looks today — same face fill (`--clock-analog-day`/`--clock-analog-night` CSS vars, unchanged), same hour/minute hand color and length (`#222`, unchanged), same center pivot dot (unchanged). **No second hand** — explicitly declined by the user ("I don't expect you to include the second hand... I'm honestly just looking for the colored circles and the white numbers inside those colored circles. That's it."). No rim/background color changes, no hand-color changes.
+- [ ] **Current 12-hour rendering (confirmed in script.js:242-260, `renderAnalogFace`):** draws tick-mark lines at all 12 positions (radius 41-46) but only labels 4 of them (3/6/9/12) with plain black text at radius 34, font-size 9. This needs a second style option that replaces that tick+4-label treatment with all 12 numbers as colored badges instead — while leaving the 24-hour branch (`hour12 === false`, lines 261-286) completely untouched.
+- [ ] **New setting:** `clockSettings.analogStyle: 'classic' | 'numbered'`, default `'classic'`. `renderAnalogFace` (or a small wrapper around it) takes this as a parameter; when `hour12 === true && analogStyle === 'numbered'`, draw all 12 numbers as filled circular badges (~7-unit radius in the existing 100×100 viewBox, centered around radius ~36) with centered bold white text (~font-size 7), one badge per hour, and skip the tick-mark lines entirely (the reference photo has no visible tick marks, just the badges). The `'classic'` style keeps today's exact rendering unchanged. The 24-hour branch ignores `analogStyle` entirely (no 24-hour "numbered" design exists) — it should always render as it does today regardless of what's stored in `analogStyle`, since the picker for it (see below) is never shown in 24-hour mode.
+- [ ] **Badge color palette (12 colors, one per number), approximated from the reference photo — adjust any shade if it doesn't match well once built:**
+  | Number | Color | Hex |
+  |--------|-------|-----|
+  | 1 | peach/orange | `#f2a65a` |
+  | 2 | blue-indigo | `#6a7fdb` |
+  | 3 | teal | `#4fa8a8` |
+  | 4 | maroon/berry | `#a83250` |
+  | 5 | medium blue | `#5b9bd5` |
+  | 6 | gold/mustard | `#d9a520` |
+  | 7 | dark brown | `#5c3a21` |
+  | 8 | lavender | `#a78bd9` |
+  | 9 | olive/moss green | `#7a9a3c` |
+  | 10 | coral/orange | `#e08a3c` |
+  | 11 | blue | `#4a7fc1` |
+  | 12 | magenta/rose | `#c2447a` |
+- [ ] **Style picker UI, confirmed with the user:** a new "Analog Style" section in the Clock Options overlay (`clock-options-overlay`), modeled on the existing digital "Color Scheme" swatch grid (index.html:451-467) — two small swatch buttons, each containing a miniature live analog clock preview (one showing the `'classic'` style, one showing the new `'numbered'` style), both using the current time. **Shown only when `clockSettings.mode === 'analog' && clockSettings.hour12 === true`** — hidden otherwise (24-hour mode has no numbered variant to offer, and digital mode's existing preview/scheme sections already handle their own visibility the same way). The existing single big "Preview" section (`clock-analog-preview-group`, index.html:469-474) can stay as-is for the case(s) where a picker isn't shown (e.g. 24-hour analog), or be reworked into the same swatch-grid pattern — left as a build-time decision, whichever fits the existing preview plumbing more cleanly.
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
