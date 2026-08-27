@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home</title>
-<link rel="stylesheet" href="styles.css?v=16">
+<link rel="stylesheet" href="styles.css?v=17">
 </head>
 <body>
 
@@ -384,6 +384,21 @@
       </div>
     </section>
 
+    <section class="options-section">
+      <h3>Hail Physics</h3>
+      <div class="option-row">
+        <span>Gravity <span id="test-hail-gravity-value">1.5</span></span>
+        <input type="range" id="test-hail-gravity-slider" min="0.1" max="3" step="0.1" value="1.5">
+      </div>
+    </section>
+
+    <section class="options-section">
+      <h3>Live Weather Diagnostics (temporary)</h3>
+      <p class="testing-note">For tracking down live-data bugs (e.g. moon phase). Not part of the real app — remove once resolved.</p>
+      <textarea id="test-weather-debug-output" readonly rows="14" class="testing-debug-output"></textarea>
+      <button type="button" class="testing-reset-btn" id="test-weather-debug-copy-btn">Copy diagnostics</button>
+    </section>
+
     <button type="button" class="testing-reset-btn" id="test-reset-btn">Reset to defaults</button>
   </div>
 </div>
@@ -500,6 +515,6 @@
   </div>
 </div>
 
-<script src="script.js?v=16"></script>
+<script src="script.js?v=17"></script>
 </body>
 </html>

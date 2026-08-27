@@ -853,12 +853,17 @@
     nightGrayBlendPct: 75,
   };
 
-  // Hail bounce physics: HAIL_GRAVITY (px/frame^2) sets the parabola's steepness — calibrated so
-  // a typical post-doubling stone (vy0 around the high-teens at a shallow angle) lands in the
-  // widget's visual scale, with harder bounces correctly arcing higher and longer as a real
-  // consequence of the physics, not a bug. HAIL_FADE_FRAMES is the rapid fade-out duration once
-  // the stone hits the ground the second time.
-  const HAIL_GRAVITY = 3;
+  // Hail bounce physics: gravity (px/frame^2) sets the parabola's steepness. Its magnitude was
+  // always an empirically-chosen stylistic value, not a physically-derived one (no pixel-to-real
+  // -world or frame-to-real-time conversion is ever established) — the *shape* of the motion
+  // (true parabola, trig decomposition) is what's physics-accurate, not this specific number —
+  // so it's a Testing Panel tunable like the cloud/fog constants rather than a fixed value.
+  // Harder bounces correctly arc higher and longer as a real consequence of the physics, not a
+  // bug. HAIL_FADE_FRAMES is the rapid fade-out duration once the stone hits the ground the
+  // second time (not currently tunable).
+  const WX_HAIL_TUNABLES = {
+    gravity: 1.5,
+  };
   const HAIL_FADE_FRAMES = 6;
 
   // Fog: previously a fixed 0.14 peak opacity at a baked-in pixel radius — too faint to notice.
@@ -950,6 +955,16 @@
       weatherSkin.appendChild(cloud);
     }
     randomizeCloud(cloud);
+    if (oldCloud) {
+      // Independent clouds have no coordination — without this, a faster cloud's respawn cadence
+      // can stay in a persistent, repeating phase relationship with a slower one, producing a
+      // recurring visual cluster. Re-rolling a random hold delay on every respawn (held off-canvas
+      // at the base `left: calc(-1 * var(--cloud-w))` rule, since no animation-fill-mode is set)
+      // makes each cloud's effective loop period vary cycle to cycle, so they can't stay locked
+      // together. The initial batch keeps its own separate negative-delay stagger in
+      // renderWeatherSkin() instead — this only applies to ongoing respawns.
+      cloud.style.animationDelay = (0.1 + Math.random() * 4.9) + 's';
+    }
     cloud.addEventListener('animationiteration', () => spawnCloud(cloud));
     return cloud;
   }
@@ -1061,15 +1076,13 @@
     }
     if (c.has('hail')) {
       for (let i = 0; i < 22; i++) {
-        // ~25% of stones fall twice as fast; that same fall speed becomes their own bounce
+        // ~25% of stones fall 1.5x as fast; that same fall speed becomes their own bounce
         // "energy" later — no separate height multiplier, a stone that fell faster just
-        // naturally bounces harder since energy in equals energy out. baseSpeed is cut to 25%
-        // of its Build Log 18 value (which had doubled it), so both fall speed and bounce
-        // height/duration read calmer rather than blanketing the widget.
-        const baseSpeed = 3.5 + Math.random() * 1;
+        // naturally bounces harder since energy in equals energy out.
+        const baseSpeed = 4.375 + Math.random() * 1.25;
         conditionParticles.push({
           type: 'hail', x: Math.random() * w, y: Math.random() * h,
-          speed: Math.random() < 0.25 ? baseSpeed * 2 : baseSpeed,
+          speed: Math.random() < 0.25 ? baseSpeed * 1.5 : baseSpeed,
           r: 2 + Math.random() * 1.2, state: 'fall', bounceT: 0,
         });
       }
@@ -1172,12 +1185,12 @@
       } else if (p.state === 'arc') {
         // True constant-acceleration projectile motion: a real gravity parabola for height
         // (not an eased curve), constant velocity horizontally (no reversal, no snapping back
-        // to the launch point). HAIL_GRAVITY is calibrated so a typical stone's flight time and
-        // peak height land in the widget's visual scale — verified against hand-calculated
-        // positions with a deterministic Math.random() override.
+        // to the launch point). Gravity is a live Testing Panel tunable (WX_HAIL_TUNABLES.gravity)
+        // rather than a fixed constant — verified against hand-calculated positions with a
+        // deterministic Math.random() override.
         p.bounceT += 1;
         const t = p.bounceT;
-        const heightAboveGround = p.vy0 * t - 0.5 * HAIL_GRAVITY * t * t;
+        const heightAboveGround = p.vy0 * t - 0.5 * WX_HAIL_TUNABLES.gravity * t * t;
         if (heightAboveGround <= 0) {
           // Real second touchdown (flight time derived from physics, not a fixed frame count).
           // Stays fully opaque up to this exact instant; the fade-out starts only now.
@@ -1390,6 +1403,8 @@
     const fogSizeValue = document.getElementById('test-fog-size-value');
     const fogSpeedSlider = document.getElementById('test-fog-speed-slider');
     const fogSpeedValue = document.getElementById('test-fog-speed-value');
+    const hailGravitySlider = document.getElementById('test-hail-gravity-slider');
+    const hailGravityValue = document.getElementById('test-hail-gravity-value');
     const resetBtn = document.getElementById('test-reset-btn');
 
     function timeStringToSeconds(str) {
@@ -1402,7 +1417,7 @@
       return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
     }
 
-    trigger.addEventListener('click', () => { overlay.hidden = false; });
+    trigger.addEventListener('click', () => { overlay.hidden = false; renderWeatherDebugPanel(); });
     closeBtn.addEventListener('click', () => { overlay.hidden = true; });
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.hidden = true; });
 
@@ -1476,6 +1491,27 @@
       WX_FOG_TUNABLES.speedMult = Number(fogSpeedSlider.value);
       fogSpeedValue.textContent = fogSpeedSlider.value + 'x';
     });
+    hailGravitySlider.addEventListener('input', () => {
+      WX_HAIL_TUNABLES.gravity = Number(hailGravitySlider.value);
+      hailGravityValue.textContent = hailGravitySlider.value;
+    });
+
+    const weatherDebugOutput = document.getElementById('test-weather-debug-output');
+    const weatherDebugCopyBtn = document.getElementById('test-weather-debug-copy-btn');
+    weatherDebugCopyBtn.addEventListener('click', async () => {
+      const text = formatWeatherDebugText();
+      try {
+        await navigator.clipboard.writeText(text);
+        weatherDebugCopyBtn.textContent = 'Copied!';
+      } catch (e) {
+        // Clipboard API unavailable/denied — fall back to selecting the textarea for a manual
+        // long-press-select-all-copy.
+        weatherDebugOutput.focus();
+        weatherDebugOutput.select();
+        weatherDebugCopyBtn.textContent = 'Select the text above to copy';
+      }
+      setTimeout(() => { weatherDebugCopyBtn.textContent = 'Copy diagnostics'; }, 2000);
+    });
 
     resetBtn.addEventListener('click', () => {
       weatherTestState.timeOverrideSec = null;
@@ -1509,6 +1545,8 @@
       fogCountSlider.value = 5; fogCountValue.textContent = '5';
       fogSizeSlider.value = 40; fogSizeValue.textContent = '40%';
       fogSpeedSlider.value = 3; fogSpeedValue.textContent = '3x';
+      WX_HAIL_TUNABLES.gravity = 1.5;
+      hailGravitySlider.value = 1.5; hailGravityValue.textContent = '1.5';
       lastParticleKey = '';
       renderWeatherExtras();
       renderWeatherSkin();
@@ -1572,6 +1610,55 @@
   // Fallback location matches the original placeholder text (Los Ranchos de Albuquerque, NM),
   // used only if geolocation is unavailable, declined, or times out.
   const FALLBACK_COORDS = { lat: 35.1497, lon: -106.6764 };
+
+  // --- Temporary Live Weather diagnostics (Testing Panel) ---
+  // Tracks what actually happened on the last loadLiveWeather() call, since real live-data bugs
+  // (e.g. moon phase silently never updating) have no visible error anywhere otherwise, and the
+  // user has no dev tools access on mobile to inspect this directly. Remove once resolved.
+  const weatherDebugState = {
+    coords: null,
+    keyPresent: false,
+    keyMasked: '(none)',
+    cachePresent: false,
+    cacheAgeMin: null,
+    cacheStale: null,
+    outcome: 'not-yet-loaded',
+    errorMessage: null,
+    rawData: null,
+  };
+  function maskApiKey(key) {
+    if (!key) return '(none)';
+    if (key.length <= 8) return '*'.repeat(key.length);
+    return key.slice(0, 4) + '...' + key.slice(-4);
+  }
+  function formatWeatherDebugText() {
+    const d = weatherDebugState;
+    const fday = d.rawData && d.rawData.forecast && d.rawData.forecast.forecastday && d.rawData.forecast.forecastday[0];
+    const astro = fday && fday.astro;
+    const condition = d.rawData && d.rawData.current && d.rawData.current.condition;
+    return [
+      '--- Live Weather Diagnostics ---',
+      'Key present: ' + (d.keyPresent ? 'yes (' + d.keyMasked + ')' : 'no'),
+      'Coords used: ' + (d.coords ? `${d.coords.lat}, ${d.coords.lon}` : '(not yet fetched)'),
+      'Cache present: ' + (d.cachePresent ? 'yes' : 'no'),
+      d.cachePresent ? 'Cache age: ' + d.cacheAgeMin + ' min (' + (d.cacheStale ? 'stale' : 'fresh') + ')' : null,
+      'Last outcome: ' + d.outcome,
+      'Last error: ' + (d.errorMessage || '(none)'),
+      '',
+      '--- Raw astro ---',
+      astro ? JSON.stringify(astro, null, 2) : '(none)',
+      '',
+      '--- Raw condition ---',
+      condition ? JSON.stringify(condition, null, 2) : '(none)',
+      '',
+      '--- Full raw response ---',
+      d.rawData ? JSON.stringify(d.rawData, null, 2) : '(none)',
+    ].filter((line) => line !== null).join('\n');
+  }
+  function renderWeatherDebugPanel() {
+    const out = document.getElementById('test-weather-debug-output');
+    if (out) out.value = formatWeatherDebugText();
+  }
 
   // Live Condition Skin animation for a WeatherAPI code now comes straight from WX_CONDITIONS
   // (the single source of truth declared earlier, alongside the icon map) instead of a separate
@@ -1674,26 +1761,52 @@
 
   async function loadLiveWeather(force) {
     const key = localStorage.getItem(WEATHERAPI_KEY_STORAGE);
-    if (!key) return;
+    weatherDebugState.keyPresent = !!key;
+    weatherDebugState.keyMasked = maskApiKey(key);
+    if (!key) {
+      weatherDebugState.outcome = 'no-key';
+      renderWeatherDebugPanel();
+      return;
+    }
     let cache = null;
     try { cache = JSON.parse(localStorage.getItem(WEATHER_CACHE_KEY) || 'null'); } catch (e) { cache = null; }
     const isStale = !cache || (Date.now() - cache.fetchedAt) >= WEATHER_STALE_MS;
+    weatherDebugState.cachePresent = !!cache;
+    weatherDebugState.cacheAgeMin = cache ? Math.round((Date.now() - cache.fetchedAt) / 60000) : null;
+    weatherDebugState.cacheStale = cache ? isStale : null;
     if (!force && cache && !isStale) {
+      weatherDebugState.outcome = 'served-cache-fresh';
+      weatherDebugState.errorMessage = null;
+      weatherDebugState.rawData = cache.data;
       applyLiveWeatherData(cache.data);
+      renderWeatherDebugPanel();
       return;
     }
     const coords = await getCoords();
+    weatherDebugState.coords = coords;
     try {
       const url = `https://api.weatherapi.com/v1/forecast.json?key=${encodeURIComponent(key)}&q=${coords.lat},${coords.lon}&days=1&aqi=no&alerts=yes`;
       const res = await fetch(url);
       if (!res.ok) throw new Error('WeatherAPI request failed: ' + res.status);
       const data = await res.json();
       localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ fetchedAt: Date.now(), data }));
+      weatherDebugState.outcome = 'fetched-fresh';
+      weatherDebugState.errorMessage = null;
+      weatherDebugState.rawData = data;
       applyLiveWeatherData(data);
     } catch (e) {
       console.error('Weather fetch failed:', e);
-      if (cache) applyLiveWeatherData(cache.data);
+      weatherDebugState.errorMessage = e.message || String(e);
+      if (cache) {
+        weatherDebugState.outcome = 'fallback-stale-cache';
+        weatherDebugState.rawData = cache.data;
+        applyLiveWeatherData(cache.data);
+      } else {
+        weatherDebugState.outcome = 'error-no-cache';
+        weatherDebugState.rawData = null;
+      }
     }
+    renderWeatherDebugPanel();
   }
 
   function refreshLiveWeather(force) {
