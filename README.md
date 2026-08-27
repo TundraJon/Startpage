@@ -509,7 +509,7 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
   - **Right** (between center and the 3/15 position): day of the month (e.g. "26").
   - **Top** (between center and the 12/00 position): month abbreviation (e.g. "Aug").
   - **Left** (between center and the 9/21 position): day-of-week abbreviation (e.g. "Wed").
-- [ ] **Open detail, not yet resolved:** whether the weather-emoji badge should reflect `weatherIconForCode(getEffectiveConditionCode())` (matching the weather widget's icon exactly, including any active Testing Panel override) or strictly the real live condition regardless of testing state. Needs a decision before/at build time.
+- [ ] **Resolved:** the weather-emoji badge uses `weatherIconForCode(getEffectiveConditionCode())` — matching the weather widget's icon exactly, including any active Testing Panel override, for consistency and so it can be tested via the same Testing Panel radios rather than only the real live condition.
 - [ ] **Style picker UI:** appears in *both* the 12-hour and 24-hour swatch-grid sections (alongside `'classic'`+`'numbered'` for 12-hour, and `'classic'`+`'dual-ring'` for 24-hour) — so each grid ends up with three options once this is built, not two.
 
 ## Build Planner
