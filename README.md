@@ -696,18 +696,25 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 - [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
 
+## Build Log 36 (completed)
+
+### Phase 2 Editing System, Part 1: Tile-level Remove Entry / Rename Entry
+
+- [x] Migrated all 20 original tiles to seed data (`TILE_SEED_DATA` in script.js), each with a stable `id`. On first load per category, if `category-tiles-<id>` doesn't exist in localStorage yet, it's seeded from that data; every tile (original and "+"-added) now renders from that one list going forward. index.html's static tile markup is gone — only the `.tile-add` button remains static per category.
+- [x] New tiles get an id via `crypto.randomUUID()` (with a fallback generator for older browsers).
+- [x] Long-press on every real tile (via the existing `attachLongPress()` helper, excluded from `.tile-add`) opens a 3-option menu: Remove Entry, Move Entry (present but disabled — inert until the Part 2 Move Entry doc arrives and is built), Rename Entry.
+- [x] Remove Entry: confirm prompt with the tile's name, then a `Math.random() < 0.10` chance of a second "Are you REALLY sure? 😳" prompt before actual deletion; Cancel at either stage leaves the tile untouched. Verified the boundary logic deterministically both directions (forced random below/above 0.10) plus the standard Cancel path — all behaved exactly as specified. The easter egg is not mentioned anywhere in the (still-placeholder) Help Overlay.
+- [x] Rename Entry: inline input pre-filled with the current name; blank names are blocked (save is a no-op, dialog stays open); verified the URL, favicon, and fallback-text state are untouched by a rename — only the name label changes.
+- [x] Verified: tap still navigates normally (long-press's built-in click-suppression prevents accidental navigation); long-press on the "+" tile does nothing (menu never opens); all of the above works identically on migrated original tiles and newly-added ones; changes persist across reload.
+
+### Regression check
+
+- [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
+- [x] Re-verified all Build 34/35 tile functionality (add-tile flow, favicon fallback, long-press dismiss of the Hourly panel) still works correctly on top of the new id-based data model.
+
 ## Build Queue
 
-### Phase 2 Editing System, Part 1: Tile-level Remove Entry / Rename Entry (per supplied spec doc)
-
-- [ ] **Spec supplied:** long-press context menu on individual tiles with exactly 3 options — Remove Entry, Move Entry (routing only; full behavior is a separate Part 2 doc not yet supplied), Rename Entry.
-- [ ] **Conflict/gap identified, resolved with user:** Remove/Rename must work on every tile regardless of category, but only tiles added via the Build 34 "+" mechanic have persisted data (`category-tiles-<id>` in localStorage) — the 20 original tiles (Gmail, Translate, Maps, USPS, Calendar, and 5 each in News/Shopping/Entertainment) are hardcoded `<a class="tile">` markup in index.html with no data behind them, so nothing currently exists to remove-from or rename-in for those. **User's decision: migrate everything to one data model.** All 20 original tiles become seed data in script.js; on first load, any category whose `category-tiles-<id>` key doesn't exist yet gets seeded from that data, and every tile (original and user-added alike) renders from that one localStorage-backed list going forward. index.html's static tile markup is removed entirely (only the `.tile-add` "+" button stays static).
-- [ ] **Data model change:** each tile object gets a stable `id` (not just `{name, url}`) so Remove/Rename can target one exact entry — seed entries get fixed ids, new tiles get one generated at creation time (e.g. `crypto.randomUUID()`).
-- [ ] **Long-press wiring:** reuse the existing `attachLongPress()` helper (script.js:154) on every rendered tile except `.tile-add` — same mechanism already used for the clock/weather widgets' long-press-to-open-settings, including its built-in tap/long-press disambiguation (suppresses the trailing `click` so long-pressing a tile never also navigates its URL).
-- [ ] **New tile action menu:** a 3-option overlay (Remove Entry / Move Entry / Rename Entry) opens on tile long-press. Move Entry is present but inert ("coming soon"-style, non-functional) until the Part 2 Move Entry doc arrives and is built — per this doc's own scope note, Part 1 "only needs the menu item present and correctly routing to that system."
-- [ ] **Remove Entry flow, exactly per spec:** confirm prompt "Are you sure you want to remove [Site Name]?" (Confirm/Cancel). On Confirm, a **10% random chance** (`Math.random() < 0.10`) shows a second prompt "Are you REALLY sure? 😳" (Confirm/Cancel) before the tile is actually deleted; Cancel on either prompt aborts with no change. **This 10% easter egg is explicitly called out in the spec as intentional and permanent — not a bug to fix or make deterministic — and must never be mentioned in any user-facing help text.** The current Help Overlay (index.html:428-434) is still just a "coming soon" placeholder, so there's nothing to conflict with yet, but this constraint carries forward to whenever real walkthrough copy is written. On actual removal (either path): delete the entry from the category's tile array, save to localStorage, remove the DOM node — remaining tiles reflow, "+" stays last.
-- [ ] **Rename Entry flow, exactly per spec:** inline text input pre-filled with the current name, Confirm/Cancel, no confirmation-of-intent prompt needed. Only updates the name/label — never touches the URL, favicon, or fallback-text styling. Blank name cannot be saved (block confirm or revert to previous name).
-- [ ] **Verification checklist to run once built:** long-press opens the menu (not on "+"/headers/dividers); tap still navigates normally; Remove Entry's second prompt fires roughly 1-in-10 over repeated trials, not every time or never; Cancel at either stage leaves the tile untouched; Rename never alters URL/icon; blank rename is blocked; both actions work identically on original (migrated) and user-added tiles, and on favicon vs. fallback-text tiles.
+_Empty — nothing queued._
 
 ## Build Planner
 

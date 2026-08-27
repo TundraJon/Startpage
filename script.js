@@ -151,18 +151,59 @@
     });
   });
 
-  // --- Tile Grid: "+" add-tile mechanic and persisted user tiles ---
+  // --- Tile Grid: "+" add-tile mechanic, persisted tiles, and Phase 2 Part 1 tile actions ---
   const TILE_STORAGE_PREFIX = 'category-tiles-';
 
-  function loadUserTiles(categoryId) {
+  const TILE_SEED_DATA = {
+    home: [
+      { id: 'seed-home-1', name: 'Gmail', url: 'https://mail.google.com' },
+      { id: 'seed-home-2', name: 'Translate', url: 'https://translate.google.com' },
+      { id: 'seed-home-3', name: 'Maps', url: 'https://maps.google.com' },
+      { id: 'seed-home-4', name: 'USPS', url: 'https://informeddelivery.usps.com' },
+      { id: 'seed-home-5', name: 'Calendar', url: 'https://calendar.google.com' },
+    ],
+    news: [
+      { id: 'seed-news-1', name: 'Google News', url: 'https://news.google.com' },
+      { id: 'seed-news-2', name: 'Sentinel', url: 'https://www.orlandosentinel.com' },
+      { id: 'seed-news-3', name: 'NWS', url: 'https://www.weather.gov' },
+      { id: 'seed-news-4', name: 'r/florida', url: 'https://www.reddit.com/r/florida' },
+      { id: 'seed-news-5', name: 'AP News', url: 'https://apnews.com' },
+    ],
+    shopping: [
+      { id: 'seed-shopping-1', name: 'Amazon', url: 'https://www.amazon.com' },
+      { id: 'seed-shopping-2', name: 'Target', url: 'https://www.target.com' },
+      { id: 'seed-shopping-3', name: 'Walmart', url: 'https://www.walmart.com' },
+      { id: 'seed-shopping-4', name: 'Home Depot', url: 'https://www.homedepot.com' },
+      { id: 'seed-shopping-5', name: 'Costco', url: 'https://www.costco.com' },
+    ],
+    entertainment: [
+      { id: 'seed-entertainment-1', name: 'YouTube', url: 'https://www.youtube.com' },
+      { id: 'seed-entertainment-2', name: 'Netflix', url: 'https://www.netflix.com' },
+      { id: 'seed-entertainment-3', name: 'Spotify', url: 'https://www.spotify.com' },
+      { id: 'seed-entertainment-4', name: 'Disney+', url: 'https://www.disneyplus.com' },
+      { id: 'seed-entertainment-5', name: 'Hulu', url: 'https://www.hulu.com' },
+    ],
+  };
+
+  function newTileId() {
+    return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+  }
+
+  function loadCategoryTiles(categoryId) {
+    const raw = localStorage.getItem(TILE_STORAGE_PREFIX + categoryId);
+    if (raw === null) {
+      const seeded = (TILE_SEED_DATA[categoryId] || []).map((t) => Object.assign({}, t));
+      localStorage.setItem(TILE_STORAGE_PREFIX + categoryId, JSON.stringify(seeded));
+      return seeded;
+    }
     try {
-      return JSON.parse(localStorage.getItem(TILE_STORAGE_PREFIX + categoryId) || '[]');
+      return JSON.parse(raw) || [];
     } catch (e) {
       return [];
     }
   }
 
-  function saveUserTiles(categoryId, tiles) {
+  function saveCategoryTiles(categoryId, tiles) {
     localStorage.setItem(TILE_STORAGE_PREFIX + categoryId, JSON.stringify(tiles));
   }
 
@@ -181,12 +222,13 @@
     }
   }
 
-  function buildTileElement(name, url) {
+  function buildTileElement(id, name, url) {
     const a = document.createElement('a');
     a.className = 'tile';
     a.href = url;
     a.target = '_blank';
     a.rel = 'noopener';
+    a.dataset.tileId = id;
 
     const img = document.createElement('img');
     img.alt = '';
@@ -201,6 +243,8 @@
     const span = document.createElement('span');
     span.textContent = name;
     a.appendChild(span);
+
+    attachLongPress(a, () => openTileMenu(a));
 
     return a;
   }
@@ -238,23 +282,137 @@
     const parsedUrl = normalizeTileUrl(addTileUrlInput.value);
     if (!name || !parsedUrl || !addTileTargetGrid) return;
     const url = parsedUrl.href;
-    const tile = buildTileElement(name, url);
+    const id = newTileId();
+    const tile = buildTileElement(id, name, url);
     addTileTargetGrid.insertBefore(tile, addTileTargetGrid.querySelector('.tile-add'));
-    const tiles = loadUserTiles(addTileTargetCategoryId);
-    tiles.push({ name, url });
-    saveUserTiles(addTileTargetCategoryId, tiles);
+    const tiles = loadCategoryTiles(addTileTargetCategoryId);
+    tiles.push({ id, name, url });
+    saveCategoryTiles(addTileTargetCategoryId, tiles);
     closeAddTile();
   });
 
   document.querySelectorAll('.tile-grid').forEach((grid) => {
     const categoryId = grid.closest('.category').dataset.categoryId;
     const addBtn = grid.querySelector('.tile-add');
-    loadUserTiles(categoryId).forEach((t) => {
-      grid.insertBefore(buildTileElement(t.name, t.url), addBtn);
+    loadCategoryTiles(categoryId).forEach((t) => {
+      grid.insertBefore(buildTileElement(t.id, t.name, t.url), addBtn);
     });
     if (addBtn) {
       addBtn.addEventListener('click', () => openAddTile(grid, categoryId));
     }
+  });
+
+  // --- Phase 2 Part 1: tile long-press action menu (Remove Entry / Move Entry / Rename Entry) ---
+  const tileMenuOverlay = document.getElementById('tile-menu-overlay');
+  const tileMenuClose = document.getElementById('tile-menu-close');
+  const tileMenuTitle = document.getElementById('tile-menu-title');
+  const tileMenuRemoveBtn = document.getElementById('tile-menu-remove');
+  const tileMenuRenameBtn = document.getElementById('tile-menu-rename');
+  let tileMenuTargetEl = null;
+
+  function closeTileMenu() {
+    tileMenuOverlay.hidden = true;
+    tileMenuTargetEl = null;
+  }
+  function openTileMenu(tileEl) {
+    tileMenuTargetEl = tileEl;
+    tileMenuTitle.textContent = tileEl.querySelector('span').textContent;
+    tileMenuOverlay.hidden = false;
+  }
+  tileMenuClose.addEventListener('click', closeTileMenu);
+  tileMenuOverlay.addEventListener('click', (e) => {
+    if (e.target === tileMenuOverlay) closeTileMenu();
+  });
+
+  const tileConfirmOverlay = document.getElementById('tile-confirm-overlay');
+  const tileConfirmClose = document.getElementById('tile-confirm-close');
+  const tileConfirmText = document.getElementById('tile-confirm-text');
+  const tileConfirmYes = document.getElementById('tile-confirm-yes');
+  const tileConfirmNo = document.getElementById('tile-confirm-no');
+  let tileConfirmOnYes = null;
+
+  function openTileConfirm(text, onYes) {
+    tileConfirmText.textContent = text;
+    tileConfirmOnYes = onYes;
+    tileConfirmOverlay.hidden = false;
+  }
+  function closeTileConfirm() {
+    tileConfirmOverlay.hidden = true;
+    tileConfirmOnYes = null;
+  }
+  tileConfirmClose.addEventListener('click', closeTileConfirm);
+  tileConfirmNo.addEventListener('click', closeTileConfirm);
+  tileConfirmOverlay.addEventListener('click', (e) => {
+    if (e.target === tileConfirmOverlay) closeTileConfirm();
+  });
+  tileConfirmYes.addEventListener('click', () => {
+    const cb = tileConfirmOnYes;
+    closeTileConfirm();
+    if (cb) cb();
+  });
+
+  function removeTile(tileEl) {
+    const categoryId = tileEl.closest('.category').dataset.categoryId;
+    const tileId = tileEl.dataset.tileId;
+    const tiles = loadCategoryTiles(categoryId).filter((t) => t.id !== tileId);
+    saveCategoryTiles(categoryId, tiles);
+    tileEl.remove();
+  }
+
+  tileMenuRemoveBtn.addEventListener('click', () => {
+    const tileEl = tileMenuTargetEl;
+    closeTileMenu();
+    const name = tileEl.querySelector('span').textContent;
+    openTileConfirm('Are you sure you want to remove ' + name + '?', () => {
+      // Intentional, permanent easter egg — a 10% chance of a second "really sure?" prompt.
+      // Never document or hint at this in user-facing help text.
+      if (Math.random() < 0.10) {
+        openTileConfirm('Are you REALLY sure? 😳', () => removeTile(tileEl));
+      } else {
+        removeTile(tileEl);
+      }
+    });
+  });
+
+  const tileRenameOverlay = document.getElementById('tile-rename-overlay');
+  const tileRenameClose = document.getElementById('tile-rename-close');
+  const tileRenameInput = document.getElementById('tile-rename-input');
+  const tileRenameSave = document.getElementById('tile-rename-save');
+  let tileRenameTargetEl = null;
+
+  function closeTileRename() {
+    tileRenameOverlay.hidden = true;
+    tileRenameTargetEl = null;
+  }
+  tileRenameClose.addEventListener('click', closeTileRename);
+  tileRenameOverlay.addEventListener('click', (e) => {
+    if (e.target === tileRenameOverlay) closeTileRename();
+  });
+
+  tileMenuRenameBtn.addEventListener('click', () => {
+    const tileEl = tileMenuTargetEl;
+    closeTileMenu();
+    tileRenameTargetEl = tileEl;
+    tileRenameInput.value = tileEl.querySelector('span').textContent;
+    tileRenameOverlay.hidden = false;
+    tileRenameInput.focus();
+  });
+
+  tileRenameSave.addEventListener('click', () => {
+    const tileEl = tileRenameTargetEl;
+    if (!tileEl) return;
+    const newName = tileRenameInput.value.trim();
+    if (!newName) return;
+    const categoryId = tileEl.closest('.category').dataset.categoryId;
+    const tileId = tileEl.dataset.tileId;
+    const tiles = loadCategoryTiles(categoryId);
+    const entry = tiles.find((t) => t.id === tileId);
+    if (entry) {
+      entry.name = newName;
+      saveCategoryTiles(categoryId, tiles);
+    }
+    tileEl.querySelector('span').textContent = newName;
+    closeTileRename();
   });
 
   function attachLongPress(el, callback) {

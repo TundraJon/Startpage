@@ -246,6 +246,10 @@ main {
   border-radius: 8px;
   overflow: hidden;
   padding: 2px;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .tile img {
