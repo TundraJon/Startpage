@@ -600,7 +600,18 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
-_Empty — nothing currently queued._
+### Hourly Forecast panel: replace precip graph with a temperature graph, add per-hour precip-alert micro icons
+
+- [ ] **Context — a design discussion following user feedback that the current precip graph (Build 28) is confusing:** the user didn't recognize what the blue line at the bottom represented, then referenced an AccuWeather-style hourly panel design and worked through several decisions with the assistant before landing on this spec. Confirmed as not just a resize/relabel — a real change in what data is shown and how.
+- [ ] **Remove the precipitation graph entirely:** delete `#hourly-precip-graph` (index.html), `renderHourlyPrecipGraph()` and its call site (script.js), and its CSS (`.hourly-precip-graph`, styles.css). **User's reasoning:** the graph is a single overall shape spanning the whole panel width, not something that reads as tied to the individual hour columns above it — "no meaningful relationship to the information above it."
+- [ ] **Add a temperature line graph in its place:** same SVG-polyline mechanism as the removed precip graph, but plotting each of the 12 hours' `hour.temp_f` (through the existing unit-conversion path) as a continuous curve — scaled to the actual min/max temp range across those 12 hours (not a fixed 0-100 scale like the old precip version, since temperature needs its own dynamic range to show meaningful variation). **Explicitly descoped for now:** no second "feels like" line overlay (the reference image has one, dotted) — user agreed to skip that, since it adds a second curve + its own legend to a panel that's meant to be compact; can be added later if wanted.
+- [ ] **New per-hour precip-alert micro icon, positioned directly under the time label (top of each column, before the main condition emoji)** — inserted between the existing `time` and `emoji` elements in `renderHourlyPanel()` (script.js:789-797): the same condition emoji already used for that hour (`weatherIconForCode(hour.condition.code)` — explicitly "our same emoji," not a new icon set) at a small size, paired with a colored dot, based on the hour's precip % (`hourlyPrecipPct(hour)`, already computed as `max(chance_of_rain, chance_of_snow)`):
+  - **≥80%: red dot**
+  - **60-79%: orange dot**
+  - **30-59%: yellow dot**
+  - **<30%: nothing displayed** — but the row's vertical space must still be reserved (a fixed-height slot present in every column regardless of content) so columns don't jump/misalign against each other depending on which hours qualify.
+  - **Thresholds chosen to track the National Weather Service's own probability-of-precipitation wording bands** (confirmed with the user in discussion): NWS shifts its forecast language at 20% ("Slight Chance"), 30% ("Chance" begins), 60% ("Likely" begins), and 80% (stated as fact, no qualifier) — the chosen dot cutoffs (30/60/80) align with the "Chance," "Likely," and nearly-certain tiers of that real convention, not an arbitrary pick.
+- [ ] **Keep unchanged:** the existing per-hour precip % text at the bottom of each column, still shown only when greater than 0% (script.js:804-810) — the user explicitly confirmed keeping this exact behavior, just wanted it to coexist with the new top-of-column micro icon rather than replace it.
 
 ## Build Planner
 
