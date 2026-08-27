@@ -680,22 +680,25 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 - [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
 
+## Build Log 35 (completed)
+
+### Add-tile URL field now hints mobile keyboards that it's a URL, not prose
+
+- [x] `#add-tile-url` (index.html:563) changed from `type="text"` to `type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false"`. Verified attributes present and the add-tile flow (name + URL -> favicon fetch -> insert -> persist) still works end to end with the new input type.
+
+### Category Headers & Accordion: consistent height, transparent unassigned stripe
+
+- [x] `.category-header`'s stripe fallback (styles.css:181) changed from `var(--stripe-color, var(--fg-muted))` to `var(--stripe-color, transparent)` — an unassigned category now shows a fully transparent 3px strip (the header's own neutral background shows through) instead of a gray line. News/Shopping/Entertainment's existing assigned colors (blue/green/purple) are unaffected — verified their computed border colors are unchanged.
+- [x] `.category-header`'s padding (styles.css:182) changed from `10px 14px` to `6px 14px 10px` to compensate for the 3px border, so standard headers render at the same height as Home's border-less header. Verified directly: both now measure exactly 38px.
+- [x] Confirmed via direct measurement with the stripe color removed at runtime: border renders as `rgba(0, 0, 0, 0)` (fully transparent), still occupying 3px.
+
+### Regression check
+
+- [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
+
 ## Build Queue
 
-### Add-tile URL field should hint mobile keyboards that it's a URL, not prose
-
-- [ ] **User feedback:** typing a URL into the Add Tile modal's URL field lets the keyboard auto-insert a space after a period and auto-insert punctuation, since it's being treated as regular text.
-- [ ] **Root cause confirmed (index.html:563):** `#add-tile-url` is `<input type="text" ... autocomplete="off" ...>` — no `type="url"`/`inputmode="url"` to switch mobile keyboards to their URL layout (no auto-space-after-period, dedicated "." key), and no `autocapitalize="off"` / `autocorrect="off"` / `spellcheck="false"` to stop autocorrect from inserting punctuation.
-- [ ] **Requested fix:** change to `<input type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off" ...>`.
-
-### Category Headers & Accordion (per supplied spec doc)
-
-- [ ] **Spec supplied:** full category-header/accordion spec covering Home's unique header treatment, standard headers' stripe/neutral treatment, and site-wide expand/collapse mechanics. Per the doc's own precedence rule, existing implementation vs. spec conflicts are surfaced below rather than silently resolved.
-- [ ] **Already matches the spec, no changes needed:** standard categories collapsed by default on load, tap-to-expand/collapse via true document-flow push-down (not an overlay), multiple categories can be open simultaneously (all verified directly — clicking every standard header at once leaves all three `aria-expanded="true"`). Chevron indicator right-aligned and rotates 180° on expand. Standard header background stays neutral (`var(--surface)`), name left-justified (styles.css:174-187). Home's header (styles.css:204-210) is a non-interactive `<div>` excluded from the accordion loop entirely (script.js:134, `.category:not(.category--home)`) — never collapsible, no tap handler, left-justified name — matches Section 1.
-- [ ] **Conflict confirmed — header height mismatch:** measured directly, Home's header renders at **38px** tall vs. standard headers at **42px**, because standard headers reserve an extra 3px via `border-top: 3px solid ...` (styles.css:181) on top of matching `padding: 10px 14px` (styles.css:182) — Home has no such border. Per the user: Home never has a 3px stripe allowance at all, but all headers (Home included) must render at the same total height regardless — the standard header's own padding needs to absorb that 3px, not add to it.
-- [ ] **User correction — the gray fallback should become transparent now, not later:** the current `border-top: 3px solid var(--stripe-color, var(--fg-muted))` (styles.css:181) falling back to a visible gray when unassigned should change to `var(--stripe-color, transparent)` — build this now, not deferred to Phase 2. Transparent lets the header's own `background: var(--surface)` (styles.css:179) show through in the stripe's 3px, so an unassigned header reads as fully neutral, matching spec Section 1. This does **not** touch News/Shopping/Entertainment's existing inline `--stripe-color` values (blue/green/purple, index.html:153/183/213) — those are deliberately assigned placeholder colors to preview the stripe look, not "unassigned," and are unaffected by this fallback change.
-- [ ] **Requested fix, verified precisely:** two independent changes to styles.css:181-182 — (1) change the border's color fallback from `var(--stripe-color, var(--fg-muted))` to `var(--stripe-color, transparent)`; (2) reduce `.category-header`'s top padding to compensate for the border's 3px, from `padding: 10px 14px;` to `padding: 6px 14px 10px;` — **not** a straight 10-3=7px; verified empirically that 6px is the value that makes the rendered heights match exactly (38px = 38px), a few pixels off from the naive arithmetic likely due to box-sizing/rounding. `.category-header--home` (styles.css:204-210) is untouched.
-- [ ] **Deferred, not built (net-new/cross-referenced to other not-yet-supplied docs):** Home's "fully colorable header" is currently a single hardcoded CSS variable (`--home-header-bg: #1A5276`, styles.css:9) with no personalization UI — that's explicitly its own Personalization/Settings document, not yet supplied. Subcategories don't exist in the site at all yet (no nesting concept currently). The long-press context menu (Remove/Rename/Sort/Merge/Reassign Color) is the already-discussed Phase 2 Editing System document, which the user has chosen to wait for (see the Tile edit/delete Build Planner entry above) — no long-press currently exists on any category header, so there's nothing to conflict with Section 4 yet.
+_Empty — nothing queued._
 
 ## Build Planner
 
