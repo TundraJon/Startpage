@@ -1518,9 +1518,15 @@
         if (existingClouds.length > cloudCount) {
           for (let i = existingClouds.length - 1; i >= cloudCount; i--) existingClouds[i].remove();
         } else if (existingClouds.length < cloudCount) {
-          // New clouds only, entering cleanly off-canvas from their own "from" keyframe — no
-          // scatter needed since a single fresh cloud starting off-canvas is already correct.
-          for (let i = existingClouds.length; i < cloudCount; i++) spawnCloud();
+          // New clouds only. Each needs its own random hold-delay (same as an ordinary
+          // respawn) — without one, every cloud added in this batch starts its animation at
+          // the exact same instant from the exact same off-canvas position, which visually
+          // looks like a vertical line of clouds at the left edge until their differing speeds
+          // spread them out.
+          for (let i = existingClouds.length; i < cloudCount; i++) {
+            const cloud = spawnCloud();
+            cloud.style.animationDelay = (0.1 + Math.random() * 4.9) + 's';
+          }
         }
       }
 
