@@ -656,6 +656,14 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [ ] **Root cause confirmed (script.js:896-962):** the Hourly Forecast panel's temperature graph (`renderHourlyTempGraph`) independently reads `displayTempUnit` too, but is only invoked from `renderHourlyPanel()`, which neither handler calls — so if the panel is open when the unit is toggled, its graph temps also go stale. (An existing guard elsewhere in the code, `if (hourlyPanel.classList.contains('open')) renderHourlyPanel();`, already handles this same class of refresh for other state changes.)
 - [ ] **Requested fix:** add `renderWeatherExtras()` and `if (hourlyPanel.classList.contains('open')) renderHourlyPanel();` to both the `tempUnitBtn` click handler (script.js:599-602) and the Weather Options `tempUnit` segmented-button handler (script.js:1034-1047).
 
+### Weather widget: UV badge color scale doesn't match the Hourly panel's UV hazard thresholds
+
+- [ ] **User feedback:** main widget shows UV 3 as yellow; it should be green. UV should turn yellow at 6 and red at 8, matching the Hourly panel's hazard definition.
+- [ ] **Root cause confirmed (script.js:531-537):** `uvSeverityClass()` uses the standard 5-tier EPA UV index scale — Low ≤2 (green), Moderate ≤5 (gold/yellow), High ≤7 (orange), Very High ≤10 (red), Extreme >10 (purple), colored via styles.css:746-750 — which is unrelated to the hourly hazard scheme.
+- [ ] **Root cause confirmed (script.js:827-830, `hourlyHazards`):** the Hourly panel's UV hazard uses a 3-tier scheme: red at `uv >= 8`, yellow at `uv >= 6`, otherwise no hazard (green). At UV 3 this is green; the main widget's 5-tier scale instead lands on "Moderate" (gold/yellow), producing the mismatch.
+- [ ] **Checked for other conflicts:** UV is the only color-coded severity display on the main weather widget (no wind/rain/cold/heat badges exist there to compare), so no other definitions conflict with the Hourly panel's hazard scheme.
+- [ ] **Requested fix:** rewrite `uvSeverityClass(uv)` to the 3-tier scheme, reusing existing CSS colors: `uv >= 8` → `'uv-veryhigh'` (red), `uv >= 6` → `'uv-moderate'` (gold/yellow), else → `'uv-low'` (green). The now-unreachable `uv-high` (orange) and `uv-extreme` (purple) CSS rules (styles.css:748, 750) should be removed as dead code.
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
