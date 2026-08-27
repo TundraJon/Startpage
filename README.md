@@ -506,6 +506,13 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
+### Moon-dial clock: move the four badges further from center, change to dark gray
+
+- [ ] **Current behavior (confirmed in script.js:273-285, `renderClockBadge`, and 302-307):** the four rounded-square badges (month, day, weather, weekday) are drawn at radius 12 from center, fill `#000` (pure black). Room to move outward exists — the inner red-number ring now sits at radius 30 (per the Build 22 spacing fix), so the badges have space between them and it before any overlap.
+- [ ] **Requested changes:**
+  - Move the badges outward: `badgeR` (script.js:302) from 12 to roughly 18 — leaves clear space to both the center and the radius-30 inner number ring. Adjust once seen live if it needs to go further or not as far.
+  - Recolor from pure black to dark gray: `fill: '#000'` → `fill: '#333'` (script.js:278) for the badge background. White text (`fill: '#fff'`) stays unchanged for contrast.
+
 ### Extend the drifting-cloud spawn band from the top 50% to the top 66%, with new size endpoints
 
 - [ ] **Current behavior (confirmed in script.js:1063-1072, `randomizeCloud`):** `topPct = Math.random() * 50` confines clouds to the top half of the widget. Size and speed both scale off the same `f = topPct / 50` fraction: `size = 2.5 - 1.5*f` rem (2.5rem at the top edge down to 1.0rem at the 50% line) and `duration = 17 + 43*f` seconds (17s/fastest at the top edge up to 60s/slowest at the 50% line) — already exactly the "further down = smaller and slower" relationship the user described, just currently capped at 50%.
