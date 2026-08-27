@@ -520,7 +520,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
-_Empty — nothing currently queued._
+### Testing Panel: slider for lightning flash opacity re-roll rate
+
+- [ ] **Current behavior (confirmed in script.js:1400-1421, `stepConditionSkin`):** while a thunderstorm flash is active, its opacity is re-rolled on *every* `requestAnimationFrame` callback (`flashDiv.style.opacity = String(flashState.flashAlpha * (0.4 + Math.random() * 0.6))`), i.e. once per rendered frame — there's no existing concept of "every N frames."
+- [ ] **Frame-rate caveat, discussed with the user:** the render loop is driven by uncapped `requestAnimationFrame`, so real frames-per-second varies by device/display (commonly 60fps, but up to 90Hz+ on some phones, or lower under throttling) — there's no single fixed "frames in 1000ms" the code can measure. **Resolved:** slider bounds use a fixed assumption of 60fps rather than a live per-device measurement, so the slider range is exactly **1 to 60**, regardless of the actual device's true refresh rate.
+- [ ] **Requested addition:** a new Testing Panel slider (range 1-60, default 1 — matching today's exact every-frame behavior so nothing changes until the slider is moved) controlling how many rendered frames pass between opacity re-rolls during an active flash. Needs a new tunable (e.g. `WX_LIGHTNING_TUNABLES.rerollFrames`, following the existing `WX_HAIL_TUNABLES`/`WX_FOG_TUNABLES`/`WX_CLOUD_TUNABLES` pattern) and a per-flash frame counter in `flashState` so the opacity value is only recomputed every `rerollFrames` frames, holding steady in between rather than reverting to a flat non-flickering brightness — the existing 100-1000ms flash-lifetime and 5-10s between-flash gap are unaffected.
 
 ## Build Planner
 
