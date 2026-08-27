@@ -309,7 +309,7 @@ main {
 }
 
 .hourly-panel.open {
-  max-height: 320px;
+  max-height: 220px;
   opacity: 1;
   pointer-events: auto;
 }
@@ -332,14 +332,14 @@ main {
 }
 
 .hourly-cell {
-  flex: 0 0 56px;
-  width: 56px;
+  flex: 0 0 32px;
+  width: 32px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 1px;
-  font-size: 0.72rem;
+  font-size: 0.6rem;
   color: var(--fg-muted);
 }
 
@@ -348,18 +348,21 @@ main {
 }
 
 .hourly-row-alert .hourly-cell {
-  height: 18px;
+  height: 16px;
+  flex-direction: row;
+  gap: 2px;
 }
 
 .hourly-alert-icon {
-  font-size: 0.5rem;
+  font-size: 0.45rem;
   line-height: 1;
 }
 
 .hourly-alert-dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
+  flex: 0 0 auto;
 }
 
 .hourly-alert-dot.red { background: #dc2626; }
@@ -368,6 +371,7 @@ main {
 
 .hourly-row-time .hourly-cell {
   height: 16px;
+  font-size: 0.55rem;
   font-weight: 600;
 }
 
@@ -377,7 +381,7 @@ main {
 
 .hourly-temp-graph {
   display: block;
-  height: 200px;
+  height: 100px;
 }
 
 .hourly-graph-now-bg {
@@ -391,13 +395,13 @@ main {
 }
 
 .hourly-graph-icon {
-  font-size: 18px;
+  font-size: 14px;
   text-anchor: middle;
   dominant-baseline: central;
 }
 
 .hourly-graph-label {
-  font-size: 12px;
+  font-size: 9px;
   font-weight: 600;
   text-anchor: middle;
   fill: var(--fg);
@@ -406,7 +410,7 @@ main {
 .hourly-row-precip .hourly-cell {
   height: 14px;
   color: #3b82f6;
-  font-size: 0.65rem;
+  font-size: 0.55rem;
 }
 
 .clock-inner {

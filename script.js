@@ -744,7 +744,7 @@
   const hourlyRowTime = document.getElementById('hourly-row-time');
   const hourlyTempGraph = document.getElementById('hourly-temp-graph');
   const hourlyRowPrecip = document.getElementById('hourly-row-precip');
-  const HOURLY_COL_WIDTH = 56;
+  const HOURLY_COL_WIDTH = 32;
 
   // WeatherAPI's hour.time is "YYYY-MM-DD HH:MM" in 24-hour format.
   function formatHourLabel(timeStr) {
@@ -898,7 +898,7 @@
     hourlyTempGraph.innerHTML = '';
     if (!hours.length) return;
     const width = hours.length * HOURLY_COL_WIDTH;
-    const height = 200;
+    const height = 100;
     hourlyTempGraph.setAttribute('width', width);
     hourlyTempGraph.setAttribute('height', height);
     hourlyTempGraph.setAttribute('viewBox', `0 0 ${width} ${height}`);
@@ -907,8 +907,8 @@
     const maxTemp = Math.max(...temps);
     const minTemp = Math.min(...temps);
     const range = Math.max(maxTemp - minTemp, 1); // avoid divide-by-zero when all 12 hours match
-    const ICON_TOP = 26;
-    const ICON_BOTTOM = 150;
+    const ICON_TOP = 13;
+    const ICON_BOTTOM = 75;
     const conv = displayTempUnit === 'F' ? toF : toC;
 
     const points = hours.map((hour, i) => {
@@ -945,7 +945,7 @@
 
       const label = document.createElementNS(svgNS, 'text');
       label.setAttribute('x', p.x);
-      label.setAttribute('y', p.y + 24);
+      label.setAttribute('y', p.y + 12);
       label.setAttribute('class', 'hourly-graph-label');
       label.textContent = conv(p.hour.temp_f) + '°';
       hourlyTempGraph.appendChild(label);
