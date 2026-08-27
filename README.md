@@ -662,7 +662,12 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
-_Empty — nothing queued._
+### Long-pressing the weather widget for Settings doesn't dismiss the open Hourly Forecast panel
+
+- [ ] **User feedback:** long pressing for the weather settings does not dismiss the hourly forecast.
+- [ ] **Root cause confirmed (script.js:1023-1026):** `openWeatherOptions()` never closes the Hourly panel — it just sets `weatherOptionsOverlay.hidden = false`. The panel only ever closes as an indirect side effect of `handleHourlyOutsideClick` (script.js:969-971), which is bound to the `click` event — and a long press's `callback()` (which calls `openWeatherOptions()`) fires from a `setTimeout` at 550ms while the pointer is still held down, well before any `click` event exists. So for the entire duration the settings menu is showing (while still pressing, and until release), the Hourly panel has not been closed at all.
+- [ ] **Root cause confirmed (styles.css:299 vs styles.css:758):** even setting timing aside, `.hourly-panel` has `z-index: 20` while `.help-overlay` (the Settings modal, including its backdrop) has `z-index: 10` — so on the occasions both are simultaneously open, the Hourly panel renders visually on top of the Settings dialog instead of being hidden behind it. Verified directly: with both open, `document.elementFromPoint()` over the panel's area resolves to the panel's own content (a `.hourly-cell`), not the Settings overlay.
+- [ ] **Requested fix:** call the existing `closeHourlyPanel()` (script.js:965) at the top of `openWeatherOptions()` (script.js:1023) so opening Settings always explicitly dismisses the Hourly panel immediately, regardless of click timing. (The z-index ordering becomes moot once this is in place, since the two will no longer coexist — no change needed there unless a similar overlap resurfaces elsewhere.)
 
 ## Build Planner
 
