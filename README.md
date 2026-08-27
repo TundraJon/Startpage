@@ -541,15 +541,17 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 - [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
 
+## Build Log 25 (completed)
+
+### Fixed all Condition Skin particle motion to be real-time-based, not frame-count-based
+
+- [x] Added a `frameScale` factor computed once per drawn frame in `stepConditionSkin`, based on actual elapsed wall-clock time versus the implicit 60fps baseline these speed values were originally tuned against (`(ts - lastDrawTs) / (1000/60)`, clamped to a max of 4 to guard against a huge jump after the widget was paused a long time). Applied as a multiplier everywhere a particle previously advanced by a bare per-frame increment: rain's `p.y`/`p.x`, snow's `p.y` and `p.swayPhase`, hail's fall-state `p.y`, hail's bounce timer (`p.bounceT`, parabola math unchanged), hail's fading-state `p.fadeT`/`p.x` drift, and fog's `b.x` drift. Star flicker (already timestamp-based) and cloud drift (a CSS animation) needed no change.
+- [x] Verified quantitatively, not just by inspection: with `Math.random` fixed so all hail particles spawn and move identically, measured the real-world fall speed via canvas pixel sampling across 3 runs — observed 362-382 px/sec, matching the expected ~300 px/sec (baseSpeed 5.0 × 60fps-equivalent baseline) within reasonable measurement tolerance. Without this fix the same particle would only cover about half that distance per real second under the 30fps cap.
+- [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
+
 ## Build Queue
 
-### Fix all Condition Skin particle motion to be real-time-based, not frame-count-based
-
-- [ ] **User feedback:** hail now looks like it's falling in slow motion since the frame-rate cap was added (Build Log 24) — asked for a hail speed slider.
-- [ ] **Root cause, broader than hail alone (confirmed in `stepConditionSkin`, script.js):** every Condition Skin particle type advances its position by a fixed amount **per drawn frame**, not per unit of real elapsed time — `p.y += p.speed` for rain (script.js:1291) and snow (script.js:1303), `p.y += p.speed` for hail's fall state (script.js:1316), `p.bounceT += 1` for the hail bounce's projectile-motion timer (script.js:~1355 area), `p.fadeT += 1` / `p.x += p.vx0` for the hail fade-out drift, and `b.x += b.speed * 0.02 * b.dir * WX_FOG_TUNABLES.speedMult` for fog drift (script.js:1372). Build Log 24's ~30fps draw-rate cap cut how often these increments happen (previously up to 90/sec on a 90Hz phone, now capped to 30/sec) without changing the increment size — so every one of these effects, not just hail, is now moving in real time at roughly 1/2 to 1/3 its original speed. Confirmed with the user: this needs a real fix, not a hail-only slider that would leave rain/snow/fog still in slow motion.
-- [ ] **Resolved fix — real-time-scaled motion, no new manual slider needed:** compute a `frameScale` once per drawn frame in `stepConditionSkin`, based on actual elapsed wall-clock time versus an assumed 60fps baseline (the implicit rate these speed values were originally tuned against): `const frameScale = lastDrawTs ? (ts - lastDrawTs) / (1000 / 60) : 1;`, computed *before* `lastDrawTs` is overwritten with the current `ts`. Clamp it to a sane maximum (e.g. 4) to avoid a huge one-time jump after the widget was paused a long time (backgrounded tab, scrolled off-screen for minutes) and then resumes. At a steady unthrottled 60fps this evaluates to ~1 (no behavior change from before the cap); at the new 30fps cap it evaluates to ~2, doubling each per-draw position increment to compensate — restoring the original real-world fall/drift speed automatically, regardless of the draw-rate cap.
-- [ ] **Apply `frameScale` as a multiplier everywhere a particle currently advances by a bare per-frame increment:** rain's `p.y`/`p.x` increments, snow's `p.y` increment and `p.swayPhase` increment, hail's fall-state `p.y` increment, hail's bounce timer (`p.bounceT += frameScale` instead of `+= 1` — the parabola math itself is unchanged, `t` just now advances in real-time-equivalent units), hail's fading-state `p.fadeT` increment and `p.x` drift, and fog's `b.x` drift. `HAIL_FADE_FRAMES` (the fade-out duration threshold `p.fadeT` is compared against) stays as-is, since `p.fadeT` now advances in the same 60fps-equivalent units it always implicitly assumed.
-- [ ] Star flicker timing is unaffected — it's already timestamp-based (`ts`), not frame-count-based, and cloud drift is unaffected — it's a CSS animation, not part of this canvas loop.
+_Empty — nothing currently queued._
 
 ## Build Planner
 

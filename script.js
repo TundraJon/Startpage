@@ -1259,6 +1259,13 @@
     requestAnimationFrame(stepConditionSkin);
     if (!skinIsVisible) return;
     if (ts - lastDrawTs < WX_FRAME_INTERVAL_MS) return;
+    // Real-time-scaled motion: particle speeds below are all tuned as a "per drawn frame"
+    // increment against an implicit 60fps baseline. Capping the draw rate (above) changes how
+    // often those increments happen without changing their size, which would otherwise slow
+    // every particle's real-world speed down to match the new draw rate. frameScale corrects for
+    // that using actual elapsed wall-clock time, so motion speed stays constant regardless of the
+    // draw-rate cap — clamped to guard against one huge jump after being paused a long time.
+    const frameScale = lastDrawTs ? Math.min(4, (ts - lastDrawTs) / (1000 / 60)) : 1;
     lastDrawTs = ts;
     const c = getEffectiveConditionSkins();
     if (!weatherSettings.liveSkin) {
@@ -1288,8 +1295,8 @@
     precipCtx.lineWidth = 1.2;
     for (const p of conditionParticles) {
       if (p.type !== 'rain') continue;
-      p.y += p.speed;
-      p.x += p.speed * 0.25;
+      p.y += p.speed * frameScale;
+      p.x += p.speed * 0.25 * frameScale;
       if (p.y > h) { p.y = -p.len; p.x = Math.random() * w; }
       precipCtx.beginPath();
       precipCtx.moveTo(p.x, p.y);
@@ -1300,8 +1307,8 @@
     precipCtx.fillStyle = 'rgba(255,255,255,0.9)';
     for (const p of conditionParticles) {
       if (p.type !== 'snow') continue;
-      p.y += p.speed;
-      p.swayPhase += 0.02 * p.swaySpeed;
+      p.y += p.speed * frameScale;
+      p.swayPhase += 0.02 * p.swaySpeed * frameScale;
       if (p.y > h) { p.y = -4; p.x = Math.random() * w; }
       const x = p.x + Math.sin(p.swayPhase) * p.swayAmp;
       precipCtx.beginPath();
@@ -1313,7 +1320,7 @@
     for (const p of conditionParticles) {
       if (p.type !== 'hail') continue;
       if (p.state === 'fall') {
-        p.y += p.speed;
+        p.y += p.speed * frameScale;
         if (p.y > h - p.r) {
           p.state = 'arc';
           p.bounceT = 0;
@@ -1335,7 +1342,7 @@
         // to the launch point). Gravity is a live Testing Panel tunable (WX_HAIL_TUNABLES.gravity)
         // rather than a fixed constant — verified against hand-calculated positions with a
         // deterministic Math.random() override.
-        p.bounceT += 1;
+        p.bounceT += frameScale;
         const t = p.bounceT;
         const heightAboveGround = p.vy0 * t - 0.5 * WX_HAIL_TUNABLES.gravity * t * t;
         if (heightAboveGround <= 0) {
@@ -1352,8 +1359,8 @@
       } else {
         // Fading: keeps drifting at the same constant horizontal rate it already had, rather
         // than freezing in place, while fading out.
-        p.fadeT += 1;
-        p.x += p.vx0;
+        p.fadeT += frameScale;
+        p.x += p.vx0 * frameScale;
         if (p.fadeT > HAIL_FADE_FRAMES) {
           p.state = 'fall';
           p.y = -4;
@@ -1369,7 +1376,7 @@
 
     for (const b of conditionFog) {
       const r = w * (WX_FOG_TUNABLES.sizePct / 100) * b.sizeFactor;
-      b.x += b.speed * 0.02 * b.dir * WX_FOG_TUNABLES.speedMult;
+      b.x += b.speed * 0.02 * b.dir * WX_FOG_TUNABLES.speedMult * frameScale;
       if (b.x - r > w) b.x = -r;
       if (b.x + r < 0) b.x = w + r;
       const grad = precipCtx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r);
