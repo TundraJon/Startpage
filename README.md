@@ -658,11 +658,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ### Weather widget: UV badge color scale doesn't match the Hourly panel's UV hazard thresholds
 
-- [ ] **User feedback:** main widget shows UV 3 as yellow; it should be green. UV should turn yellow at 6 and red at 8, matching the Hourly panel's hazard definition.
+- [ ] **User feedback:** main widget shows UV 3 as yellow; it should be green. UV should turn yellow at 6 and red at 8, matching the Hourly panel's hazard definition. Follow-up: user wants to keep purple for UV 10+ as a 4th tier on top of that.
 - [ ] **Root cause confirmed (script.js:531-537):** `uvSeverityClass()` uses the standard 5-tier EPA UV index scale — Low ≤2 (green), Moderate ≤5 (gold/yellow), High ≤7 (orange), Very High ≤10 (red), Extreme >10 (purple), colored via styles.css:746-750 — which is unrelated to the hourly hazard scheme.
 - [ ] **Root cause confirmed (script.js:827-830, `hourlyHazards`):** the Hourly panel's UV hazard uses a 3-tier scheme: red at `uv >= 8`, yellow at `uv >= 6`, otherwise no hazard (green). At UV 3 this is green; the main widget's 5-tier scale instead lands on "Moderate" (gold/yellow), producing the mismatch.
 - [ ] **Checked for other conflicts:** UV is the only color-coded severity display on the main weather widget (no wind/rain/cold/heat badges exist there to compare), so no other definitions conflict with the Hourly panel's hazard scheme.
-- [ ] **Requested fix:** rewrite `uvSeverityClass(uv)` to the 3-tier scheme, reusing existing CSS colors: `uv >= 8` → `'uv-veryhigh'` (red), `uv >= 6` → `'uv-moderate'` (gold/yellow), else → `'uv-low'` (green). The now-unreachable `uv-high` (orange) and `uv-extreme` (purple) CSS rules (styles.css:748, 750) should be removed as dead code.
+- [ ] **Requested fix:** rewrite `uvSeverityClass(uv)` to a 4-tier scheme, reusing existing CSS colors: `uv >= 10` → `'uv-extreme'` (purple), `uv >= 8` → `'uv-veryhigh'` (red), `uv >= 6` → `'uv-moderate'` (gold/yellow), else → `'uv-low'` (green). The now-unreachable `uv-high` (orange) CSS rule (styles.css:748) should be removed as dead code.
 
 ## Build Planner
 
