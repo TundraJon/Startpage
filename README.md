@@ -486,23 +486,27 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 - [x] Full sweep across all 49 radio values (48 conditions + Live) plus every new clock feature with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
 
+## Build Log 22 (completed)
+
+### Night sky stars made bigger
+
+- [x] Star radius (script.js:1234) changed from `0.4 + Math.random() * 0.6` (0.4-1.0px) to `0.6 + Math.random() * 0.9` (0.6-1.5px), a ~50% bump — color, flicker, and count logic untouched. Verified the formula change is present in the shipped script.
+
+### Hail bounce: narrowed random angle range from ±60° to ±45°
+
+- [x] `p.bounceAngle` (script.js:1311) changed from `(Math.random() * 120 - 60) * Math.PI / 180` to `(Math.random() * 90 - 45) * Math.PI / 180` — same continuous random draw and energy-conserving trig decomposition, just a narrower bound. Comment above updated to match (45° above horizontal on each side, was 30°). Verified the formula change is present in the shipped script and algebraically confirmed the new bound (±45° vs. the old ±60°) at the random-value extreme.
+
+### Dual-ring analog styles: inner red numbers moved closer to the outer black numbers
+
+- [x] `renderDualRingNumbers`'s inner-number radius (script.js:266) changed from 23 to 30, shrinking the radial gap to the outer numbers (radius 38) from 15 units to 8 — shared by both the `'dual-ring'` (24-hour) and `'moon-dial'` styles, so both picked up the fix from the same change. Verified: measured on-screen distance from center to the inner "00" label increased consistently in both styles after the change.
+
+### Regression check
+
+- [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
+
 ## Build Queue
 
-### Night sky stars: make them a little bigger
-
-- [ ] **Current behavior (confirmed in script.js:1234):** each star's radius is `0.4 + Math.random() * 0.6`, a random 0.4-1.0px range (shrunk from 0.8-1.8px back in Build Log 15 as part of the event-driven-flicker star rewrite).
-- [ ] **Proposed change:** bump the range up ~50%, to `0.6 + Math.random() * 0.9` (0.6-1.5px) — same random spread and color/flicker logic untouched, just larger dots. Adjust up/down once seen live if "a little bigger" needs to be more or less than that.
-
-### Hail bounce: narrow the random angle range from ±60° to ±45°
-
-- [ ] **Current behavior (confirmed in script.js:1305-1313):** each stone's bounce angle is drawn from a continuous random range of -60° to +60° off straight up (`(Math.random() * 120 - 60) * Math.PI / 180`), then split into vertical/horizontal launch velocity via true trig decomposition (`vy0 = speed*cos(angle)`, `vx0 = speed*sin(angle)`) so energy is conserved — a wide angle trades height for reach rather than getting both.
-- [ ] **Confirmed with user:** this is a range narrowing, not a switch to two fixed values — keep the same continuous random draw and trig decomposition, just change the bound from 60 to 45: `(Math.random() * 90 - 45) * Math.PI / 180`. No other part of the bounce physics (gravity, energy conservation, projectile motion) changes.
-
-### Dual-ring analog styles: inner red numbers sit too far from the outer black numbers
-
-- [ ] **User feedback, with screenshot of the moon-dial style:** the red inner-ring numbers (13-23/00) need to be closer to the black outer-ring numbers (1-12) — not touching, just closer.
-- [ ] **Root cause (confirmed in script.js:254-271, `renderDualRingNumbers`):** the outer number text is placed at radius 38 and the inner number text at radius 23 — a 15-unit radial gap in the clock's 100×100 SVG viewBox, which reads as a large, disconnected-looking space between the two rings, as shown in the screenshot. This function is shared by both the `'dual-ring'` (24-hour) and `'moon-dial'` styles, so the fix applies to both automatically.
-- [ ] **Proposed fix:** move the inner number radius from 23 to roughly 30 (halving the gap to ~8 units) — close enough to visually pair each inner number with its outer counterpart without the two touching or overlapping. Adjust up/down from 30 if it still reads as too far or too close once built. No other values in `renderDualRingNumbers` (outer radius 38, tick line 41-46, font sizes) need to change for this.
+_Empty — nothing currently queued._
 
 ## Build Planner
 

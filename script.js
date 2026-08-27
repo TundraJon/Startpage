@@ -263,7 +263,7 @@
       const ot = svgEl('text', { x: op.x, y: op.y + 3.5, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 'bold', fill: '#000' });
       ot.textContent = String(i);
       svg.appendChild(ot);
-      const ip = polarPoint(cx, cy, 23, angle);
+      const ip = polarPoint(cx, cy, 30, angle);
       const it = svgEl('text', { x: ip.x, y: ip.y + 2.5, 'text-anchor': 'middle', 'font-size': 7, fill: '#c0392b' });
       it.textContent = WX_DUAL_RING_INNER[i];
       svg.appendChild(it);
@@ -1231,7 +1231,7 @@
           const isDim = Math.random() < 0.2;
           const baseline = isDim ? 0.15 + Math.random() * 0.2 : 0.75 + Math.random() * 0.25;
           return {
-            x: Math.random() * w, y: Math.random() * h * 0.8, r: 0.4 + Math.random() * 0.6,
+            x: Math.random() * w, y: Math.random() * h * 0.8, r: 0.6 + Math.random() * 0.9,
             color: pickStarColor(), isDim, baseline,
             flickerStart: -1, flickerDur: 0, flickerDelta: 0,
             nextFlickerAt: ts + 500 + Math.random() * 6000,
@@ -1302,13 +1302,13 @@
           p.bounceT = 0;
           p.bounceFromY = h - p.r;
           p.bounceFromX = p.x;
-          // -60..+60 degrees off straight-up (30 degrees above horizontal on each side), so a
+          // -45..+45 degrees off straight-up (45 degrees above horizontal on each side), so a
           // stone can shoot off to either side or bounce straight back. Energy conservation, not
           // a separate height multiplier: a stone's own fall speed is its bounce energy, split
           // into vertical/horizontal launch velocity components via true trigonometric
           // decomposition (satisfying vertical^2 + horizontal^2 = energy^2), so a wide angle
           // trades height for reach rather than getting both at once.
-          p.bounceAngle = (Math.random() * 120 - 60) * Math.PI / 180;
+          p.bounceAngle = (Math.random() * 90 - 45) * Math.PI / 180;
           p.vy0 = p.speed * Math.cos(p.bounceAngle);
           p.vx0 = p.speed * Math.sin(p.bounceAngle);
         }
