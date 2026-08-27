@@ -517,6 +517,13 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [ ] **Current default (confirmed in script.js:868 and 1548-1549; index.html:391):** `WX_HAIL_TUNABLES.gravity = 1.5`, matching the reset value and the Testing Panel slider's initial `value="1.5"`/label.
 - [ ] **Requested change:** change the default (script.js:868), the reset-button value (script.js:1548-1549), and the HTML slider's initial value/label (index.html:391) from 1.5 to 0.5. Slider range (0.1–3) is unaffected — 0.5 is already within it.
 
+### Add a "Clear" button to the Live Weather Diagnostics panel
+
+- [ ] **Current behavior (confirmed in index.html:398-399, script.js:1499-1500, 1659):** the diagnostics `<textarea id="test-weather-debug-output">` isn't an accumulating log — `renderWeatherDebugPanel()` overwrites its full contents (`out.value = ...`) on every call, it doesn't append. It's long because the panel intentionally dumps the *entire* raw API response as pretty-printed JSON in one snapshot, which is inherently a lot of text — not because old data is piling up.
+- [ ] **User feedback:** it's gotten too long, and they don't want to have to copy all of that when they don't need it.
+- [ ] **Requested addition:** a "Clear" button next to the existing "Copy diagnostics" button (index.html:399), that blanks the textarea (`weatherDebugOutput.value = ''`) on click.
+- [ ] **Note for whoever builds this:** the textarea will still auto-repopulate the next time `loadLiveWeather` actually runs (script.js's `renderWeatherDebugPanel()` calls at the end of that function) or the next time the Testing Panel is reopened (the `trigger` click handler also calls `renderWeatherDebugPanel()`) — "Clear" only blanks the current snapshot, it doesn't disable or pause that auto-refresh behavior. Worth confirming that's the intended behavior (a simple "wipe it right now" button) rather than something that should also suppress the next auto-refresh.
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
