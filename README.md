@@ -621,11 +621,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
-### Hourly panel: shrink graph to 60px, scale temp/condition icons 1.25×
+### Hourly panel: shrink graph to 70px, scale temp/condition icons 1.25×
 
-- [ ] **Graph height:** `renderHourlyTempGraph`'s SVG height (script.js, currently `const height = 100;`, set in Build 31) changes from 100 to 60. `ICON_TOP`/`ICON_BOTTOM` (currently 13/75) and the temp-label vertical offset (currently `p.y + 12`) need to scale down proportionally (×0.6) to keep the icons/labels positioned correctly within the shorter box, the same way they were rescaled when the graph went from 200→100 in Build 31: proposed values `ICON_TOP = 8`, `ICON_BOTTOM = 45`, label offset `+7`. `.hourly-temp-graph`'s CSS height and `.hourly-panel.open`'s `max-height` (currently 220px) should shrink to match the smaller total content height, matching the same proportional-adjustment approach as Build 31.
+- [ ] **Graph height (updated — user corrected 60 to 70 before this was built):** `renderHourlyTempGraph`'s SVG height (script.js, currently `const height = 100;`, set in Build 31) changes from 100 to **70**. `ICON_TOP`/`ICON_BOTTOM` (currently 13/75) and the temp-label vertical offset (currently `p.y + 12`) scale down proportionally (×0.7, not ×0.6) to keep the icons/labels positioned correctly within the shorter box, the same way they were rescaled when the graph went from 200→100 in Build 31: proposed values `ICON_TOP = 9`, `ICON_BOTTOM = 53`, label offset `+8`. `.hourly-temp-graph`'s CSS height and `.hourly-panel.open`'s `max-height` (currently 220px) should shrink proportionally to match (≈190px for the panel), matching the same proportional-adjustment approach as Build 31.
 - [ ] **Temperature and condition icons 1.25× larger:** `.hourly-graph-icon` (condition icon on the graph, currently `font-size: 14px`) → `17.5px`; `.hourly-graph-label` (temperature label, currently `font-size: 9px`) → `11.25px`.
-- [ ] **Worth flagging before building, not just noting after:** this shrinks the graph's vertical room (×0.6) at the same time the icons get 1.25× bigger — the combination could cause icons to visually crowd or overlap each other more than before, especially for hours with close temperatures. Build it as specified and check live rather than guessing a different compromise unasked.
+- [ ] **Worth flagging before building, not just noting after:** this shrinks the graph's vertical room (×0.7) at the same time the icons get 1.25× bigger — the combination could cause icons to visually crowd or overlap each other more than before, especially for hours with close temperatures. Build it as specified and check live rather than guessing a different compromise unasked.
 
 ### Hazard-alert row: increase icon size 20%
 
