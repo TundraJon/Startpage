@@ -740,7 +740,11 @@
   // row beneath it rather than displacing it, per explicit user direction.
   const hourlyPanel = document.getElementById('hourly-panel');
   const hourlyStrip = document.getElementById('hourly-strip');
-  const hourlyPrecipGraph = document.getElementById('hourly-precip-graph');
+  const hourlyRowAlert = document.getElementById('hourly-row-alert');
+  const hourlyRowTime = document.getElementById('hourly-row-time');
+  const hourlyTempGraph = document.getElementById('hourly-temp-graph');
+  const hourlyRowPrecip = document.getElementById('hourly-row-precip');
+  const HOURLY_COL_WIDTH = 56;
 
   // WeatherAPI's hour.time is "YYYY-MM-DD HH:MM" in 24-hour format.
   function formatHourLabel(timeStr) {
@@ -754,65 +758,208 @@
     return Math.max(hour.chance_of_rain || 0, hour.chance_of_snow || 0);
   }
 
-  function renderHourlyPrecipGraph(hours) {
-    const w = 100;
-    const h = 20;
-    hourlyPrecipGraph.innerHTML = '';
+  function currentHourEpochNow() {
+    return Math.floor(Date.now() / 1000 / 3600) * 3600;
+  }
+
+  // Hazard-alert row: at most one icon+dot per hour, covering anything that might cause
+  // discomfort or injury (not just precipitation) — condition-code-based hazards (thunderstorm,
+  // hail, fog) have no percentage field in WeatherAPI's hourly data, so they're presence-only;
+  // rain/snow use their existing chance_of_rain/chance_of_snow percentage tiers, with a handful
+  // of condition codes (freezing rain, blizzard, blowing snow) forced to red regardless of %
+  // since they're hazardous independent of how likely they are that hour.
+  const WX_HAZARD_ICONS = {
+    thunder: '⚡', hail: '🪨', snow: '❄️', rain: '💧',
+    wind: '💨', cold: '🥶', heat: '🥵', uv: '☀️', fog: '🌫️',
+  };
+  // Tie-break order when multiple hazards land on the exact same color tier in the same hour —
+  // severity (red > orange > yellow) is always checked first; this only decides ties.
+  const WX_HAZARD_PRIORITY = ['thunder', 'hail', 'snow', 'rain', 'wind', 'cold', 'heat', 'uv', 'fog'];
+  const WX_TIER_RANK = { red: 3, orange: 2, yellow: 1 };
+  const WX_THUNDER_RED_CODES = new Set([1276, 1282]);
+  const WX_THUNDER_YELLOW_CODES = new Set([1087, 1273, 1279]);
+  const WX_HAIL_RED_CODES = new Set([1237, 1261, 1264]);
+  const WX_HAIL_YELLOW_CODES = new Set([1069, 1204, 1207, 1249, 1252]);
+  const WX_SNOW_RED_OVERRIDE_CODES = new Set([1117, 1114]); // Blizzard, blowing snow
+  const WX_RAIN_RED_OVERRIDE_CODES = new Set([1198, 1201, 1072, 1168, 1171]); // Freezing rain/drizzle
+
+  function hourlyHazards(hour) {
+    const code = hour.condition && hour.condition.code;
+    const hazards = [];
+
+    if (WX_THUNDER_RED_CODES.has(code)) hazards.push({ type: 'thunder', color: 'red' });
+    else if (WX_THUNDER_YELLOW_CODES.has(code)) hazards.push({ type: 'thunder', color: 'yellow' });
+
+    if (WX_HAIL_RED_CODES.has(code)) hazards.push({ type: 'hail', color: 'red' });
+    else if (WX_HAIL_YELLOW_CODES.has(code)) hazards.push({ type: 'hail', color: 'yellow' });
+
+    if (WX_SNOW_RED_OVERRIDE_CODES.has(code)) {
+      hazards.push({ type: 'snow', color: 'red' });
+    } else {
+      const snowPct = hour.chance_of_snow || 0;
+      if (snowPct >= 80) hazards.push({ type: 'snow', color: 'red' });
+      else if (snowPct >= 60) hazards.push({ type: 'snow', color: 'orange' });
+      else if (snowPct >= 30) hazards.push({ type: 'snow', color: 'yellow' });
+    }
+
+    if (WX_RAIN_RED_OVERRIDE_CODES.has(code)) {
+      hazards.push({ type: 'rain', color: 'red' });
+    } else {
+      const rainPct = hour.chance_of_rain || 0;
+      if (rainPct >= 80) hazards.push({ type: 'rain', color: 'red' });
+      else if (rainPct >= 60) hazards.push({ type: 'rain', color: 'orange' });
+      else if (rainPct >= 30) hazards.push({ type: 'rain', color: 'yellow' });
+    }
+
+    const wind = hour.wind_mph || 0;
+    const gust = hour.gust_mph || 0;
+    if (wind >= 40 || gust >= 50) hazards.push({ type: 'wind', color: 'red' });
+    else if (wind >= 30 || gust >= 40) hazards.push({ type: 'wind', color: 'yellow' });
+
+    if (hour.feelslike_f !== undefined) {
+      if (hour.feelslike_f <= 0) hazards.push({ type: 'cold', color: 'red' });
+      else if (hour.feelslike_f <= 20) hazards.push({ type: 'cold', color: 'yellow' });
+
+      if (hour.feelslike_f >= 110) hazards.push({ type: 'heat', color: 'red' });
+      else if (hour.feelslike_f >= 95) hazards.push({ type: 'heat', color: 'yellow' });
+    }
+
+    if (hour.uv !== undefined) {
+      if (hour.uv >= 8) hazards.push({ type: 'uv', color: 'red' });
+      else if (hour.uv >= 6) hazards.push({ type: 'uv', color: 'yellow' });
+    }
+
+    if (WX_CONDITIONS[code] && WX_CONDITIONS[code].anim === 'fog') hazards.push({ type: 'fog', color: 'yellow' });
+
+    return hazards;
+  }
+
+  // Severity first (red beats orange beats yellow); ties broken by WX_HAZARD_PRIORITY order.
+  function pickHazard(hour) {
+    const hazards = hourlyHazards(hour);
+    if (!hazards.length) return null;
+    hazards.sort((a, b) => {
+      const rankDiff = WX_TIER_RANK[b.color] - WX_TIER_RANK[a.color];
+      if (rankDiff !== 0) return rankDiff;
+      return WX_HAZARD_PRIORITY.indexOf(a.type) - WX_HAZARD_PRIORITY.indexOf(b.type);
+    });
+    return hazards[0];
+  }
+
+  function makeHourlyCell(isNow) {
+    const cell = document.createElement('div');
+    cell.className = 'hourly-cell' + (isNow ? ' now' : '');
+    return cell;
+  }
+
+  function renderHourlyAlertRow(hours, nowEpoch) {
+    hourlyRowAlert.innerHTML = '';
+    hours.forEach((hour) => {
+      const cell = makeHourlyCell(hour.time_epoch === nowEpoch);
+      const hazard = pickHazard(hour);
+      if (hazard) {
+        const icon = document.createElement('span');
+        icon.className = 'hourly-alert-icon';
+        icon.textContent = WX_HAZARD_ICONS[hazard.type];
+        cell.appendChild(icon);
+        const dot = document.createElement('span');
+        dot.className = 'hourly-alert-dot ' + hazard.color;
+        cell.appendChild(dot);
+      }
+      hourlyRowAlert.appendChild(cell);
+    });
+  }
+
+  function renderHourlyTimeRow(hours, nowEpoch) {
+    hourlyRowTime.innerHTML = '';
+    hours.forEach((hour) => {
+      const isNow = hour.time_epoch === nowEpoch;
+      const cell = makeHourlyCell(isNow);
+      cell.textContent = isNow ? 'Now' : formatHourLabel(hour.time);
+      hourlyRowTime.appendChild(cell);
+    });
+  }
+
+  function renderHourlyPrecipRow(hours, nowEpoch) {
+    hourlyRowPrecip.innerHTML = '';
+    hours.forEach((hour) => {
+      const cell = makeHourlyCell(hour.time_epoch === nowEpoch);
+      const pct = hourlyPrecipPct(hour);
+      if (pct > 0) cell.textContent = pct + '%';
+      hourlyRowPrecip.appendChild(cell);
+    });
+  }
+
+  // Temperature graph: each point IS that hour's condition icon (not a plain dot marker),
+  // positioned by temperature — highest of the 12 fetched hours at the top, lowest at the
+  // bottom — with the numeric temp label directly underneath each icon.
+  function renderHourlyTempGraph(hours, nowEpoch) {
+    const svgNS = 'http://www.w3.org/2000/svg';
+    hourlyTempGraph.innerHTML = '';
     if (!hours.length) return;
-    const values = hours.map(hourlyPrecipPct);
-    const maxVal = Math.max(...values, 1); // avoid divide-by-zero; renders flat at the bottom when all 0
-    const step = w / Math.max(values.length - 1, 1);
-    const points = values.map((v, i) => {
-      const x = i * step;
-      const y = h - (v / maxVal) * (h - 2) - 1;
-      return x + ',' + y.toFixed(1);
-    }).join(' ');
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-    line.setAttribute('points', points);
-    line.setAttribute('fill', 'none');
-    line.setAttribute('stroke', '#3b82f6');
-    line.setAttribute('stroke-width', '1.5');
+    const width = hours.length * HOURLY_COL_WIDTH;
+    const height = 200;
+    hourlyTempGraph.setAttribute('width', width);
+    hourlyTempGraph.setAttribute('height', height);
+    hourlyTempGraph.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+    const temps = hours.map((h) => h.temp_f);
+    const maxTemp = Math.max(...temps);
+    const minTemp = Math.min(...temps);
+    const range = Math.max(maxTemp - minTemp, 1); // avoid divide-by-zero when all 12 hours match
+    const ICON_TOP = 26;
+    const ICON_BOTTOM = 150;
+    const conv = displayTempUnit === 'F' ? toF : toC;
+
+    const points = hours.map((hour, i) => {
+      const x = i * HOURLY_COL_WIDTH + HOURLY_COL_WIDTH / 2;
+      const frac = (hour.temp_f - minTemp) / range;
+      const y = ICON_BOTTOM - frac * (ICON_BOTTOM - ICON_TOP);
+      return { x, y, hour };
+    });
+
+    const nowIdx = hours.findIndex((h) => h.time_epoch === nowEpoch);
+    if (nowIdx >= 0) {
+      const rect = document.createElementNS(svgNS, 'rect');
+      rect.setAttribute('x', nowIdx * HOURLY_COL_WIDTH);
+      rect.setAttribute('y', 0);
+      rect.setAttribute('width', HOURLY_COL_WIDTH);
+      rect.setAttribute('height', height);
+      rect.setAttribute('class', 'hourly-graph-now-bg');
+      hourlyTempGraph.appendChild(rect);
+    }
+
+    const line = document.createElementNS(svgNS, 'polyline');
+    line.setAttribute('points', points.map((p) => p.x + ',' + p.y).join(' '));
+    line.setAttribute('class', 'hourly-graph-line');
     line.setAttribute('vector-effect', 'non-scaling-stroke');
-    hourlyPrecipGraph.appendChild(line);
+    hourlyTempGraph.appendChild(line);
+
+    points.forEach((p) => {
+      const icon = document.createElementNS(svgNS, 'text');
+      icon.setAttribute('x', p.x);
+      icon.setAttribute('y', p.y);
+      icon.setAttribute('class', 'hourly-graph-icon');
+      icon.textContent = weatherIconForCode(p.hour.condition && p.hour.condition.code);
+      hourlyTempGraph.appendChild(icon);
+
+      const label = document.createElementNS(svgNS, 'text');
+      label.setAttribute('x', p.x);
+      label.setAttribute('y', p.y + 24);
+      label.setAttribute('class', 'hourly-graph-label');
+      label.textContent = conv(p.hour.temp_f) + '°';
+      hourlyTempGraph.appendChild(label);
+    });
   }
 
   function renderHourlyPanel() {
-    hourlyStrip.innerHTML = '';
     const hours = weatherState.hourly;
-    const conv = displayTempUnit === 'F' ? toF : toC;
-    const currentHourEpoch = Math.floor(Date.now() / 1000 / 3600) * 3600;
-    hours.forEach((hour) => {
-      const isNow = hour.time_epoch === currentHourEpoch;
-      const col = document.createElement('div');
-      col.className = 'hourly-col' + (isNow ? ' now' : '');
-
-      const time = document.createElement('span');
-      time.className = 'hourly-time';
-      time.textContent = isNow ? 'Now' : formatHourLabel(hour.time);
-      col.appendChild(time);
-
-      const emoji = document.createElement('span');
-      emoji.className = 'hourly-emoji';
-      emoji.textContent = weatherIconForCode(hour.condition && hour.condition.code);
-      col.appendChild(emoji);
-
-      const temp = document.createElement('span');
-      temp.className = 'hourly-temp';
-      temp.textContent = conv(hour.temp_f) + '°';
-      col.appendChild(temp);
-
-      const precipPct = hourlyPrecipPct(hour);
-      if (precipPct > 0) {
-        const precip = document.createElement('span');
-        precip.className = 'hourly-precip';
-        precip.textContent = precipPct + '%';
-        col.appendChild(precip);
-      }
-
-      hourlyStrip.appendChild(col);
-    });
+    const nowEpoch = currentHourEpochNow();
+    renderHourlyAlertRow(hours, nowEpoch);
+    renderHourlyTimeRow(hours, nowEpoch);
+    renderHourlyTempGraph(hours, nowEpoch);
+    renderHourlyPrecipRow(hours, nowEpoch);
     hourlyStrip.scrollLeft = 0;
-    renderHourlyPrecipGraph(hours);
   }
 
   function closeHourlyPanel() {

@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home</title>
-<link rel="stylesheet" href="styles.css?v=20">
+<link rel="stylesheet" href="styles.css?v=21">
 </head>
 <body>
 
@@ -117,8 +117,12 @@
       </div>
 
       <div class="hourly-panel" id="hourly-panel">
-        <div class="hourly-strip" id="hourly-strip"></div>
-        <svg class="hourly-precip-graph" id="hourly-precip-graph" viewBox="0 0 100 20" preserveAspectRatio="none"></svg>
+        <div class="hourly-strip" id="hourly-strip">
+          <div class="hourly-row hourly-row-alert" id="hourly-row-alert"></div>
+          <div class="hourly-row hourly-row-time" id="hourly-row-time"></div>
+          <svg class="hourly-temp-graph" id="hourly-temp-graph"></svg>
+          <div class="hourly-row hourly-row-precip" id="hourly-row-precip"></div>
+        </div>
       </div>
 
       <a class="tile" href="https://mail.google.com" target="_blank" rel="noopener">
@@ -546,6 +550,6 @@
   </div>
 </div>
 
-<script src="script.js?v=25"></script>
+<script src="script.js?v=26"></script>
 </body>
 </html>

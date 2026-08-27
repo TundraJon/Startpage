@@ -600,28 +600,20 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
+## Build Log 30 (completed)
+
 ### Hourly Forecast panel: redesigned layout — hazard-alert icon, temperature graph, precip %
 
-- [ ] **Context — a long design discussion following user feedback that the Build 28 precip graph was confusing** (the user didn't recognize what the blue line represented), which evolved through an AccuWeather-style reference image, several corrected mockups, and a broadening of the top alert row from "precipitation only" to a general hazard/discomfort/injury indicator. This entry supersedes every earlier draft of this same spec — the version below is final.
-- [ ] **Final per-column vertical order, top to bottom:**
-  1. **Hazard-alert micro icon (0.5rem) + colored dot** — see the full rule set below. Reserves its vertical space in every column even when nothing qualifies (fixed-height slot), so columns never jump/misalign depending on which hours have an active alert.
-  2. **Time label** (existing `.hourly-time`, "Now" for the current hour else a parsed 12-hour label) — unchanged.
-  3. **Temperature, shown via a shared line graph** (script.js:757-777 is the old precip-graph implementation to repurpose) spanning the full strip width beneath the time row — **replaces the separate `.hourly-emoji` condition-icon row entirely** (script.js:794-797 removed as a standalone element): each point on the graph *is* that hour's condition icon (`weatherIconForCode(hour.condition.code)`, reused, not a plain dot marker) positioned at the correct height for that hour's temperature, with the numeric temp label directly *underneath* each point (not beside it). Y-axis scaled so the *highest* of the 12 fetched hourly temps sits at the top and the *lowest* sits at the bottom (dynamic range). Target height ~200px, called out by the user as a rough starting point to tune once seen live. No second "feels like" line (descoped, can revisit later).
-  4. **Precip % text**, only when greater than 0% (existing behavior at script.js:804-810, unchanged) — sits at the very bottom, under the graph.
-- [ ] **Remove the old precipitation graph:** delete `#hourly-precip-graph`'s current role as a precip-% plot (`renderHourlyPrecipGraph()`, script.js:757-777) — repurposed into the temperature graph above rather than deleted outright, since the SVG-polyline mechanism carries over.
-- [ ] **Hazard-alert row — full rule set, in priority order for tie-breaking (see "combining multiple hazards" below):**
-  1. **Thunderstorm ⚡** — condition-code based (no percentage field exists for this): codes 1087/1273/1279 ("Thundery outbreaks possible" / "Patchy light rain with thunder" / "Patchy light snow with thunder") → **yellow**; codes 1276/1282 ("Moderate or heavy rain/snow with thunder") → **red**.
-  2. **Hail 🪨** — condition-code based: sleet codes 1069/1204/1207/1249/1252 → **yellow**; ice pellet codes 1237/1261/1264 → **red**.
-  3. **Snow ❄️** — percentage-based via `chance_of_snow`: ≥80% red, 60-79% orange, 30-59% yellow, <30% nothing — **except fixed overrides regardless of %:** Blizzard (1117) → **red**, Blowing snow (1114) → **red**.
-  4. **Rain 💧** — percentage-based via `chance_of_rain`, same ≥80/60-79/30-59 red/orange/yellow tiers — **except fixed override regardless of %:** any freezing rain/drizzle code (1198, 1201, 1072, 1168, 1171) → **red**.
-  5. **Wind 💨** — hourly `wind_mph`/`gust_mph`: sustained ≥40mph OR gust ≥50mph → **red**; sustained ≥30mph OR gust ≥40mph → **yellow**.
-  6. **Cold 🥶** — hourly `feelslike_f`: ≤0°F → **red**; ≤20°F → **yellow**.
-  7. **Heat 🥵** — hourly `feelslike_f`: ≥110°F → **red**; ≥95°F → **yellow**.
-  8. **UV ☀️** — hourly `uv`: ≥8 → **red**; ≥6 → **yellow**.
-  9. **Fog 🌫️** — condition-code based (1030, 1135, 1147): → **yellow** only (no red tier).
-  - Rain/snow's percentage tiers are the only ones that can produce **orange** — every other category is yellow/red only. Overall tier ranking for comparison purposes: red > orange > yellow > (not shown).
-  - **Combining multiple hazards in the same hour:** at most one icon+dot shows per column. Evaluate every category above for that hour, keep only the ones that qualify (produced a color), then pick **whichever reached the highest color tier** (red beats orange beats yellow); if two or more qualifying hazards land on the exact same tier, break the tie using the numbered priority order above (thunderstorm first, fog last). Example: an hour with 65% rain chance (orange) and a yellow-tier thunderstorm shows the rain icon or the thunderstorm icon — the rain wins solely because orange beats yellow on severity, even though thunderstorm outranks rain in the category order; the category order only matters when the winning tier is genuinely tied.
-  - **Hurricane explicitly excluded:** WeatherAPI's hourly data has no per-hour hurricane signal — real NWS hurricane/tropical-storm alerts already surface through the existing severe-weather alert ticker (`weatherState.alerts`), a separate feature from this per-hour row.
+- [x] Restructured the panel's DOM: `.hourly-strip` is now a single vertical scroll container (`overflow-x: auto`) holding four stacked rows — `#hourly-row-alert`, `#hourly-row-time`, `#hourly-temp-graph` (SVG), `#hourly-row-precip` — so all four scroll horizontally in lockstep automatically, with no manual scroll-sync code needed. Each row uses fixed 56px-wide cells matching the hour count exactly.
+- [x] **Temperature graph** (`renderHourlyTempGraph`): each of the 12 points is that hour's condition icon (`weatherIconForCode`), not a plain dot, positioned by `hour.temp_f` — highest of the 12 fetched hours at the top, lowest at the bottom, dynamically scaled (not fixed) — with the numeric temp label directly underneath each icon and a thin connecting line through all 12 points. The current-hour column gets a background tint drawn behind everything else in the SVG. Old precip-graph SVG-polyline mechanism repurposed rather than rebuilt from scratch.
+- [x] **Hazard-alert row** (`hourlyHazards`/`pickHazard`): evaluates all 9 categories (thunderstorm, hail, snow, rain, wind, cold, heat, UV, fog) per hour against their thresholds/condition-code rules, including the freezing-rain/blizzard/blowing-snow fixed-red overrides, then picks the single highest-severity hazard (red > orange > yellow), breaking ties with the fixed category-priority order. Reserves its slot's height in every column even when no hazard qualifies.
+- [x] Verified exhaustively with mocked hourly data across two full 12-hour test rounds plus a dedicated tie-break test: all 9 hazard categories' color thresholds (including boundary values), all 3 fixed-red overrides (freezing rain, blizzard, blowing snow), the severity-beats-category-order rule (65% rain/orange correctly beat a yellow-tier thunderstorm in the same hour), and the category-order tie-break rule in both directions (thunderstorm beat wind when both were red; hail beat cold when both were red) — every case matched the spec exactly. Also verified the temperature graph's geometry directly: a 100°F hour rendered at the smallest y (top) and a 10°F hour at the largest y (bottom), confirming the line rises with temperature rather than the inverted direction from an earlier mockup mistake.
+- [x] Verified panel mechanics (open/close, horizontal scroll, correct anchor position beneath the widgets) still work correctly after the DOM restructure.
+- [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
+
+## Build Queue
+
+_Empty — nothing currently queued._
 
 ## Build Planner
 

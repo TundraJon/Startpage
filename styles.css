@@ -309,63 +309,104 @@ main {
 }
 
 .hourly-panel.open {
-  max-height: 220px;
+  max-height: 320px;
   opacity: 1;
   pointer-events: auto;
 }
 
+/* Single scroll container: alert/time/graph/precip all stack vertically inside it and scroll
+   horizontally together as one unit, so nothing needs manual scroll-position syncing. */
 .hourly-strip {
   display: flex;
-  gap: 4px;
-  padding: 8px 6px 4px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 6px 6px;
   overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
-  scroll-snap-type: x proximity;
 }
 
-.hourly-col {
-  flex: 0 0 auto;
+.hourly-row {
+  display: flex;
+  gap: 0;
+}
+
+.hourly-cell {
+  flex: 0 0 56px;
   width: 56px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 4px 2px 6px;
-  border-radius: 8px;
+  justify-content: center;
+  gap: 1px;
   font-size: 0.72rem;
   color: var(--fg-muted);
-  scroll-snap-align: start;
 }
 
-.hourly-col.now {
+.hourly-cell.now {
   background: rgba(59, 130, 246, 0.14);
-  border: 1px solid var(--home-header-bg);
 }
 
-.hourly-col .hourly-time {
+.hourly-row-alert .hourly-cell {
+  height: 18px;
+}
+
+.hourly-alert-icon {
+  font-size: 0.5rem;
+  line-height: 1;
+}
+
+.hourly-alert-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.hourly-alert-dot.red { background: #dc2626; }
+.hourly-alert-dot.orange { background: #f97316; }
+.hourly-alert-dot.yellow { background: #eab308; }
+
+.hourly-row-time .hourly-cell {
+  height: 16px;
   font-weight: 600;
 }
 
-.hourly-col .hourly-emoji {
-  font-size: 1.1rem;
-}
-
-.hourly-col .hourly-temp {
-  font-weight: 600;
+.hourly-row-time .hourly-cell.now {
   color: var(--fg);
 }
 
-.hourly-col .hourly-precip {
-  color: #3b82f6;
-  font-size: 0.65rem;
+.hourly-temp-graph {
+  display: block;
+  height: 200px;
 }
 
-.hourly-precip-graph {
-  display: block;
-  width: 100%;
-  height: 24px;
-  padding: 0 6px 6px;
-  box-sizing: border-box;
+.hourly-graph-now-bg {
+  fill: rgba(59, 130, 246, 0.14);
+}
+
+.hourly-graph-line {
+  fill: none;
+  stroke: #94a3b8;
+  stroke-width: 1.5;
+}
+
+.hourly-graph-icon {
+  font-size: 18px;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.hourly-graph-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-anchor: middle;
+  fill: var(--fg);
+}
+
+.hourly-row-precip .hourly-cell {
+  height: 14px;
+  color: #3b82f6;
+  font-size: 0.65rem;
 }
 
 .clock-inner {
