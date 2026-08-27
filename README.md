@@ -518,31 +518,32 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 - [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
 
-## Build Queue
+## Build Log 24 (completed)
 
-### Weather widget: reduce phone heating from the Live Condition Skin animation loop
+### Weather widget: reduced phone heating from the Live Condition Skin animation loop
 
-- [ ] **User feedback:** their phone gets warm while using the app, asked what's causing it and what can be done.
-- [ ] **Root cause diagnosed in `stepConditionSkin` (script.js:1243-onward):** the animation loop runs on an uncapped `requestAnimationFrame`, so it fires at the device's full display refresh rate (up to 90Hz on a Pixel 7) continuously from page load, since `liveSkin` defaults to `true` (script.js:576) — it runs at full speed even on a plain "Clear" sky with only stars drawn, not just during precipitation. Three specific per-frame costs identified, confirmed with the user to fix:
-  1. **Forced synchronous layout read every frame:** `weatherSkin.getBoundingClientRect()` (script.js:1252) runs unconditionally each frame just to build a cache key — one of the more expensive calls a browser can do per frame.
-  2. **Two full canvas clears at native device pixel ratio every frame** (script.js:1258, 1261-1268: `precipCanvas`/`starsCanvas` sized at `devicePixelRatio`, both `clearRect`'d every frame) — on a ~2.6-3x DPR phone screen this multiplies the raw pixel-fill work several times over what the CSS size suggests.
-  3. **No pause when the effect is scrolled out of view** — only page-hidden throttling exists (already automatic in browsers); nothing stops the loop when the weather widget itself isn't visible on screen.
-- [ ] **Requested fixes (DPR-cap option was presented but not selected — leave canvas resolution untouched):**
-  - **Frame-rate cap (~30fps):** track elapsed time since the last drawn frame inside `stepConditionSkin` and skip the draw work (but still schedule the next `requestAnimationFrame`) until roughly 33ms have passed — halves per-frame work on a 60Hz screen, cuts it further on 90Hz+ displays. Keep the loop itself still requesting every rAF tick (needed to keep timing accurate), just gate the actual clear/draw work behind the elapsed-time check.
-  - **Remove the per-frame layout read:** cache `weatherSkin`'s measured width/height instead of calling `getBoundingClientRect()` every frame; only re-measure on a `resize`/orientation-change event (and once on setup), not on every animation tick.
-  - **Pause via visibility:** add an `IntersectionObserver` on the weather widget that stops calling into the per-frame draw work (early-return, similar to the existing `!weatherSettings.liveSkin` gate) whenever the widget isn't intersecting the viewport — resume automatically when it scrolls back into view. Complements (doesn't replace) the existing `visibilitychange` cloud re-stagger logic, which handles a different case (tab backgrounded/restored, not on-page scroll position).
+- [x] **Frame-rate cap (~30fps):** added `WX_FRAME_INTERVAL_MS = 1000/30` and a `lastDrawTs` tracker in `stepConditionSkin` — the loop still requests every `requestAnimationFrame` tick for accurate timing, but skips the actual clear/draw work until ~33ms have elapsed since the last drawn frame.
+- [x] **Removed the per-frame layout read:** `weatherSkin.getBoundingClientRect()` no longer runs every frame — its width/height are now cached in `cachedSkinSize`, measured once at setup and re-measured only on a `resize` event.
+- [x] **Pause via visibility:** a new `IntersectionObserver` on the weather widget sets `skinIsVisible = false` whenever it's scrolled out of the viewport, and `stepConditionSkin` early-returns while it's not visible — resumes automatically once it scrolls back into view. This is separate from the existing `visibilitychange` cloud re-stagger logic, which only handles the tab-backgrounded case.
+- [x] DPR-cap option was presented but not selected — canvas resolution left untouched.
+- [x] Verified: the animation loop's canvas output is provably frozen (identical pixel hash across two snapshots) while the widget is scrolled off-screen, and resumes changing normally once back on-screen. Full 49-condition regression sweep passed with zero real errors afterward.
 
-### Moon-dial clock: remove the four center badges entirely
+### Moon-dial clock: removed the four center badges
 
-- [ ] **Current behavior (confirmed in script.js:287-308, `renderMoonDialFace`):** the moon-dial style draws four rounded-square badges (month, day, weather emoji, weekday) at radius 18 between the center and the inner number ring, via `renderClockBadge` (script.js:275-285).
-- [ ] **User feedback:** doesn't want those badges cluttering the moon-phase emoji at the center — remove them from the moon-dial face entirely.
-- [ ] **Requested change:** delete the 4 `renderClockBadge(...)` calls and the `badgeR`/`badgeSize` locals from `renderMoonDialFace` (script.js:302-307), leaving just the moon emoji background and dual-ring numbers. Since `renderClockBadge` (script.js:275-285) has no other caller, remove that function too rather than leaving unused code behind. Update the comment above `renderMoonDialFace` (script.js:289-290, "Four info badges sit between...") to drop the now-inaccurate mention.
+- [x] Deleted the 4 `renderClockBadge(...)` calls and the `badgeR`/`badgeSize` locals from `renderMoonDialFace`, leaving just the moon emoji background and dual-ring numbers. Since `renderClockBadge` had no other caller, removed that function entirely along with the now-unused `now` parameter it required. Verified: the moon-dial SVG renders zero badge rects while the moon emoji and numbers remain.
 
 ### Testing Panel: slider for lightning flash opacity re-roll rate
 
-- [ ] **Current behavior (confirmed in script.js:1400-1421, `stepConditionSkin`):** while a thunderstorm flash is active, its opacity is re-rolled on *every* `requestAnimationFrame` callback (`flashDiv.style.opacity = String(flashState.flashAlpha * (0.4 + Math.random() * 0.6))`), i.e. once per rendered frame — there's no existing concept of "every N frames."
-- [ ] **Frame-rate caveat, discussed with the user:** the render loop is driven by uncapped `requestAnimationFrame`, so real frames-per-second varies by device/display (commonly 60fps, but up to 90Hz+ on some phones, or lower under throttling) — there's no single fixed "frames in 1000ms" the code can measure. **Resolved:** slider bounds use a fixed assumption of 60fps rather than a live per-device measurement, so the slider range is exactly **1 to 60**, regardless of the actual device's true refresh rate.
-- [ ] **Requested addition:** a new Testing Panel slider (range 1-60, default 1 — matching today's exact every-frame behavior so nothing changes until the slider is moved) controlling how many rendered frames pass between opacity re-rolls during an active flash. Needs a new tunable (e.g. `WX_LIGHTNING_TUNABLES.rerollFrames`, following the existing `WX_HAIL_TUNABLES`/`WX_FOG_TUNABLES`/`WX_CLOUD_TUNABLES` pattern) and a per-flash frame counter in `flashState` so the opacity value is only recomputed every `rerollFrames` frames, holding steady in between rather than reverting to a flat non-flickering brightness — the existing 100-1000ms flash-lifetime and 5-10s between-flash gap are unaffected.
+- [x] Added `WX_LIGHTNING_TUNABLES.rerollFrames` (default 1, matching the original every-frame behavior) and a per-flash `frameCount`/`currentOpacity` pair on `flashState`, so the flicker opacity is only recomputed every `rerollFrames` drawn frames, holding steady in between. New Testing Panel slider (1-60, using the fixed 60fps assumption discussed for its bounds), wired into the existing reset-to-defaults handler.
+- [x] Verified functionally, not just via the slider UI: sampling the flash div's opacity across ~200 animation frames showed a single held value for an entire flash's lifetime at `rerollFrames=30`, versus opacity changing every few frames at the default `rerollFrames=1` — confirming the re-roll cadence genuinely responds to the slider.
+
+### Regression check
+
+- [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
+
+## Build Queue
+
+_Empty — nothing currently queued._
 
 ## Build Planner
 

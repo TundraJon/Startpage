@@ -393,6 +393,14 @@
     </section>
 
     <section class="options-section">
+      <h3>Lightning Flash</h3>
+      <div class="option-row">
+        <span>Opacity re-roll every N frames <span id="test-lightning-reroll-value">1</span></span>
+        <input type="range" id="test-lightning-reroll-slider" min="1" max="60" step="1" value="1">
+      </div>
+    </section>
+
+    <section class="options-section">
       <h3>Live Weather Diagnostics (temporary)</h3>
       <p class="testing-note">For tracking down live-data bugs (e.g. moon phase). Not part of the real app — remove once resolved.</p>
       <textarea id="test-weather-debug-output" readonly rows="14" class="testing-debug-output"></textarea>
@@ -533,6 +541,6 @@
   </div>
 </div>
 
-<script src="script.js?v=20"></script>
+<script src="script.js?v=21"></script>
 </body>
 </html>

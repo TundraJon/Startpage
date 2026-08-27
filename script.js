@@ -270,26 +270,11 @@
     }
   }
 
-  // A small dark-gray rounded-square badge with centered white content (emoji or text), positioned
-  // radially between the inner number ring and the center — used by the 'moon-dial' style.
-  function renderClockBadge(svg, cx, cy, angleDeg, radius, size, content) {
-    const p = polarPoint(cx, cy, radius, angleDeg);
-    svg.appendChild(svgEl('rect', {
-      x: p.x - size / 2, y: p.y - size / 2, width: size, height: size, rx: size * 0.25, fill: '#333',
-    }));
-    const t = svgEl('text', {
-      x: p.x, y: p.y, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': size * 0.55, fill: '#fff',
-    });
-    t.textContent = content;
-    svg.appendChild(t);
-  }
-
   // Background is a large moon-phase emoji (accurate to the real current phase) instead of the
   // usual day/night face fill — it fully replaces that fill, no fallback circle underneath.
-  // Dual-ring numbers same as 'dual-ring'. Four info badges sit between the inner ring and
-  // center at the cardinal positions. Hands (added by the caller) always use ordinary 12-hour
-  // math regardless of the hour12 setting, since this style is offered under both toggles.
-  function renderMoonDialFace(svg, cx, cy, now) {
+  // Dual-ring numbers same as 'dual-ring'. Hands (added by the caller) always use ordinary
+  // 12-hour math regardless of the hour12 setting, since this style is offered under both toggles.
+  function renderMoonDialFace(svg, cx, cy) {
     const moonEmoji = WX_MOON_PHASE_ICONS[weatherState.moonPhase] || '🌕';
     const moonText = svgEl('text', {
       x: cx, y: cy, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': 85,
@@ -298,13 +283,6 @@
     svg.appendChild(moonText);
 
     renderDualRingNumbers(svg, cx, cy);
-
-    const badgeR = 18;
-    const badgeSize = 15;
-    renderClockBadge(svg, cx, cy, 0, badgeR, badgeSize, now.toLocaleDateString(undefined, { month: 'short' }));
-    renderClockBadge(svg, cx, cy, 90, badgeR, badgeSize, String(now.getDate()));
-    renderClockBadge(svg, cx, cy, 180, badgeR, badgeSize, weatherIconForCode(getEffectiveConditionCode()));
-    renderClockBadge(svg, cx, cy, 270, badgeR, badgeSize, now.toLocaleDateString(undefined, { weekday: 'short' }));
   }
 
   function renderAnalogFace(svg, hour12, analogStyle) {
@@ -314,7 +292,7 @@
     const now = new Date();
 
     if (analogStyle === 'moon-dial') {
-      renderMoonDialFace(svg, cx, cy, now);
+      renderMoonDialFace(svg, cx, cy);
       const totalMin12 = (now.getHours() % 12) * 60 + now.getMinutes();
       addHand(svg, cx, cy, (totalMin12 / 720) * 360, 24, 2.5, '#222');
       addHand(svg, cx, cy, (now.getMinutes() / 60) * 360, 36, 1.5, '#222');
@@ -996,6 +974,14 @@
   };
   const HAIL_FADE_FRAMES = 6;
 
+  // How many rendered frames pass between re-rolling a thunderstorm flash's opacity. Default 1
+  // matches the original every-frame flicker exactly; a Testing Panel slider (1-60, a fixed
+  // 60fps assumption rather than a live per-device measurement, since real frame rate varies by
+  // display) can slow it down to see the flash hold steady longer between re-rolls.
+  const WX_LIGHTNING_TUNABLES = {
+    rerollFrames: 1,
+  };
+
   // Fog: previously a fixed 0.14 peak opacity at a baked-in pixel radius — too faint to notice.
   // Opacity/size/speed are read live at draw time (not baked into each blob at creation) so their
   // sliders take effect immediately; only blob count needs a rebuild, forced via lastParticleKey.
@@ -1130,7 +1116,36 @@
   let conditionParticles = [];
   let conditionStars = [];
   let conditionFog = [];
-  let flashState = { active: false, nextFlash: 0, flashUntil: 0, flashAlpha: 0, boltPath: null };
+  let flashState = {
+    active: false, nextFlash: 0, flashUntil: 0, flashAlpha: 0, boltPath: null,
+    frameCount: 0, currentOpacity: 0,
+  };
+
+  // Cache the widget's rendered size instead of calling getBoundingClientRect() every animation
+  // frame — a forced synchronous layout read, one of the more expensive things a browser can do
+  // per frame. Only re-measure on an actual resize/orientation change, not on every frame.
+  let cachedSkinSize = { w: 1, h: 1 };
+  function measureSkinSize() {
+    const rect = weatherSkin.getBoundingClientRect();
+    cachedSkinSize = { w: Math.max(1, Math.round(rect.width)), h: Math.max(1, Math.round(rect.height)) };
+  }
+  measureSkinSize();
+  window.addEventListener('resize', measureSkinSize);
+
+  // Pause the per-frame animation loop entirely whenever the weather widget scrolls out of the
+  // viewport. Tab-hidden is already handled for free by the browser's own rAF throttling; this
+  // covers the separate case of the widget merely being scrolled off-screen in a visible tab.
+  let skinIsVisible = true;
+  new IntersectionObserver((entries) => {
+    skinIsVisible = entries[entries.length - 1].isIntersecting;
+  }).observe(weatherSkin);
+
+  // Frame-rate cap: the loop's real per-frame cost (canvas clears, particle math) doesn't need to
+  // run at a phone's full display refresh rate (up to 90Hz+) to look smooth. Capped to ~30fps by
+  // skipping the draw work (but still rescheduling the next rAF for accurate timing) until enough
+  // wall-clock time has passed, cutting sustained CPU/GPU work roughly in half on a 60Hz screen.
+  const WX_FRAME_INTERVAL_MS = 1000 / 30;
+  let lastDrawTs = 0;
 
   // Procedurally generate a jagged bolt each time it fires — never the same shape twice — as a
   // zigzag random-walk from a random point along the top edge down to a strike point biased
@@ -1242,6 +1257,9 @@
 
   function stepConditionSkin(ts) {
     requestAnimationFrame(stepConditionSkin);
+    if (!skinIsVisible) return;
+    if (ts - lastDrawTs < WX_FRAME_INTERVAL_MS) return;
+    lastDrawTs = ts;
     const c = getEffectiveConditionSkins();
     if (!weatherSettings.liveSkin) {
       if (precipCanvas.width) precipCtx.clearRect(0, 0, precipCanvas.width, precipCanvas.height);
@@ -1249,9 +1267,8 @@
       flashDiv.style.opacity = '0';
       return;
     }
-    const rect = weatherSkin.getBoundingClientRect();
-    const w = Math.max(1, Math.round(rect.width));
-    const h = Math.max(1, Math.round(rect.height));
+    const w = cachedSkinSize.w;
+    const h = cachedSkinSize.h;
     const dpr = window.devicePixelRatio || 1;
     const key = [...c].sort().join(',') + '|' + w + 'x' + h + '@' + dpr;
     if (key !== lastParticleKey) {
@@ -1406,6 +1423,7 @@
         flashState.active = true;
         flashState.flashUntil = ts + 100 + Math.random() * 900;
         flashState.flashAlpha = 0.85 + Math.random() * 0.15;
+        flashState.frameCount = 0;
         // Most flashes are ambient-only (a distant/off-screen strike); 25% also show a bolt.
         flashState.boltPath = Math.random() < 0.25 ? generateBoltPath(w, h) : null;
       }
@@ -1415,7 +1433,13 @@
           flashState.nextFlash = ts + 5000 + Math.random() * 5000;
           flashDiv.style.opacity = '0';
         } else {
-          flashDiv.style.opacity = String(flashState.flashAlpha * (0.4 + Math.random() * 0.6));
+          // Re-roll the flicker only every WX_LIGHTNING_TUNABLES.rerollFrames frames, holding
+          // the last value steady in between (default 1 = every frame, the original behavior).
+          if (flashState.frameCount % WX_LIGHTNING_TUNABLES.rerollFrames === 0) {
+            flashState.currentOpacity = flashState.flashAlpha * (0.4 + Math.random() * 0.6);
+          }
+          flashState.frameCount++;
+          flashDiv.style.opacity = String(flashState.currentOpacity);
           if (flashState.boltPath) drawBoltPath(flashState.boltPath);
         }
       }
@@ -1535,6 +1559,8 @@
     const fogSpeedValue = document.getElementById('test-fog-speed-value');
     const hailGravitySlider = document.getElementById('test-hail-gravity-slider');
     const hailGravityValue = document.getElementById('test-hail-gravity-value');
+    const lightningRerollSlider = document.getElementById('test-lightning-reroll-slider');
+    const lightningRerollValue = document.getElementById('test-lightning-reroll-value');
     const resetBtn = document.getElementById('test-reset-btn');
 
     function timeStringToSeconds(str) {
@@ -1626,6 +1652,10 @@
       WX_HAIL_TUNABLES.gravity = Number(hailGravitySlider.value);
       hailGravityValue.textContent = hailGravitySlider.value;
     });
+    lightningRerollSlider.addEventListener('input', () => {
+      WX_LIGHTNING_TUNABLES.rerollFrames = Number(lightningRerollSlider.value);
+      lightningRerollValue.textContent = lightningRerollSlider.value;
+    });
 
     const weatherDebugOutput = document.getElementById('test-weather-debug-output');
     const weatherDebugCopyBtn = document.getElementById('test-weather-debug-copy-btn');
@@ -1683,6 +1713,8 @@
       fogSpeedSlider.value = 3; fogSpeedValue.textContent = '3x';
       WX_HAIL_TUNABLES.gravity = 0.5;
       hailGravitySlider.value = 0.5; hailGravityValue.textContent = '0.5';
+      WX_LIGHTNING_TUNABLES.rerollFrames = 1;
+      lightningRerollSlider.value = 1; lightningRerollValue.textContent = '1';
       lastParticleKey = '';
       renderWeatherExtras();
       renderWeatherSkin();
