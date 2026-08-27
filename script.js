@@ -134,13 +134,15 @@
   document.querySelectorAll('.category:not(.category--home) .category-header').forEach((btn) => {
     const section = btn.closest('.category');
     const id = section.dataset.categoryId;
-    const grid = section.querySelector('.tile-grid');
+    // A category with subcategories wraps them + its own tile-grid in .category-content;
+    // a flat category (no subcategories) has .tile-grid as its direct child instead.
+    const content = section.querySelector(':scope > .category-content') || section.querySelector(':scope > .tile-grid');
     const stored = localStorage.getItem('category-collapsed-' + id);
     const collapsed = stored === null ? true : stored === 'true';
     setExpanded(!collapsed);
 
     function setExpanded(expanded) {
-      grid.hidden = !expanded;
+      content.hidden = !expanded;
       btn.setAttribute('aria-expanded', String(expanded));
     }
 
@@ -182,6 +184,52 @@
       { id: 'seed-entertainment-3', name: 'Spotify', url: 'https://www.spotify.com' },
       { id: 'seed-entertainment-4', name: 'Disney+', url: 'https://www.disneyplus.com' },
       { id: 'seed-entertainment-5', name: 'Hulu', url: 'https://www.hulu.com' },
+    ],
+    // --- Placeholder test content (disposable): nested categories/subcategories for building and
+    // testing the Tile Grid, Accordion, and Move Entry systems. Remove once real content replaces it.
+    'test-a': [
+      { id: 'seed-test-a-1', name: 'Google', url: 'https://google.com' },
+      { id: 'seed-test-a-2', name: 'Wikipedia', url: 'https://wikipedia.org' },
+      { id: 'seed-test-a-3', name: 'GitHub', url: 'https://github.com' },
+    ],
+    'test-b-sub1': [
+      { id: 'seed-test-b-sub1-1', name: 'YouTube', url: 'https://youtube.com' },
+      { id: 'seed-test-b-sub1-2', name: 'Reddit', url: 'https://reddit.com' },
+      { id: 'seed-test-b-sub1-3', name: 'Amazon', url: 'https://amazon.com' },
+      { id: 'seed-test-b-sub1-4', name: 'Netflix', url: 'https://netflix.com' },
+    ],
+    'test-b-sub2': [
+      { id: 'seed-test-b-sub2-1', name: 'Spotify', url: 'https://spotify.com' },
+      { id: 'seed-test-b-sub2-2', name: 'Apple', url: 'https://apple.com' },
+    ],
+    'test-c-suba': [
+      { id: 'seed-test-c-suba-1', name: 'Microsoft', url: 'https://microsoft.com' },
+      { id: 'seed-test-c-suba-2', name: 'Yahoo', url: 'https://yahoo.com' },
+    ],
+    'test-c-suba-1': [
+      { id: 'seed-test-c-suba-1-1', name: 'Twitch', url: 'https://twitch.tv' },
+      { id: 'seed-test-c-suba-1-2', name: 'Discord', url: 'https://discord.com' },
+      { id: 'seed-test-c-suba-1-3', name: 'Steam', url: 'https://store.steampowered.com' },
+      { id: 'seed-test-c-suba-1-4', name: 'LinkedIn', url: 'https://linkedin.com' },
+      { id: 'seed-test-c-suba-1-5', name: 'Pinterest', url: 'https://pinterest.com' },
+      { id: 'seed-test-c-suba-1-6', name: 'eBay', url: 'https://ebay.com' },
+    ],
+    'test-d': [
+      { id: 'seed-test-d-1', name: 'Bing', url: 'https://bing.com' },
+      { id: 'seed-test-d-2', name: 'DuckDuckGo', url: 'https://duckduckgo.com' },
+      { id: 'seed-test-d-3', name: 'Firefox', url: 'https://mozilla.org' },
+      { id: 'seed-test-d-4', name: 'Chrome', url: 'https://google.com/chrome' },
+      { id: 'seed-test-d-5', name: 'Edge', url: 'https://microsoft.com/edge' },
+      { id: 'seed-test-d-6', name: 'Wikipedia', url: 'https://wikipedia.org' },
+      { id: 'seed-test-d-7', name: 'Archive.org', url: 'https://archive.org' },
+      { id: 'seed-test-d-8', name: 'Wayback Machine', url: 'https://web.archive.org' },
+      { id: 'seed-test-d-9', name: 'W3Schools', url: 'https://w3schools.com' },
+      { id: 'seed-test-d-10', name: 'MDN Web Docs', url: 'https://developer.mozilla.org' },
+      { id: 'seed-test-d-11', name: 'Stack Overflow', url: 'https://stackoverflow.com' },
+      { id: 'seed-test-d-12', name: 'CodePen', url: 'https://codepen.io' },
+    ],
+    'test-e': [
+      { id: 'seed-test-e-1', name: 'Fallback Test', url: 'https://thisdoesnotexistasarealsite12345.com' },
     ],
   };
 

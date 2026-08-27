@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home</title>
-<link rel="stylesheet" href="styles.css?v=29">
+<link rel="stylesheet" href="styles.css?v=30">
 </head>
 <body>
 
@@ -153,6 +153,101 @@
   <section class="category" data-category-id="entertainment" style="--stripe-color:#8E44AD">
     <button class="category-header" aria-expanded="false">
       <span class="category-name">Entertainment</span>
+      <span class="chevron">▾</span>
+    </button>
+    <div class="tile-grid" hidden>
+      <button type="button" class="tile tile-add" aria-label="Add tile">+</button>
+    </div>
+  </section>
+
+  <!-- Placeholder test content (disposable): nested categories/subcategories for building and
+       testing the Tile Grid, Accordion, and Move Entry systems against real nesting. Remove once
+       real content replaces it. -->
+  <section class="category" data-category-id="test-a" style="--stripe-color:#E74C3C">
+    <button class="category-header" aria-expanded="false">
+      <span class="category-name">Sample Category A</span>
+      <span class="chevron">▾</span>
+    </button>
+    <div class="tile-grid" hidden>
+      <button type="button" class="tile tile-add" aria-label="Add tile">+</button>
+    </div>
+  </section>
+
+  <section class="category" data-category-id="test-b" style="--stripe-color:#16A085">
+    <button class="category-header" aria-expanded="false">
+      <span class="category-name">Sample Category B</span>
+      <span class="chevron">▾</span>
+    </button>
+    <div class="category-content" hidden>
+      <section class="category" data-category-id="test-b-sub1" style="--stripe-color:#1ABC9C">
+        <button class="category-header" aria-expanded="false">
+          <span class="category-name">Sample Sub 1</span>
+          <span class="chevron">▾</span>
+        </button>
+        <div class="tile-grid" hidden>
+          <button type="button" class="tile tile-add" aria-label="Add tile">+</button>
+        </div>
+      </section>
+      <section class="category" data-category-id="test-b-sub2" style="--stripe-color:#48C9B0">
+        <button class="category-header" aria-expanded="false">
+          <span class="category-name">Sample Sub 2</span>
+          <span class="chevron">▾</span>
+        </button>
+        <div class="tile-grid" hidden>
+          <button type="button" class="tile tile-add" aria-label="Add tile">+</button>
+        </div>
+      </section>
+      <div class="tile-grid" hidden>
+        <button type="button" class="tile tile-add" aria-label="Add tile">+</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="category" data-category-id="test-c" style="--stripe-color:#F39C12">
+    <button class="category-header" aria-expanded="false">
+      <span class="category-name">Sample Category C</span>
+      <span class="chevron">▾</span>
+    </button>
+    <div class="category-content" hidden>
+      <section class="category" data-category-id="test-c-suba" style="--stripe-color:#F5B041">
+        <button class="category-header" aria-expanded="false">
+          <span class="category-name">Sample Sub A</span>
+          <span class="chevron">▾</span>
+        </button>
+        <div class="category-content" hidden>
+          <section class="category" data-category-id="test-c-suba-1" style="--stripe-color:#F8C471">
+            <button class="category-header" aria-expanded="false">
+              <span class="category-name">Sample Sub A-1</span>
+              <span class="chevron">▾</span>
+            </button>
+            <div class="tile-grid" hidden>
+              <button type="button" class="tile tile-add" aria-label="Add tile">+</button>
+            </div>
+          </section>
+          <div class="tile-grid" hidden>
+            <button type="button" class="tile tile-add" aria-label="Add tile">+</button>
+          </div>
+        </div>
+      </section>
+      <div class="tile-grid" hidden>
+        <button type="button" class="tile tile-add" aria-label="Add tile">+</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="category" data-category-id="test-d" style="--stripe-color:#9B59B6">
+    <button class="category-header" aria-expanded="false">
+      <span class="category-name">Sample Category D</span>
+      <span class="chevron">▾</span>
+    </button>
+    <div class="tile-grid" hidden>
+      <button type="button" class="tile tile-add" aria-label="Add tile">+</button>
+    </div>
+  </section>
+
+  <section class="category" data-category-id="test-e" style="--stripe-color:#7F8C8D">
+    <button class="category-header" aria-expanded="false">
+      <span class="category-name">Sample Category E</span>
       <span class="chevron">▾</span>
     </button>
     <div class="tile-grid" hidden>
@@ -516,6 +611,6 @@
   </div>
 </div>
 
-<script src="script.js?v=33"></script>
+<script src="script.js?v=34"></script>
 </body>
 </html>

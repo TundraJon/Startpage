@@ -232,6 +232,10 @@ main {
   display: none;
 }
 
+.category-content[hidden] {
+  display: none;
+}
+
 .tile {
   aspect-ratio: 1 / 1;
   display: flex;
