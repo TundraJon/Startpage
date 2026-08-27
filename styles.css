@@ -300,6 +300,8 @@ main {
 .clock-face[data-scheme="blue-black"] { background: #000; color: #3b82f6; }
 .clock-face[data-scheme="black-white"] { background: #000; color: #fff; }
 .clock-face[data-scheme="white-black"] { background: #000; color: #fff; }
+.clock-face[data-scheme="green-black"] { background: #000; color: #22c55e; }
+.clock-face[data-scheme="orange-black"] { background: #000; color: #f97316; }
 .clock-face[data-mode="analog"] { background: var(--clock-bg); }
 
 .clock-face[data-scheme="black-white"] .clock-digits {
@@ -837,6 +839,8 @@ main {
 .mini-clock[data-scheme="blue-black"] { background: #000; color: #3b82f6; }
 .mini-clock[data-scheme="black-white"] { background: #fff; color: #000; }
 .mini-clock[data-scheme="white-black"] { background: #000; color: #fff; }
+.mini-clock[data-scheme="green-black"] { background: #000; color: #22c55e; }
+.mini-clock[data-scheme="orange-black"] { background: #000; color: #f97316; }
 
 .analog-preview-wrap {
   display: flex;
@@ -847,4 +851,28 @@ main {
 .analog-preview-svg {
   width: 140px;
   height: 140px;
+}
+
+.analog-style-swatch {
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+  cursor: pointer;
+  overflow: hidden;
+  background: var(--surface);
+  display: flex;
+  justify-content: center;
+}
+
+.analog-style-swatch.active {
+  border-color: var(--home-header-bg);
+}
+
+.analog-style-swatch[hidden] {
+  display: none;
+}
+
+.analog-style-preview-svg {
+  width: 64px;
+  height: 64px;
 }

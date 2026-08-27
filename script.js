@@ -198,7 +198,7 @@
   }
 
   const CLOCK_SETTINGS_KEY = 'clockSettings';
-  const defaultClockSettings = { mode: 'digital', scheme: 'red-black', hour12: true };
+  const defaultClockSettings = { mode: 'digital', scheme: 'red-black', hour12: true, analogStyle: 'classic' };
   let storedClockSettings = {};
   try {
     storedClockSettings = JSON.parse(localStorage.getItem(CLOCK_SETTINGS_KEY) || '{}');
@@ -228,11 +228,100 @@
     }));
   }
 
-  function renderAnalogFace(svg, hour12) {
+  // Colored number-badge palette for the 'numbered' 12-hour style, approximated from the
+  // reference photo (kids'-style wall clock, each hour in its own colored circle badge).
+  const WX_CLOCK_BADGE_COLORS = {
+    1: '#f2a65a', 2: '#6a7fdb', 3: '#4fa8a8', 4: '#a83250', 5: '#5b9bd5', 6: '#d9a520',
+    7: '#5c3a21', 8: '#a78bd9', 9: '#7a9a3c', 10: '#e08a3c', 11: '#4a7fc1', 12: '#c2447a',
+  };
+  // Dual-ring 24-hour numbers ('dual-ring' and 'moon-dial' styles): each outer 1-12 position
+  // also carries the matching 24-hour number at the same angle, closer to center.
+  const WX_DUAL_RING_INNER = { 1: '13', 2: '14', 3: '15', 4: '16', 5: '17', 6: '18', 7: '19', 8: '20', 9: '21', 10: '22', 11: '23', 12: '00' };
+
+  function renderNumberedBadgeNumbers(svg, cx, cy) {
+    for (let i = 1; i <= 12; i++) {
+      const p = polarPoint(cx, cy, 36, i * 30);
+      svg.appendChild(svgEl('circle', { cx: p.x, cy: p.y, r: 7, fill: WX_CLOCK_BADGE_COLORS[i] }));
+      const t = svgEl('text', { x: p.x, y: p.y + 2.5, 'text-anchor': 'middle', 'font-size': 7, 'font-weight': 'bold', fill: '#fff' });
+      t.textContent = String(i);
+      svg.appendChild(t);
+    }
+  }
+
+  // Shared by 'dual-ring' (24-hour) and 'moon-dial' (both): outer black 1-12, inner red 13-23/00
+  // at the same angle as their outer counterpart, plus a tick mark only at each of the 12
+  // positions (no minute ticks).
+  function renderDualRingNumbers(svg, cx, cy) {
+    for (let i = 1; i <= 12; i++) {
+      const angle = i * 30;
+      const outer = polarPoint(cx, cy, 46, angle);
+      const inner = polarPoint(cx, cy, 41, angle);
+      svg.appendChild(svgEl('line', {
+        x1: outer.x, y1: outer.y, x2: inner.x, y2: inner.y, stroke: '#333', 'stroke-width': 1.2,
+      }));
+      const op = polarPoint(cx, cy, 38, angle);
+      const ot = svgEl('text', { x: op.x, y: op.y + 3.5, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 'bold', fill: '#000' });
+      ot.textContent = String(i);
+      svg.appendChild(ot);
+      const ip = polarPoint(cx, cy, 23, angle);
+      const it = svgEl('text', { x: ip.x, y: ip.y + 2.5, 'text-anchor': 'middle', 'font-size': 7, fill: '#c0392b' });
+      it.textContent = WX_DUAL_RING_INNER[i];
+      svg.appendChild(it);
+    }
+  }
+
+  // A small black rounded-square badge with centered white content (emoji or text), positioned
+  // radially between the inner number ring and the center — used by the 'moon-dial' style.
+  function renderClockBadge(svg, cx, cy, angleDeg, radius, size, content) {
+    const p = polarPoint(cx, cy, radius, angleDeg);
+    svg.appendChild(svgEl('rect', {
+      x: p.x - size / 2, y: p.y - size / 2, width: size, height: size, rx: size * 0.25, fill: '#000',
+    }));
+    const t = svgEl('text', {
+      x: p.x, y: p.y, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': size * 0.55, fill: '#fff',
+    });
+    t.textContent = content;
+    svg.appendChild(t);
+  }
+
+  // Background is a large moon-phase emoji (accurate to the real current phase) instead of the
+  // usual day/night face fill — it fully replaces that fill, no fallback circle underneath.
+  // Dual-ring numbers same as 'dual-ring'. Four info badges sit between the inner ring and
+  // center at the cardinal positions. Hands (added by the caller) always use ordinary 12-hour
+  // math regardless of the hour12 setting, since this style is offered under both toggles.
+  function renderMoonDialFace(svg, cx, cy, now) {
+    const moonEmoji = WX_MOON_PHASE_ICONS[weatherState.moonPhase] || '🌕';
+    const moonText = svgEl('text', {
+      x: cx, y: cy, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': 85,
+    });
+    moonText.textContent = moonEmoji;
+    svg.appendChild(moonText);
+
+    renderDualRingNumbers(svg, cx, cy);
+
+    const badgeR = 12;
+    const badgeSize = 15;
+    renderClockBadge(svg, cx, cy, 0, badgeR, badgeSize, now.toLocaleDateString(undefined, { month: 'short' }));
+    renderClockBadge(svg, cx, cy, 90, badgeR, badgeSize, String(now.getDate()));
+    renderClockBadge(svg, cx, cy, 180, badgeR, badgeSize, weatherIconForCode(getEffectiveConditionCode()));
+    renderClockBadge(svg, cx, cy, 270, badgeR, badgeSize, now.toLocaleDateString(undefined, { weekday: 'short' }));
+  }
+
+  function renderAnalogFace(svg, hour12, analogStyle) {
     svg.innerHTML = '';
     const cx = 50;
     const cy = 50;
     const now = new Date();
+
+    if (analogStyle === 'moon-dial') {
+      renderMoonDialFace(svg, cx, cy, now);
+      const totalMin12 = (now.getHours() % 12) * 60 + now.getMinutes();
+      addHand(svg, cx, cy, (totalMin12 / 720) * 360, 24, 2.5, '#222');
+      addHand(svg, cx, cy, (now.getMinutes() / 60) * 360, 36, 1.5, '#222');
+      svg.appendChild(svgEl('circle', { cx, cy, r: 2, fill: '#222' }));
+      return;
+    }
+
     const rootStyle = getComputedStyle(document.documentElement);
     const dayFill = rootStyle.getPropertyValue('--clock-analog-day').trim() || '#fff';
     const nightFill = rootStyle.getPropertyValue('--clock-analog-night').trim() || '#c9c9c9';
@@ -240,23 +329,35 @@
     svg.appendChild(svgEl('circle', { cx, cy, r: 48, fill: dayFill, stroke: '#333', 'stroke-width': 1 }));
 
     if (hour12) {
-      for (let i = 1; i <= 12; i++) {
-        const angle = i * 30;
-        const outer = polarPoint(cx, cy, 46, angle);
-        const inner = polarPoint(cx, cy, 41, angle);
-        svg.appendChild(svgEl('line', {
-          x1: outer.x, y1: outer.y, x2: inner.x, y2: inner.y,
-          stroke: '#333', 'stroke-width': i % 3 === 0 ? 1.5 : 0.6,
-        }));
+      if (analogStyle === 'numbered') {
+        renderNumberedBadgeNumbers(svg, cx, cy);
+      } else {
+        for (let i = 1; i <= 12; i++) {
+          const angle = i * 30;
+          const outer = polarPoint(cx, cy, 46, angle);
+          const inner = polarPoint(cx, cy, 41, angle);
+          svg.appendChild(svgEl('line', {
+            x1: outer.x, y1: outer.y, x2: inner.x, y2: inner.y,
+            stroke: '#333', 'stroke-width': i % 3 === 0 ? 1.5 : 0.6,
+          }));
+        }
+        [3, 6, 9, 12].forEach((n) => {
+          const p = polarPoint(cx, cy, 34, n * 30);
+          const t = svgEl('text', { x: p.x, y: p.y + 3, 'text-anchor': 'middle', 'font-size': 9, fill: '#222' });
+          t.textContent = String(n);
+          svg.appendChild(t);
+        });
       }
-      [3, 6, 9, 12].forEach((n) => {
-        const p = polarPoint(cx, cy, 34, n * 30);
-        const t = svgEl('text', { x: p.x, y: p.y + 3, 'text-anchor': 'middle', 'font-size': 9, fill: '#222' });
-        t.textContent = String(n);
-        svg.appendChild(t);
-      });
       const totalMin = (now.getHours() % 12) * 60 + now.getMinutes();
       addHand(svg, cx, cy, (totalMin / 720) * 360, 24, 2.5, '#222');
+      addHand(svg, cx, cy, (now.getMinutes() / 60) * 360, 36, 1.5, '#222');
+    } else if (analogStyle === 'dual-ring') {
+      // Plain face fill only (no half-circle night shading — the reference has none), ticks only
+      // at the 12 hour positions, and ordinary 12-hour hand math even though this is the 24-hour
+      // toggle: the dial's dual black/red numbers carry the 24-hour reading, not the hands.
+      renderDualRingNumbers(svg, cx, cy);
+      const totalMin12 = (now.getHours() % 12) * 60 + now.getMinutes();
+      addHand(svg, cx, cy, (totalMin12 / 720) * 360, 24, 2.5, '#222');
       addHand(svg, cx, cy, (now.getMinutes() / 60) * 360, 36, 1.5, '#222');
     } else {
       const innerR = 34;
@@ -337,13 +438,21 @@
     document.getElementById('clock-daynum').textContent = String(now.getDate());
 
     if (clockSettings.mode === 'analog') {
-      renderAnalogFace(document.getElementById('clock-analog-svg'), clockSettings.hour12);
+      renderAnalogFace(document.getElementById('clock-analog-svg'), clockSettings.hour12, clockSettings.analogStyle);
     }
     updateMiniClocks();
     const analogPreviewGroup = document.getElementById('clock-analog-preview-group');
     if (analogPreviewGroup && !analogPreviewGroup.hidden) {
-      renderAnalogFace(document.getElementById('clock-analog-preview-svg'), clockSettings.hour12);
+      renderAnalogStylePreviews();
     }
+  }
+  // Each swatch in the "Analog Style" picker live-renders its own style, using the current
+  // hour12 setting (not the swatch's own — a swatch always previews how its style would look
+  // right now, since 'numbered'/'dual-ring' are each only ever shown for one hour12 value anyway).
+  function renderAnalogStylePreviews() {
+    document.querySelectorAll('.analog-style-preview-svg').forEach((svg) => {
+      renderAnalogFace(svg, clockSettings.hour12, svg.dataset.analogStyle);
+    });
   }
   function scheduleNextClockTick() {
     const now = new Date();
@@ -353,9 +462,6 @@
       scheduleNextClockTick();
     }, msToNextMinute);
   }
-  applyClockDisplayMode();
-  updateClock();
-  scheduleNextClockTick();
 
   const clockOptionsOverlay = document.getElementById('clock-options-overlay');
   const clockOptionsClose = document.getElementById('clock-options-close');
@@ -373,10 +479,20 @@
     clockOptionsOverlay.querySelectorAll('.scheme-swatch').forEach((sw) => {
       sw.classList.toggle('active', sw.dataset.scheme === clockSettings.scheme);
     });
+    clockOptionsOverlay.querySelectorAll('.analog-style-swatch').forEach((sw) => {
+      const style = sw.dataset.analogStyle;
+      // 'numbered' only makes sense for a 12-hour dial, 'dual-ring' only for 24-hour — 'classic'
+      // and 'moon-dial' are offered under both.
+      const applicable = style === 'numbered' ? clockSettings.hour12
+        : style === 'dual-ring' ? !clockSettings.hour12
+        : true;
+      sw.hidden = !applicable;
+      sw.classList.toggle('active', style === clockSettings.analogStyle);
+    });
     clockDigitalPreviewGroup.hidden = clockSettings.mode !== 'digital';
     clockAnalogPreviewGroup.hidden = clockSettings.mode !== 'analog';
     if (clockSettings.mode === 'analog') {
-      renderAnalogFace(document.getElementById('clock-analog-preview-svg'), clockSettings.hour12);
+      renderAnalogStylePreviews();
     }
     updateMiniClocks();
   }
@@ -400,6 +516,11 @@
         clockSettings.mode = btn.dataset.value;
       } else if (setting === 'clockHour12') {
         clockSettings.hour12 = btn.dataset.value === '12';
+        // 'numbered' only applies to 12-hour, 'dual-ring' only to 24-hour — if the newly
+        // inapplicable style was selected, fall back to 'classic' so the style grid always has
+        // a visible active swatch matching what's actually rendering.
+        if (clockSettings.analogStyle === 'numbered' && !clockSettings.hour12) clockSettings.analogStyle = 'classic';
+        if (clockSettings.analogStyle === 'dual-ring' && clockSettings.hour12) clockSettings.analogStyle = 'classic';
       }
       saveClockSettings();
       applyClockDisplayMode();
@@ -413,6 +534,15 @@
       clockSettings.scheme = btn.dataset.scheme;
       saveClockSettings();
       applyClockDisplayMode();
+      syncClockOptionsUI();
+    });
+  });
+
+  clockOptionsOverlay.querySelectorAll('.analog-style-swatch').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      clockSettings.analogStyle = btn.dataset.analogStyle;
+      saveClockSettings();
+      updateClock();
       syncClockOptionsUI();
     });
   });
@@ -862,7 +992,7 @@
   // bug. HAIL_FADE_FRAMES is the rapid fade-out duration once the stone hits the ground the
   // second time (not currently tunable).
   const WX_HAIL_TUNABLES = {
-    gravity: 1.5,
+    gravity: 0.5,
   };
   const HAIL_FADE_FRAMES = 6;
 
@@ -1457,6 +1587,7 @@
         }
         renderWeatherExtras();
         renderWeatherSkin();
+        updateClock(); // moon-dial clock's weather badge should reflect the override immediately
       });
     });
 
@@ -1513,6 +1644,11 @@
       setTimeout(() => { weatherDebugCopyBtn.textContent = 'Copy diagnostics'; }, 2000);
     });
 
+    const weatherDebugClearBtn = document.getElementById('test-weather-debug-clear-btn');
+    weatherDebugClearBtn.addEventListener('click', () => {
+      weatherDebugOutput.value = '';
+    });
+
     resetBtn.addEventListener('click', () => {
       weatherTestState.timeOverrideSec = null;
       weatherTestState.cloudOverridePct = null;
@@ -1545,11 +1681,12 @@
       fogCountSlider.value = 5; fogCountValue.textContent = '5';
       fogSizeSlider.value = 40; fogSizeValue.textContent = '40%';
       fogSpeedSlider.value = 3; fogSpeedValue.textContent = '3x';
-      WX_HAIL_TUNABLES.gravity = 1.5;
-      hailGravitySlider.value = 1.5; hailGravityValue.textContent = '1.5';
+      WX_HAIL_TUNABLES.gravity = 0.5;
+      hailGravitySlider.value = 0.5; hailGravityValue.textContent = '0.5';
       lastParticleKey = '';
       renderWeatherExtras();
       renderWeatherSkin();
+      updateClock();
     });
   })();
 
@@ -1816,4 +1953,14 @@
   refreshLiveWeather(false);
 
   attachLongPress(document.getElementById('weather-widget'), openWeatherOptions);
+
+  // Deferred to here (not immediately after the clock section is defined above) because the
+  // 'moon-dial' analog style's rendering reads weatherState/WX_MOON_PHASE_ICONS/WX_CONDITIONS,
+  // all declared later in the weather section — calling this any earlier would throw a
+  // temporal-dead-zone error the moment a returning user had that style saved from a previous
+  // session with mode:'analog', crashing the whole script silently (the same class of bug this
+  // codebase has hit before with weatherTestState/weatherLiveConditions).
+  applyClockDisplayMode();
+  updateClock();
+  scheduleNextClockTick();
 })();

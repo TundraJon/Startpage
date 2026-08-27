@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home</title>
-<link rel="stylesheet" href="styles.css?v=17">
+<link rel="stylesheet" href="styles.css?v=18">
 </head>
 <body>
 
@@ -387,8 +387,8 @@
     <section class="options-section">
       <h3>Hail Physics</h3>
       <div class="option-row">
-        <span>Gravity <span id="test-hail-gravity-value">1.5</span></span>
-        <input type="range" id="test-hail-gravity-slider" min="0.1" max="3" step="0.1" value="1.5">
+        <span>Gravity <span id="test-hail-gravity-value">0.5</span></span>
+        <input type="range" id="test-hail-gravity-slider" min="0.1" max="3" step="0.1" value="0.5">
       </div>
     </section>
 
@@ -397,6 +397,7 @@
       <p class="testing-note">For tracking down live-data bugs (e.g. moon phase). Not part of the real app — remove once resolved.</p>
       <textarea id="test-weather-debug-output" readonly rows="14" class="testing-debug-output"></textarea>
       <button type="button" class="testing-reset-btn" id="test-weather-debug-copy-btn">Copy diagnostics</button>
+      <button type="button" class="testing-reset-btn" id="test-weather-debug-clear-btn">Clear</button>
     </section>
 
     <button type="button" class="testing-reset-btn" id="test-reset-btn">Reset to defaults</button>
@@ -463,13 +464,30 @@
         <button type="button" class="scheme-swatch" data-scheme="white-black">
           <span class="mini-clock" data-scheme="white-black"><span class="mh">--</span><span class="mm">--</span></span>
         </button>
+        <button type="button" class="scheme-swatch" data-scheme="green-black">
+          <span class="mini-clock" data-scheme="green-black"><span class="mh">--</span><span class="mm">--</span></span>
+        </button>
+        <button type="button" class="scheme-swatch" data-scheme="orange-black">
+          <span class="mini-clock" data-scheme="orange-black"><span class="mh">--</span><span class="mm">--</span></span>
+        </button>
       </div>
     </section>
 
     <section class="options-section" id="clock-analog-preview-group" hidden>
-      <h3>Preview</h3>
-      <div class="analog-preview-wrap">
-        <svg class="analog-preview-svg" id="clock-analog-preview-svg" viewBox="0 0 100 100"></svg>
+      <h3>Analog Style</h3>
+      <div class="scheme-grid">
+        <button type="button" class="analog-style-swatch" data-analog-style="classic">
+          <svg class="analog-style-preview-svg" data-analog-style="classic" viewBox="0 0 100 100"></svg>
+        </button>
+        <button type="button" class="analog-style-swatch" data-analog-style="numbered">
+          <svg class="analog-style-preview-svg" data-analog-style="numbered" viewBox="0 0 100 100"></svg>
+        </button>
+        <button type="button" class="analog-style-swatch" data-analog-style="dual-ring">
+          <svg class="analog-style-preview-svg" data-analog-style="dual-ring" viewBox="0 0 100 100"></svg>
+        </button>
+        <button type="button" class="analog-style-swatch" data-analog-style="moon-dial">
+          <svg class="analog-style-preview-svg" data-analog-style="moon-dial" viewBox="0 0 100 100"></svg>
+        </button>
       </div>
     </section>
   </div>
@@ -515,6 +533,6 @@
   </div>
 </div>
 
-<script src="script.js?v=17"></script>
+<script src="script.js?v=18"></script>
 </body>
 </html>
