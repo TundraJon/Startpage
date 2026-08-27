@@ -488,7 +488,11 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 ## Build Queue
 
-_Empty — nothing currently queued._
+### Dual-ring analog styles: inner red numbers sit too far from the outer black numbers
+
+- [ ] **User feedback, with screenshot of the moon-dial style:** the red inner-ring numbers (13-23/00) need to be closer to the black outer-ring numbers (1-12) — not touching, just closer.
+- [ ] **Root cause (confirmed in script.js:254-271, `renderDualRingNumbers`):** the outer number text is placed at radius 38 and the inner number text at radius 23 — a 15-unit radial gap in the clock's 100×100 SVG viewBox, which reads as a large, disconnected-looking space between the two rings, as shown in the screenshot. This function is shared by both the `'dual-ring'` (24-hour) and `'moon-dial'` styles, so the fix applies to both automatically.
+- [ ] **Proposed fix:** move the inner number radius from 23 to roughly 30 (halving the gap to ~8 units) — close enough to visually pair each inner number with its outer counterpart without the two touching or overlapping. Adjust up/down from 30 if it still reads as too far or too close once built. No other values in `renderDualRingNumbers` (outer radius 38, tick line 41-46, font sizes) need to change for this.
 
 ## Build Planner
 
