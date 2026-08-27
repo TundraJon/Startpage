@@ -258,10 +258,31 @@ main {
   font-size: 0.6rem;
   text-align: center;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   max-width: 100%;
   color: var(--fg-muted);
+}
+
+.tile-add {
+  border-style: dashed;
+  background: transparent;
+  color: var(--fg-muted);
+  font-family: inherit;
+  font-size: 1.5rem;
+  opacity: 0.5;
+  cursor: pointer;
+}
+
+.tile-add:hover,
+.tile-add:focus-visible {
+  opacity: 0.85;
+}
+
+.tile-fallback span {
+  font-size: 0.75rem;
+  -webkit-line-clamp: 3;
 }
 
 .widget {

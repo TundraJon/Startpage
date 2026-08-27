@@ -660,28 +660,29 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 
 - [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
 
-## Build Queue
+## Build Log 34 (completed)
 
-### Long-pressing the weather widget for Settings doesn't dismiss the open Hourly Forecast panel
+### Long-pressing the weather widget for Settings now dismisses the open Hourly Forecast panel
 
-- [ ] **User feedback:** long pressing for the weather settings does not dismiss the hourly forecast.
-- [ ] **Root cause confirmed (script.js:1023-1026):** `openWeatherOptions()` never closes the Hourly panel — it just sets `weatherOptionsOverlay.hidden = false`. The panel only ever closes as an indirect side effect of `handleHourlyOutsideClick` (script.js:969-971), which is bound to the `click` event — and a long press's `callback()` (which calls `openWeatherOptions()`) fires from a `setTimeout` at 550ms while the pointer is still held down, well before any `click` event exists. So for the entire duration the settings menu is showing (while still pressing, and until release), the Hourly panel has not been closed at all.
-- [ ] **Root cause confirmed (styles.css:299 vs styles.css:758):** even setting timing aside, `.hourly-panel` has `z-index: 20` while `.help-overlay` (the Settings modal, including its backdrop) has `z-index: 10` — so on the occasions both are simultaneously open, the Hourly panel renders visually on top of the Settings dialog instead of being hidden behind it. Verified directly: with both open, `document.elementFromPoint()` over the panel's area resolves to the panel's own content (a `.hourly-cell`), not the Settings overlay.
-- [ ] **Requested fix:** call the existing `closeHourlyPanel()` (script.js:965) at the top of `openWeatherOptions()` (script.js:1023) so opening Settings always explicitly dismisses the Hourly panel immediately, regardless of click timing. (The z-index ordering becomes moot once this is in place, since the two will no longer coexist — no change needed there unless a similar overlap resurfaces elsewhere.)
+- [x] `openWeatherOptions()` (script.js:1129) now calls the existing `closeHourlyPanel()` first if the panel is open, so Settings always explicitly dismisses it immediately regardless of click timing (the z-index overlap with `.help-overlay` no longer matters since the two can't coexist anymore).
+- [x] Verified: with the Hourly panel open, holding the weather widget for a simulated 700ms long-press (finger still down) shows the panel already closed the moment the Settings dialog appears.
 
 ### Tile Grid System (new feature, per supplied spec doc)
 
-- [ ] **Spec supplied:** full tile-grid system spec covering grid sizing/spacing, favicon fetch/fallback, the "+" add-tile mechanic, grouping-header dividers, and the Home-category row-3 handover. Per the doc's own precedence rule, existing implementation vs. spec conflicts were surfaced to the user before logging — resolutions below.
-- [ ] **Already matches the spec, no changes needed:** the existing `.tile-grid` (`display:grid; grid-template-columns:repeat(5,1fr); gap:3px; padding:3px`, styles.css:223-229) plus `.tile { aspect-ratio:1/1 }` (styles.css:235-236) is mathematically equivalent to the spec's manual `(container_width - 18px) / 5` formula — 5 fixed columns, always-square tiles, 3px on all sides and between cells, fully responsive with no horizontal scroll. `container_width` already derives from the category panel width, itself capped by `main { max-width:900px }` (styles.css:161), matching spec Section 3. Tap-to-open behavior (plain `<a href target="_blank">`) already matches Section 2. The Home category's row-3 handover to the standard grid (clock/weather in rows 1-2, Gmail/Translate/Maps/USPS/Calendar starting row 3) already matches Section 3's Home exception.
-- [ ] **Conflict resolved — favicon source (user decision: keep current approach):** the spec calls for client-side `/favicon.ico` + `<link rel="icon">`/`apple-touch-icon` parsing at tile-creation time; every existing tile instead uses Google's public favicon proxy (`https://www.google.com/s2/favicons?sz=64&domain=...`, e.g. index.html:129), which sidesteps the CORS failures a real client-side fetch of arbitrary third-party HTML would hit. **Decision: new tiles created via the "+" mechanic will also use the Google favicon proxy** — the spec's direct-fetch chain will not be built.
-- [ ] **Conflict resolved — icon fill ratio (user decision: keep current value):** spec wants ~80% fill; current `.tile img { width:75%; height:75% }` (styles.css:251-255) stays at 75%, unchanged.
-- [ ] **Conflict resolved — fallback text wrapping (user decision: adopt the spec's behavior):** no fallback-to-typed-name tiles exist yet (no dynamic tile creation exists at all currently), but the CSS that will govern it, `.tile span` (styles.css:257-265), currently truncates to one line via `white-space:nowrap; text-overflow:ellipsis`. **Requested fix: change to wrap up to 2 lines instead of single-line ellipsis truncation**, per spec Section 2 — user expects this to be rarely needed but wants it available.
-- [ ] **Net-new work (nothing existing to conflict with):**
-  - The "+" add-tile placeholder tile: always last in each grid, shadowed/muted styling, tap opens a name/URL input flow.
-  - Tile creation flow: fetch favicon via the Google proxy (per decision above); if the proxy returns no usable image, prompt for a display name and render a fallback text tile (2-line wrap per decision above).
-  - Data persistence for user-added tiles (not yet designed — needs a storage approach, e.g. localStorage, since all tiles today are static HTML).
-  - Visual grouping-header dividers (Free/Paid-style) — no current category uses these; spec's Section 3 grouping behavior (divider is not a grid cell, grid restarts fresh above/below it) to be implemented if/when a category needs it.
-  - The 4 verification scenarios and full checklist in spec Sections 5-6 (small-tile-count category, multi-row category, no-favicon-found fallback, viewport resize/rotation).
+- [x] Added a `.tile.tile-add` "+" placeholder as the last item in every category's tile grid (Home, News, Shopping, Entertainment) — dashed border, 50% opacity, styled distinctly from real tiles. Verified always-last placement and square sizing in all 4 categories.
+- [x] Built the add-tile flow: tapping "+" opens a new `#add-tile-overlay` modal (Name + URL fields, reusing the existing `.help-overlay`/`.options-panel` pattern); submitting normalizes the URL (adds `https://` if missing), builds the favicon URL via Google's proxy (per the resolved conflict — not the spec's direct-fetch chain), inserts the new tile before the "+" button, and persists it to `localStorage` under `category-tiles-<id>`. Verified: added tile appears immediately, ordered before "+", and survives a page reload.
+- [x] Built the favicon-fallback path: if the proxy image fails to load (`img.onerror`), the tile drops the `<img>` and gets `.tile-fallback` (larger text, up to 3-line wrap) so the typed name alone renders legibly. Verified with a non-resolving domain.
+- [x] `.tile span` (all tile captions, including fallback-only tiles) changed from single-line ellipsis truncation to wrapping up to 2 lines (`-webkit-line-clamp: 2`), per the resolved conflict. Icon fill ratio (75%) and favicon source (Google proxy) intentionally left unchanged, per the other two resolved conflicts.
+- [x] Verified geometry: no horizontal scroll at 412px or 900px viewports, all tiles stay perfectly square, and the partial second row created by the 6th (add) tile in each category does not stretch to fill — it sits alone in column 1, confirming the existing CSS Grid formula already handles partial rows and multi-row wrapping correctly per spec Sections 5-6.
+- [x] Deferred, not built: grouping-header dividers (no category currently needs them) and the spec's direct favicon-fetch chain (superseded by the Google-proxy decision).
+
+### Regression check
+
+- [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
+
+## Build Queue
+
+_Empty — nothing queued._
 
 ## Build Planner
 

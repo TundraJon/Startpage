@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home</title>
-<link rel="stylesheet" href="styles.css?v=24">
+<link rel="stylesheet" href="styles.css?v=25">
 </head>
 <body>
 
@@ -145,6 +145,7 @@
         <img src="https://www.google.com/s2/favicons?sz=64&domain=calendar.google.com" alt="" loading="lazy">
         <span>Calendar</span>
       </a>
+      <button type="button" class="tile tile-add" aria-label="Add tile">+</button>
 
     </div>
   </section>
@@ -175,6 +176,7 @@
         <img src="https://www.google.com/s2/favicons?sz=64&domain=apnews.com" alt="" loading="lazy">
         <span>AP News</span>
       </a>
+      <button type="button" class="tile tile-add" aria-label="Add tile">+</button>
     </div>
   </section>
 
@@ -204,6 +206,7 @@
         <img src="https://www.google.com/s2/favicons?sz=64&domain=costco.com" alt="" loading="lazy">
         <span>Costco</span>
       </a>
+      <button type="button" class="tile tile-add" aria-label="Add tile">+</button>
     </div>
   </section>
 
@@ -233,6 +236,7 @@
         <img src="https://www.google.com/s2/favicons?sz=64&domain=hulu.com" alt="" loading="lazy">
         <span>Hulu</span>
       </a>
+      <button type="button" class="tile tile-add" aria-label="Add tile">+</button>
     </div>
   </section>
 
@@ -550,6 +554,18 @@
   </div>
 </div>
 
-<script src="script.js?v=29"></script>
+<div class="help-overlay" id="add-tile-overlay" hidden>
+  <div class="help-panel options-panel">
+    <button class="help-close" id="add-tile-close" aria-label="Close add tile">&times;</button>
+    <h2>Add Tile</h2>
+    <section class="options-section">
+      <div class="option-row"><span>Name</span><input type="text" id="add-tile-name" autocomplete="off" placeholder="Site name" style="width: 55%; min-width: 0;"></div>
+      <div class="option-row"><span>URL</span><input type="text" id="add-tile-url" autocomplete="off" placeholder="example.com" style="width: 55%; min-width: 0;"></div>
+    </section>
+    <button type="button" class="testing-reset-btn" id="add-tile-submit">Add Tile</button>
+  </div>
+</div>
+
+<script src="script.js?v=30"></script>
 </body>
 </html>

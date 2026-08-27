@@ -151,6 +151,112 @@
     });
   });
 
+  // --- Tile Grid: "+" add-tile mechanic and persisted user tiles ---
+  const TILE_STORAGE_PREFIX = 'category-tiles-';
+
+  function loadUserTiles(categoryId) {
+    try {
+      return JSON.parse(localStorage.getItem(TILE_STORAGE_PREFIX + categoryId) || '[]');
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveUserTiles(categoryId, tiles) {
+    localStorage.setItem(TILE_STORAGE_PREFIX + categoryId, JSON.stringify(tiles));
+  }
+
+  function faviconUrlForDomain(domain) {
+    return 'https://www.google.com/s2/favicons?sz=64&domain=' + encodeURIComponent(domain);
+  }
+
+  function normalizeTileUrl(raw) {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : 'https://' + trimmed;
+    try {
+      return new URL(withProtocol);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function buildTileElement(name, url) {
+    const a = document.createElement('a');
+    a.className = 'tile';
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+
+    const img = document.createElement('img');
+    img.alt = '';
+    img.loading = 'lazy';
+    img.src = faviconUrlForDomain(new URL(url).hostname);
+    img.addEventListener('error', () => {
+      img.remove();
+      a.classList.add('tile-fallback');
+    });
+    a.appendChild(img);
+
+    const span = document.createElement('span');
+    span.textContent = name;
+    a.appendChild(span);
+
+    return a;
+  }
+
+  const addTileOverlay = document.getElementById('add-tile-overlay');
+  const addTileClose = document.getElementById('add-tile-close');
+  const addTileNameInput = document.getElementById('add-tile-name');
+  const addTileUrlInput = document.getElementById('add-tile-url');
+  const addTileSubmit = document.getElementById('add-tile-submit');
+  let addTileTargetGrid = null;
+  let addTileTargetCategoryId = null;
+
+  function openAddTile(grid, categoryId) {
+    addTileTargetGrid = grid;
+    addTileTargetCategoryId = categoryId;
+    addTileNameInput.value = '';
+    addTileUrlInput.value = '';
+    addTileOverlay.hidden = false;
+    addTileNameInput.focus();
+  }
+
+  function closeAddTile() {
+    addTileOverlay.hidden = true;
+    addTileTargetGrid = null;
+    addTileTargetCategoryId = null;
+  }
+
+  addTileClose.addEventListener('click', closeAddTile);
+  addTileOverlay.addEventListener('click', (e) => {
+    if (e.target === addTileOverlay) closeAddTile();
+  });
+
+  addTileSubmit.addEventListener('click', () => {
+    const name = addTileNameInput.value.trim();
+    const parsedUrl = normalizeTileUrl(addTileUrlInput.value);
+    if (!name || !parsedUrl || !addTileTargetGrid) return;
+    const url = parsedUrl.href;
+    const tile = buildTileElement(name, url);
+    addTileTargetGrid.insertBefore(tile, addTileTargetGrid.querySelector('.tile-add'));
+    const tiles = loadUserTiles(addTileTargetCategoryId);
+    tiles.push({ name, url });
+    saveUserTiles(addTileTargetCategoryId, tiles);
+    closeAddTile();
+  });
+
+  document.querySelectorAll('.tile-grid').forEach((grid) => {
+    const categoryId = grid.closest('.category').dataset.categoryId;
+    const addBtn = grid.querySelector('.tile-add');
+    loadUserTiles(categoryId).forEach((t) => {
+      grid.insertBefore(buildTileElement(t.name, t.url), addBtn);
+    });
+    if (addBtn) {
+      addBtn.addEventListener('click', () => openAddTile(grid, categoryId));
+    }
+  });
+
   function attachLongPress(el, callback) {
     const LONG_PRESS_MS = 550;
     const MOVE_CANCEL_PX = 20;
@@ -1021,6 +1127,7 @@
   }
 
   function openWeatherOptions() {
+    if (hourlyPanel.classList.contains('open')) closeHourlyPanel();
     syncWeatherOptionsUI();
     weatherOptionsOverlay.hidden = false;
   }
