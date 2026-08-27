@@ -309,7 +309,7 @@ main {
 }
 
 .hourly-panel.open {
-  max-height: 220px;
+  max-height: 190px;
   opacity: 1;
   pointer-events: auto;
 }
@@ -354,7 +354,7 @@ main {
 }
 
 .hourly-alert-icon {
-  font-size: 0.45rem;
+  font-size: 0.54rem;
   line-height: 1;
 }
 
@@ -381,7 +381,7 @@ main {
 
 .hourly-temp-graph {
   display: block;
-  height: 100px;
+  height: 70px;
 }
 
 .hourly-graph-now-bg {
@@ -395,13 +395,13 @@ main {
 }
 
 .hourly-graph-icon {
-  font-size: 14px;
+  font-size: 17.5px;
   text-anchor: middle;
   dominant-baseline: central;
 }
 
 .hourly-graph-label {
-  font-size: 9px;
+  font-size: 11.25px;
   font-weight: 600;
   text-anchor: middle;
   fill: var(--fg);

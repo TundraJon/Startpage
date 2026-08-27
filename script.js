@@ -885,7 +885,7 @@
     hours.forEach((hour) => {
       const cell = makeHourlyCell(hour.time_epoch === nowEpoch);
       const pct = hourlyPrecipPct(hour);
-      if (pct > 0) cell.textContent = pct + '%';
+      if (pct >= 20) cell.textContent = pct + '%';
       hourlyRowPrecip.appendChild(cell);
     });
   }
@@ -898,7 +898,7 @@
     hourlyTempGraph.innerHTML = '';
     if (!hours.length) return;
     const width = hours.length * HOURLY_COL_WIDTH;
-    const height = 100;
+    const height = 70;
     hourlyTempGraph.setAttribute('width', width);
     hourlyTempGraph.setAttribute('height', height);
     hourlyTempGraph.setAttribute('viewBox', `0 0 ${width} ${height}`);
@@ -907,8 +907,8 @@
     const maxTemp = Math.max(...temps);
     const minTemp = Math.min(...temps);
     const range = Math.max(maxTemp - minTemp, 1); // avoid divide-by-zero when all 12 hours match
-    const ICON_TOP = 13;
-    const ICON_BOTTOM = 75;
+    const ICON_TOP = 9;
+    const ICON_BOTTOM = 53;
     const conv = displayTempUnit === 'F' ? toF : toC;
 
     const points = hours.map((hour, i) => {
@@ -945,7 +945,7 @@
 
       const label = document.createElementNS(svgNS, 'text');
       label.setAttribute('x', p.x);
-      label.setAttribute('y', p.y + 12);
+      label.setAttribute('y', p.y + 8);
       label.setAttribute('class', 'hourly-graph-label');
       label.textContent = conv(p.hour.temp_f) + '°';
       hourlyTempGraph.appendChild(label);

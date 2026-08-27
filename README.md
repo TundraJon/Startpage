@@ -619,24 +619,29 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [x] Verified directly: `hourly-strip`'s `scrollWidth` now exactly matches `clientWidth` (no overflow) with 12 real hours rendered, graph height attribute reads 100, and the alert icon+dot are horizontally adjacent (dot starts right where the icon ends) rather than vertically stacked.
 - [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
 
+## Build Log 32 (completed)
+
+### Hourly panel: graph shrunk to 70px, temp/condition icons scaled 1.25×
+
+- [x] Graph height changed 100→70 (`renderHourlyTempGraph`), with `ICON_TOP`/`ICON_BOTTOM` scaled to 9/53 and the temp-label vertical offset to `p.y + 8`, matching the ×0.7 proportional adjustment. `.hourly-temp-graph`'s CSS height and `.hourly-panel.open`'s `max-height` (220px → 190px) updated to match.
+- [x] `.hourly-graph-icon` (condition icon on the graph) 14px → 17.5px; `.hourly-graph-label` (temperature label) 9px → 11.25px.
+- [x] Verified directly: `getAttribute('height')` on the graph SVG reads exactly `70`.
+
+### Hazard-alert row: icon size increased 20%
+
+- [x] `.hourly-alert-icon` font-size 0.45rem → 0.54rem. Verified computed font-size renders at exactly 8.64px (0.54rem × 16px root).
+
+### Hourly panel: precip % display threshold raised from >0% to ≥20%
+
+- [x] `renderHourlyPrecipRow`'s `if (pct > 0)` → `if (pct >= 20)`. Verified with mocked data: a 15% hour renders no text (empty cell, reserved space intact), a 25% hour renders "25%".
+
+### Regression check
+
+- [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
+
 ## Build Queue
 
-### Hourly panel: shrink graph to 70px, scale temp/condition icons 1.25×
-
-- [ ] **Graph height (updated — user corrected 60 to 70 before this was built):** `renderHourlyTempGraph`'s SVG height (script.js, currently `const height = 100;`, set in Build 31) changes from 100 to **70**. `ICON_TOP`/`ICON_BOTTOM` (currently 13/75) and the temp-label vertical offset (currently `p.y + 12`) scale down proportionally (×0.7, not ×0.6) to keep the icons/labels positioned correctly within the shorter box, the same way they were rescaled when the graph went from 200→100 in Build 31: proposed values `ICON_TOP = 9`, `ICON_BOTTOM = 53`, label offset `+8`. `.hourly-temp-graph`'s CSS height and `.hourly-panel.open`'s `max-height` (currently 220px) should shrink proportionally to match (≈190px for the panel), matching the same proportional-adjustment approach as Build 31.
-- [ ] **Temperature and condition icons 1.25× larger:** `.hourly-graph-icon` (condition icon on the graph, currently `font-size: 14px`) → `17.5px`; `.hourly-graph-label` (temperature label, currently `font-size: 9px`) → `11.25px`.
-- [ ] **Worth flagging before building, not just noting after:** this shrinks the graph's vertical room (×0.7) at the same time the icons get 1.25× bigger — the combination could cause icons to visually crowd or overlap each other more than before, especially for hours with close temperatures. Build it as specified and check live rather than guessing a different compromise unasked.
-
-### Hazard-alert row: increase icon size 20%
-
-- [ ] **Current behavior (confirmed in styles.css):** `.hourly-alert-icon` (the hazard icon in the top "warnings" row, paired with the colored dot, from Build 31) is `font-size: 0.45rem`. The row itself (`.hourly-row-alert .hourly-cell`) is 16px tall, per the user's own observation there's extra unused vertical space at that size.
-- [ ] **Requested change:** increase to `0.54rem` (0.45 × 1.2).
-
-### Hourly panel: raise the precip % display threshold from >0% to ≥20%
-
-- [ ] **Current behavior (confirmed in script.js, `renderHourlyPrecipRow`):** the bottom precip-% row shows the value whenever `pct > 0` — so a WeatherAPI-reported 1% chance still displays.
-- [ ] **User's reasoning:** WeatherAPI sometimes reports a token 1% (or similarly negligible) chance that isn't meaningfully useful to show.
-- [ ] **Requested change:** `if (pct > 0)` → `if (pct >= 20)`. No other behavior changes — the cell still renders empty (reserved space, unchanged) below that threshold.
+_Empty — nothing currently queued._
 
 ## Build Planner
 
