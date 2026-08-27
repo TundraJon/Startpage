@@ -498,6 +498,20 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
   - Center pivot dot: same as the existing classic styles (`#222`) unless a different color is specifically wanted — no red hand exists anymore to justify deviating from that default, so leaving it as-is unless corrected.
 - [ ] **Style picker UI:** same swatch-grid pattern as the 12-hour "numbered" picker above, but shown when `clockSettings.mode === 'analog' && clockSettings.hour12 === false`, offering `'classic'` (existing 24-hour face) vs `'dual-ring'` (this new one) as the two swatch options.
 
+### New analog clock style: moon-phase dial (available in both 12-hour and 24-hour toggles)
+
+- [ ] **Adds a fourth `clockSettings.analogStyle` value**, e.g. `'moon-dial'`. Structurally different from the other two new styles: `'numbered'` is 12-hour-only and `'dual-ring'` is 24-hour-only, but `'moon-dial'` must appear as a selectable option in **both** the 12-hour and 24-hour style-picker swatch grids — whichever toggle is active, selecting it renders the same thing (see mechanism below, which always uses 12-hour hand math regardless of the `hour12` setting).
+- [ ] **Background:** the clock face's background is a large moon-phase emoji (🌑🌒🌓🌔🌕🌖🌗🌘 — same `WX_MOON_PHASE_ICONS` source the weather widget already uses, driven by `weatherState.moonPhase`), scaled up to dominate the face, always accurate to the real current moon phase. **Confirmed: there is no white/gray face-fill fallback behind it** — the emoji completely replaces the normal `--clock-analog-day`/night circle fill for this style; nothing else is drawn as a base layer.
+- [ ] **Numbers:** identical dual-ring layout to the `'dual-ring'` style above — black outer 1-12 at the normal 12-hour radius/positions, red inner 13→23→00 at an inner radius, each at the *same angle* as its outer counterpart. **Clarified by the user:** every inner number sits radially between its outer counterpart and the center, at the same angle — it is not "below" or "stacked under" in a screen sense except for the two positions where that's already the literal vertical direction: 00 is directly below 12 (top of the dial) and 18 is directly above 6 (bottom of the dial). Every other inner/outer pair (3/15, 9/21, and so on) is a purely radial (center-ward) relationship, not vertical.
+- [ ] **Hands/mechanism:** identical to `'dual-ring'` — ordinary 12-hour clock hand math (hour hand 30°/hour, two revolutions per day), used regardless of whether the 12-hour or 24-hour toggle is currently selected. No extra hand.
+- [ ] **Four black rounded-square badges**, each sitting radially between the inner red-number ring and the center (not overlapping any numbers), one per cardinal direction — confirmed positions:
+  - **Bottom** (between center and the 6/18 position): current weather emoji.
+  - **Right** (between center and the 3/15 position): day of the month (e.g. "26").
+  - **Top** (between center and the 12/00 position): month abbreviation (e.g. "Aug").
+  - **Left** (between center and the 9/21 position): day-of-week abbreviation (e.g. "Wed").
+- [ ] **Open detail, not yet resolved:** whether the weather-emoji badge should reflect `weatherIconForCode(getEffectiveConditionCode())` (matching the weather widget's icon exactly, including any active Testing Panel override) or strictly the real live condition regardless of testing state. Needs a decision before/at build time.
+- [ ] **Style picker UI:** appears in *both* the 12-hour and 24-hour swatch-grid sections (alongside `'classic'`+`'numbered'` for 12-hour, and `'classic'`+`'dual-ring'` for 24-hour) — so each grid ends up with three options once this is built, not two.
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
