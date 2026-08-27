@@ -549,23 +549,24 @@ Geolocation, true local timezone, and the full live data pull stay queued below 
 - [x] Verified quantitatively, not just by inspection: with `Math.random` fixed so all hail particles spawn and move identically, measured the real-world fall speed via canvas pixel sampling across 3 runs — observed 362-382 px/sec, matching the expected ~300 px/sec (baseSpeed 5.0 × 60fps-equivalent baseline) within reasonable measurement tolerance. Without this fix the same particle would only cover about half that distance per real second under the 30fps cap.
 - [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
 
+## Build Log 26 (completed)
+
+### Drifting clouds: fixed mid-canvas pop-ins caused by settings-triggered cloud rebuilds
+
+- [x] `renderWeatherSkin()` no longer removes and recreates every cloud on every settings change. The instant-scatter (negative-delay) placement now only applies the very first time the cloud layer is created (`existingClouds.length === 0`). On every later call: an unchanged cloud count leaves the existing elements completely untouched; a decreased count removes only the excess; an increased count adds only the new ones via a plain `spawnCloud()`, entering cleanly off-canvas with no scatter needed. Preserved clouds are re-appended (moved, not recreated) after `precipCanvas` and before `flashDiv` on every call to keep correct paint layering, since none of these elements use `z-index`. Line 1483's removal query was split so only `.weather-skin-overlay` is unconditionally wiped there — clouds are now explicitly removed only in the `liveSkin`-off branch, restoring that cleanup path.
+- [x] Verified: an unrelated setting change (time-override slider) leaves the exact same cloud DOM elements in place (confirmed by a marker on each), not replaced. Raising the cloud-cover slider from 2 to 10 clouds preserved the original 2 elements and added exactly 8 new ones, every one of which started with a negative (off-canvas) computed `left` — never mid-canvas. Lowering it back to 2 removed only the excess, keeping pre-existing clouds. Toggling Live Condition Skin off then back on correctly triggers a fresh scatter, as intended for a genuine re-creation of the layer.
+
+### Drifting clouds: raised the smallest size from 0.5rem to 0.75rem
+
+- [x] `randomizeCloud`'s size formula changed from `3 - 2.5 * f` to `3 - 2.25 * f`, keeping the largest size (3rem at the top edge) and the duration/speed formula unchanged. Verified the updated formula is present in the shipped script.
+
+### Regression check
+
+- [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
+
 ## Build Queue
 
-### Drifting clouds: stop mid-canvas pop-ins caused by settings-triggered cloud rebuilds
-
-- [ ] **User feedback:** thought they saw a cloud "pop in" mid-canvas when wrapping from the right edge back to the left.
-- [ ] **Real root cause, different from the reported mechanism (confirmed in script.js):** the wrap-around/respawn path (`spawnCloud(oldCloud)`, script.js:1064-1086) is already correct — it gets a *positive* 0.1-5s delay and sits at the off-canvas base `left` position (styles.css:450) the whole time, so it can't be the source. The actual cause: `renderWeatherSkin()` (script.js:1460) **removes and recreates every cloud from scratch** (script.js:1483) on *any* settings change — theme toggle, the cloud slider, a Testing Panel condition pick, the time-override slider, and ~10 total call sites — and each fresh batch is given a *negative* `animation-delay` up to its full duration (script.js:1504, `-Math.random() * duration`), which places it instantly at a random point along its entire drift path, including squarely mid-canvas. That's intentional for avoiding a left-edge clump on a genuinely fresh batch, but it was re-triggering on every settings tweak, not just true page load — confirmed with the user as the real explanation.
-- [ ] **Resolved fix:** only apply the instant-scatter (negative-delay) placement the very first time the cloud layer is created (i.e., when `weatherSkin.querySelectorAll('.wx-skin-cloud')` is empty at the top of the `liveSkin` branch). On every later `renderWeatherSkin()` call:
-  - If the target `cloudCount` (`Math.floor(cloudPct / 10)`) matches the existing cloud count, leave the existing cloud elements completely untouched (don't remove/recreate them at all).
-  - If cloud cover decreased, remove only the excess existing clouds.
-  - If cloud cover increased, add only the new ones via a plain `spawnCloud()` with no delay override — entering cleanly off-canvas from the "from" keyframe, same as a first-load cloud, just without the instant-scatter treatment (not given the wrap-around's positive hold-delay either, since starting immediately from off-canvas is already visually correct — simplification flagged here rather than silently decided).
-  - Since `.weather-skin-overlay`/`precipCanvas`/`flashDiv` are still removed+recreated or re-appended every call (unchanged), and DOM order determines paint order here (none of these elements have an explicit `z-index`), any preserved (untouched) cloud elements must be explicitly re-appended (moved, not recreated) after `precipCanvas` and before `flashDiv` on every call, so they stay correctly layered on top of the overlay/precip canvas — re-appending an existing node via `appendChild` doesn't restart or otherwise disturb its running CSS animation.
-- [ ] Line 1483's combined removal query (`'.weather-skin-overlay, .wx-skin-cloud'`) needs to be split so clouds are no longer unconditionally wiped there — only `.weather-skin-overlay` stays removed unconditionally each call.
-
-### Drifting clouds: raise the smallest size from 0.5rem to 0.75rem
-
-- [ ] **Current behavior (confirmed in script.js:1049-1053, `randomizeCloud`):** `size = 3 - 2.5 * f`, where `f = topPct / 66` — 3rem at the top edge down to 0.5rem at the 66% line (the bottom of the spawn band).
-- [ ] **Requested change:** raise the smallest size from 0.5rem to 0.75rem, keeping the largest (3rem at the top edge) and the duration/speed formula (`17 + 43*f` seconds) unchanged: `size = 3 - 2.25 * f` (3rem at `f=0` down to 0.75rem at `f=1`).
+_Empty — nothing currently queued._
 
 ## Build Planner
 

@@ -1049,7 +1049,7 @@
   function randomizeCloud(cloud) {
     const topPct = Math.random() * 66;
     const f = topPct / 66;
-    const size = 3 - 2.5 * f;
+    const size = 3 - 2.25 * f;
     const duration = 17 + 43 * f;
     cloud.style.fontSize = size + 'rem';
     cloud.style.top = topPct + '%';
@@ -1480,7 +1480,7 @@
       weatherSkin.style.opacity = '';
     }
 
-    weatherSkin.querySelectorAll('.weather-skin-overlay, .wx-skin-cloud').forEach((el) => el.remove());
+    weatherSkin.querySelectorAll('.weather-skin-overlay').forEach((el) => el.remove());
     const cloudPct = getEffectiveCloudPct();
     let cloudTint = null;
     if (weatherSettings.liveSkin) {
@@ -1496,12 +1496,32 @@
       weatherSkin.appendChild(overlay);
       weatherSkin.appendChild(precipCanvas);
 
+      // Every call here used to wipe and recreate every cloud from scratch, each one instantly
+      // scattered mid-drift via a negative animation-delay. That's the right move only for the
+      // cloud layer's true first appearance (so a fresh batch doesn't visually clump at the left
+      // edge all starting together) — but this function runs on every settings change (theme,
+      // cloud slider, condition pick, time override, etc.), so it was re-scattering existing
+      // clouds mid-canvas on every one of those, not just page load. Now: leave an unchanged
+      // cloud count alone entirely, only add/remove the difference when cloudPct actually changes.
+      const existingClouds = Array.from(weatherSkin.querySelectorAll('.wx-skin-cloud'));
       const cloudCount = Math.floor(cloudPct / 10);
-      for (let i = 0; i < cloudCount; i++) {
-        const cloud = spawnCloud();
-        // Stagger only the initial batch so they don't all start in lockstep; respawns via
-        // spawnCloud(oldCloud) deliberately get no delay — a fresh element just starts cleanly.
-        cloud.style.animationDelay = (-Math.random() * parseFloat(cloud.style.animationDuration)) + 's';
+      if (existingClouds.length === 0) {
+        for (let i = 0; i < cloudCount; i++) {
+          const cloud = spawnCloud();
+          cloud.style.animationDelay = (-Math.random() * parseFloat(cloud.style.animationDuration)) + 's';
+        }
+      } else {
+        // Re-append (move, not recreate) the preserved clouds so they stay correctly layered
+        // above the overlay/precip canvas just re-appended above — moving an existing node via
+        // appendChild doesn't restart or otherwise disturb its running CSS animation.
+        existingClouds.forEach((cloud) => weatherSkin.appendChild(cloud));
+        if (existingClouds.length > cloudCount) {
+          for (let i = existingClouds.length - 1; i >= cloudCount; i--) existingClouds[i].remove();
+        } else if (existingClouds.length < cloudCount) {
+          // New clouds only, entering cleanly off-canvas from their own "from" keyframe — no
+          // scatter needed since a single fresh cloud starting off-canvas is already correct.
+          for (let i = existingClouds.length; i < cloudCount; i++) spawnCloud();
+        }
       }
 
       weatherSkin.appendChild(flashDiv);
@@ -1510,6 +1530,7 @@
       starsCanvas.remove();
       precipCanvas.remove();
       flashDiv.remove();
+      weatherSkin.querySelectorAll('.wx-skin-cloud').forEach((el) => el.remove());
       updateCloudTestingReadout(null, 0);
     }
 
