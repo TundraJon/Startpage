@@ -791,9 +791,55 @@ _Note: these two were live regressions from Build 36 actively breaking real usag
 - [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
 - [x] Re-verified all Build 39 nested-category structure and nested tile-action behavior (accordion expand/collapse at every depth, rename/add on nested-subcategory tiles, per-subcategory persistence with no cross-leakage) still works correctly on top of the Move Entry changes.
 
+## Build Log 41 (completed)
+
+_Six queued items, all built and verified together in one pass, per "That's all I can think of now go ahead and build."_
+
+### Move Entry: cross-category drop now live-reflows to an exact position
+
+- [x] Once the drag crosses from a category's header into that category's actual `.tile-grid` area, the tile live-reparents into it (`dragInfo.currentGrid`, tracked separately from `dragInfo.grid`, the true original source) and reflows using the same nearest-tile-center algorithm same-category reorder already used — generalized (`reflowWithinCurrentGrid`) to operate on whichever grid the tile currently lives in, not a hardcoded source. Dropping there persists at that exact live DOM index. Dropping directly on a header without ever reaching a grid area still falls back to append-to-end, per the original design, for a category with nothing reachable to reflow against (e.g. no visible tile area at all).
+- [x] Off-viewport cancel still always restores to the true original source grid + position, regardless of how many grids the tile passed through mid-drag.
+- [x] **Real bug found and fixed during the build, not in the original plan:** the drag path can incidentally sweep over an unrelated grid that cascading hover-expand just revealed on the way to the true target (e.g. a sibling subcategory's tiles, exposed because an ancestor got auto-expanded in passing) — the tile would get live-reparented there and, if the drop-decision logic didn't re-check, could persist into the wrong category entirely, silently. Fixed by making header-hover the authoritative signal at drop time whenever a *different* category's header is still highlighted right up to release: hovering a header and hovering a grid are mutually exclusive at any instant, so whichever was true last is trusted, regardless of what grid the tile was transiently sitting in earlier in the drag. Verified directly with a reproduction matching the exact failure mode before landing on this fix.
+
+### Move Entry: cascading hover-expand now collapses again live, and auto-scroll works near the viewport edges
+
+- [x] **Auto-collapse:** categories auto-expanded by *this drag's* hovering (tracked per-drag, `dragInfo.autoExpandedIds`) collapse again live as soon as the hover target is no longer a descendant of (or the same as) them — never touching anything the user already had open before the drag started. At drop/cancel, everything auto-expanded collapses except the path to wherever the tile actually ends up (so the result stays visible) — cancelled drags collapse everything, since nothing was kept.
+- [x] **Real bug found and fixed during the build:** the collapse-at-drop logic initially anchored on `dragInfo.currentGrid`'s category, which is stale in the header-only-drop fallback case (the tile's DOM position never changed, so it still pointed at the source) — the just-expanded destination would incorrectly collapse right back down instead of staying open. Fixed by anchoring on wherever the tile actually ends up (`crossTargetId` in the fallback case, `currentGrid`'s category otherwise), matching the same header-vs-grid priority fix above.
+- [x] **Auto-scroll:** holding near the top/bottom edge of the viewport during a drag scrolls the page continuously via a `requestAnimationFrame` loop (not a one-shot `scrollBy`), at a speed scaled by proximity to the edge, re-running the drag's position-follow/reflow logic on every scroll tick (since the page moves under a stationary pointer with no new pointer event), and resetting the 5s idle timeout so genuinely-active edge-scrolling doesn't auto-exit move mode.
+- [x] Verified directly: a category auto-expands on hover and collapses again once the drag moves on to an unrelated category; holding at the bottom edge measurably scrolls the page and stops the moment the pointer leaves the edge zone.
+
+### Move Entry: cross-category-moved tile no longer stays stuck tilted/glowing
+
+- [x] `finishTileDrag` and `cancelTileDrag` now explicitly remove `.move-grabbed` from the tile directly, rather than relying on `exitMoveMode`'s grid-scoped cleanup sweep (which never finds a tile that's been reparented into a different grid than the anchor). Verified directly: a cross-moved tile's class list no longer contains `move-grabbed` or `move-dragging` after drop.
+
+### Static header: title, search bar, clock, and weather now pinned; everything else scrolls
+
+- [x] `clock-widget`, `weather-widget`, and `hourly-panel` moved out of Home's `.tile-grid` into a new `.pinned-header` (`position: sticky; top: 0;`, solid background, `z-index: 100`) alongside the existing `.site-header` and `.search-row`. Home's own `.tile-grid` now holds only its 5 real link tiles + the "+" button, rendered dynamically exactly as before — no JS changes were needed there, confirming the prediction that the add/rename/remove/Move-Entry logic is fully class/data-attribute driven.
+- [x] Clock/weather now live in a dedicated `.home-widgets` grid (`grid-template-columns: 2fr 3fr`) reproducing their original 2-of-5 / 3-of-5 width split from the old shared tile-grid; weather-widget still stretches to match clock-widget's aspect-ratio-driven height via the grid's default `align-items: stretch`, exactly as before.
+- [x] **Real bug found and fixed during the build:** the hourly panel initially rendered *overlapping* clock/weather instead of appearing below them. Root cause: it's `position: absolute` with only `grid-column` specified — an absolutely-positioned grid item doesn't participate in normal collision-avoidance auto-placement (it's out of flow), so without an explicit `grid-row` it defaulted to row 1 instead of "auto-finding" the empty row 2 the way a normal-flow item would. Fixed with an explicit `grid-row: 2`.
+- [x] Verified directly with real (mocked) weather data: clock/weather render at the correct size and stay pinned at the same viewport position across a real scroll, the hourly panel opens correctly anchored right below them with all 24 hour labels/icons rendering (confirming the pixel-tuned graph geometry from prior builds is untouched), and the rest of the page scrolls underneath the whole time.
+
+### A category's own content is no longer permanently invisible when it also has subcategories
+
+- [x] Removed the redundant `hidden` attribute from the three "own tile-grid directly inside `.category-content`" elements (`test-b`, `test-c`, `test-c-suba`) in the static HTML — they're already correctly hidden whenever their ancestor `.category-content` is hidden, no JS changes needed. Verified directly: the "+" tile is now visible and functional in `test-b`'s own (previously empty) list, and a tile added there persists correctly.
+
+### Subcategories now indent from the left and outdent their chevron from the right
+
+- [x] `.category-content > .category` gets `margin-left: 2ch` (indent) and `margin-right: 2ch` (outdent — pulls the flush-right chevron left, away from the page edge, since `justify-content: space-between` meant a left-only margin left it exactly aligned with every ancestor's chevron). Compounds naturally through CSS's normal margin cascade at deeper nesting levels, matching the standard nested-list/file-tree convention. Verified visually against Category B/Sub 1's real rendering.
+
+### Home header: expand-all / collapse-all buttons
+
+- [x] `▲` (expand-all) and `▼` (collapse-all, in the very corner) added to the Home header, both iterating the existing `categoryToggles` map (covers every category at every nesting depth) and persisting to `category-collapsed-<id>` — unlike Move Entry's transient hover-expand, this is a deliberate user action and survives reload. Verified directly: both buttons affect every top-level category and nested subcategories in one click, and the resulting state survives a reload.
+
+### Regression check
+
+- [x] Full sweep across all 49 radio values (48 conditions + Live) with zero real errors — only the pre-existing, unrelated favicon 404 appeared.
+- [x] Re-verified all Move Entry functionality from Build 40 (same-category reorder, tap-away/header-tap/timeout exit, off-viewport cancel, fallback-tile support) and all Build 39 nested-category structure/tile-action behavior still work correctly on top of this build's changes.
+
 ## Build Queue
 
 _Empty — nothing queued right now._
+  - Once the already-queued "own tile-grid stays permanently hidden" fix above ships, expand-all will correctly reveal those too — no additional work needed here for that to work, it's already covered by that other fix.
 
 ## Build Planner
 

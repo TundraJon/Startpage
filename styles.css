@@ -34,6 +34,14 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
+.pinned-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
 .site-header {
   display: flex;
   align-items: center;
@@ -213,10 +221,40 @@ main {
   color: var(--home-header-fg);
 }
 
-.category--home .tile-grid {
+.home-header-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.home-header-action-btn {
+  border: none;
+  background: transparent;
+  color: var(--home-header-fg);
+  opacity: 0.75;
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 6px;
+  border-radius: 4px;
+}
+
+.home-header-action-btn:hover,
+.home-header-action-btn:focus-visible {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.home-widgets {
+  display: grid;
+  /* 2fr/3fr reproduces the original 2-of-5 / 3-of-5 column split the widgets used when they
+     still lived inside Home's 5-column tile-grid. */
+  grid-template-columns: 2fr 3fr;
+  gap: 3px;
+  padding: 3px;
+  background: var(--surface);
   /* Establishes this grid as the containing block for .hourly-panel's position:absolute +
-     explicit grid-column/grid-row placement — without this, an absolutely-positioned grid item
-     falls back to the viewport as its containing block, ignoring the grid entirely. */
+     explicit grid-column placement — without this, an absolutely-positioned grid item falls
+     back to the viewport as its containing block, ignoring the grid entirely. */
   position: relative;
 }
 
@@ -234,6 +272,16 @@ main {
 
 .category-content[hidden] {
   display: none;
+}
+
+/* Nested subcategory sections indent from the left (title/stripe) and outdent from the right
+   (chevron) by 2ch each, so a subcategory's own chevron doesn't sit flush with its parent's at
+   the same x-position — .category-header is space-between, so only margin-left would leave the
+   chevron untouched. Applies only to actual nested .category sections, not the sibling .tile-grid
+   that holds the parent category's own direct tiles. Compounds naturally at deeper nesting. */
+.category-content > .category {
+  margin-left: 2ch;
+  margin-right: 2ch;
 }
 
 .tile {
@@ -329,8 +377,6 @@ main {
 }
 
 .clock-widget {
-  grid-column: 1 / 3;
-  grid-row: 1 / 3;
   aspect-ratio: 1 / 1;
   touch-action: manipulation;
   -webkit-touch-callout: none;
@@ -341,18 +387,22 @@ main {
 }
 
 .weather-widget {
-  grid-column: 3 / 6;
-  grid-row: 1 / 3;
+  /* No explicit height: default grid align-items:stretch matches it to clock-widget's
+     aspect-ratio-driven height, same as when both shared a row-span in the old 5-column grid. */
 }
 
-/* Popover, not a pushed-down block: anchored via grid placement to row 3 (the row right below
+/* Popover, not a pushed-down block: anchored via grid placement to row 2 (the row right below
    the clock+weather widgets, which together span the full grid width), but taken out of grid
-   flow via position:absolute so it floats over the tile row beneath rather than displacing it.
+   flow via position:absolute so it floats over content beneath rather than displacing it.
    A grid container is the containing block for its own absolutely-positioned children with
-   explicit grid-column/grid-row, so no extra positioned wrapper is needed. */
+   explicit grid-column placement, so no extra positioned wrapper is needed. */
 .hourly-panel {
-  grid-column: 1 / 6;
-  grid-row: 3 / 4;
+  grid-column: 1 / 3;
+  /* Explicit grid-row is required here, not left to auto-placement: an absolutely-positioned
+     grid item doesn't participate in normal collision-avoidance auto-placement (it's out of
+     flow), so without this it defaults to row 1 and overlaps clock/weather instead of landing
+     in row 2, right below them. */
+  grid-row: 2;
   position: absolute;
   inset: 0 0 auto 0;
   z-index: 20;

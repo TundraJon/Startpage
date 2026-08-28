@@ -165,6 +165,16 @@
     });
   });
 
+  function setAllCategoriesExpanded(expanded) {
+    categoryToggles.forEach((toggle, id) => {
+      toggle.setExpanded(expanded);
+      localStorage.setItem('category-collapsed-' + id, String(!expanded));
+    });
+  }
+
+  document.getElementById('expand-all-btn').addEventListener('click', () => setAllCategoriesExpanded(true));
+  document.getElementById('collapse-all-btn').addEventListener('click', () => setAllCategoriesExpanded(false));
+
   // --- Tile Grid: "+" add-tile mechanic, persisted tiles, and Phase 2 Part 1 tile actions ---
   const TILE_STORAGE_PREFIX = 'category-tiles-';
 
@@ -584,9 +594,14 @@
   }
 
   // --- Phase 2 Editing System, Part 2: Move Entry (drag-and-drop) ---
-  // moveMode: { grid } — the single .tile-grid currently in move mode, or null.
-  // dragInfo: state for the tile actively being dragged within moveMode.grid, or null when idle
-  // (move mode can be active with no active drag — e.g. right after entry, before the first pointerdown).
+  // moveMode: { grid } — the single .tile-grid currently in move mode (the anchor/source
+  // category, shown with the resting drop-shadow on all its tiles), or null.
+  // dragInfo: state for the tile actively being dragged, or null when idle (move mode can be
+  // active with no active drag — e.g. right after entry, before the first pointerdown).
+  //   dragInfo.grid — the TRUE original source grid, fixed for the whole drag (needed for
+  //     off-viewport-cancel snap-back, regardless of how many grids the tile passed through).
+  //   dragInfo.currentGrid — whichever grid the tile is LIVE-reparented into right now; this is
+  //     what same-category reorder and cross-category reflow both operate on.
   let moveMode = null;
   let moveModeTimeoutId = null;
   let dragInfo = null;
@@ -638,6 +653,44 @@
     moveMode = null;
   }
 
+  function categorySectionFor(categoryId) {
+    const grid = categoryGrids.get(categoryId);
+    return grid && grid.closest('.category');
+  }
+
+  // True if `ancestorId`'s category section contains (or is) `id`'s section — used to decide
+  // which auto-expanded categories are still "on the path" to wherever the drag currently is.
+  function isAncestorOrSelfCategory(ancestorId, id) {
+    if (ancestorId === id) return true;
+    const anc = categorySectionFor(ancestorId);
+    const sec = categorySectionFor(id);
+    return !!(anc && sec && anc !== sec && anc.contains(sec));
+  }
+
+  // Collapses every category this drag auto-expanded, except those still on the path to
+  // `keepPathToId` (pass null to collapse all of them, e.g. on a voided/cancelled drag).
+  function collapseAutoExpanded(info, keepPathToId) {
+    info.autoExpandedIds.forEach((id) => {
+      if (keepPathToId && isAncestorOrSelfCategory(id, keepPathToId)) return;
+      const toggle = categoryToggles.get(id);
+      if (toggle) toggle.setExpanded(false);
+    });
+    info.autoExpandedIds = [];
+  }
+
+  // Collapses any previously auto-expanded category that is no longer an ancestor of (or equal
+  // to) wherever the drag currently is — called live on every move so categories close again as
+  // soon as the drag moves past/away from them, not just at the end.
+  function updateAutoCollapse(activeCategoryId) {
+    if (!dragInfo) return;
+    dragInfo.autoExpandedIds = dragInfo.autoExpandedIds.filter((id) => {
+      if (isAncestorOrSelfCategory(id, activeCategoryId)) return true;
+      const toggle = categoryToggles.get(id);
+      if (toggle) toggle.setExpanded(false);
+      return false;
+    });
+  }
+
   function handleHeaderHover(headerEl) {
     if (dragInfo.lastHeaderEl === headerEl) return;
     if (dragInfo.lastHeaderEl) dragInfo.lastHeaderEl.classList.remove('move-drop-target');
@@ -649,7 +702,10 @@
     const sourceCategoryId = dragInfo.grid.closest('.category').dataset.categoryId;
     if (id === sourceCategoryId) return; // hovering the tile's own category header: no-op
     const toggle = categoryToggles.get(id);
-    if (toggle && !toggle.expanded) toggle.setExpanded(true);
+    if (toggle && !toggle.expanded) {
+      toggle.setExpanded(true);
+      dragInfo.autoExpandedIds.push(id);
+    }
     headerEl.classList.add('move-drop-target');
     dragInfo.lastHeaderEl = headerEl;
     dragInfo.crossTargetId = id;
@@ -669,12 +725,19 @@
     dragInfo = {
       tileEl,
       grid,
+      currentGrid: grid,
       pointerId: e.pointerId,
       grabDX: e.clientX - rect.left,
       grabDY: e.clientY - rect.top,
       crossTargetId: null,
       lastHeaderEl: null,
       originalNextSibling: tileEl.nextSibling,
+      autoExpandedIds: [],
+      lastClientX: e.clientX,
+      lastClientY: e.clientY,
+      autoScrollDir: 0,
+      autoScrollSpeed: 0,
+      autoScrollRAF: null,
     };
     setGrabbedTile(tileEl);
     tileEl.classList.add('move-dragging');
@@ -725,59 +788,137 @@
     return nearest;
   }
 
+  // Live-reparents the dragged tile into `grid` if it isn't already there, dropping it at an
+  // initial nearest-tile position so it doesn't sit at a stale spot before the next reflow pass.
+  function enterGrid(grid) {
+    if (!dragInfo || dragInfo.currentGrid === grid) return;
+    dragInfo.currentGrid = grid;
+    const nearest = findNearestTile(grid, dragInfo.tileEl, dragInfo.lastClientX, dragInfo.lastClientY);
+    if (nearest) nearest.before(dragInfo.tileEl);
+    else grid.insertBefore(dragInfo.tileEl, grid.querySelector('.tile-add'));
+  }
+
+  // Reorders dragInfo.currentGrid around the dragged tile based on cursor position. Nearest-tile-
+  // center (rather than exact hit-test under the cursor) so a fast or coalesced drag still
+  // resolves to the correct slot even if intermediate pointermove events over specific sibling
+  // tiles never actually get dispatched.
+  function reflowWithinCurrentGrid(x, y) {
+    const grid = dragInfo.currentGrid;
+    const nearest = findNearestTile(grid, dragInfo.tileEl, x, y);
+    if (!nearest) return;
+    dragInfo.tileEl.style.transform = 'none';
+    const ownRect = dragInfo.tileEl.getBoundingClientRect();
+    const ownCx = ownRect.left + ownRect.width / 2;
+    const ownCy = ownRect.top + ownRect.height / 2;
+    const distToOwnSq = (ownCx - x) * (ownCx - x) + (ownCy - y) * (ownCy - y);
+    const nr = nearest.getBoundingClientRect();
+    const ncx = nr.left + nr.width / 2;
+    const ncy = nr.top + nr.height / 2;
+    const distToNearestSq = (ncx - x) * (ncx - x) + (ncy - y) * (ncy - y);
+    // Only reorder when the pointer is genuinely closer to the candidate's slot than to the
+    // dragged tile's own current slot. With very few siblings (e.g. exactly one other tile in
+    // the category), "nearest" is otherwise trivially always that same tile regardless of real
+    // proximity, which would flip the order back and forth on every single move event.
+    if (distToNearestSq < distToOwnSq) {
+      const siblings = Array.from(grid.children).filter(
+        (c) => c.classList.contains('tile') && !c.classList.contains('tile-add')
+      );
+      const draggedIndex = siblings.indexOf(dragInfo.tileEl);
+      const targetIndex = siblings.indexOf(nearest);
+      if (draggedIndex !== -1 && targetIndex !== -1 && draggedIndex !== targetIndex) {
+        if (draggedIndex < targetIndex) nearest.after(dragInfo.tileEl);
+        else nearest.before(dragInfo.tileEl);
+      }
+    }
+  }
+
+  function followPointer(x, y) {
+    dragInfo.tileEl.style.transform = 'none';
+    const rect = dragInfo.tileEl.getBoundingClientRect();
+    const dx = x - dragInfo.grabDX - rect.left;
+    const dy = y - dragInfo.grabDY - rect.top;
+    dragInfo.tileEl.style.transform = 'translate(' + dx + 'px, ' + dy + 'px) rotate(-3deg) scale(1.05)';
+  }
+
+  function processDragPosition(clientX, clientY) {
+    if (!dragInfo) return;
+    const under = document.elementFromPoint(clientX, clientY);
+    const headerUnder = under && under.closest && under.closest('.category-header');
+
+    if (headerUnder) {
+      handleHeaderHover(headerUnder);
+      const section = headerUnder.closest('.category');
+      if (section) updateAutoCollapse(section.dataset.categoryId);
+    } else {
+      clearHeaderHover();
+      // Prefer whichever visible grid is directly under the pointer (picking up a newly-revealed
+      // destination immediately); otherwise keep reflowing within wherever the tile currently is.
+      const gridUnder = under && under.closest && under.closest('.tile-grid:not([hidden])');
+      enterGrid(gridUnder || dragInfo.currentGrid);
+      reflowWithinCurrentGrid(clientX, clientY);
+      const liveSection = dragInfo.currentGrid.closest('.category');
+      if (liveSection) updateAutoCollapse(liveSection.dataset.categoryId);
+    }
+
+    followPointer(clientX, clientY);
+  }
+
+  const AUTO_SCROLL_EDGE_PX = 70;
+  const AUTO_SCROLL_MAX_PX_PER_FRAME = 14;
+
+  function updateAutoScroll(clientY) {
+    if (!dragInfo) return;
+    const h = window.innerHeight;
+    let dir = 0;
+    let speed = 0;
+    if (clientY < AUTO_SCROLL_EDGE_PX) {
+      dir = -1;
+      speed = (AUTO_SCROLL_EDGE_PX - clientY) / AUTO_SCROLL_EDGE_PX;
+    } else if (clientY > h - AUTO_SCROLL_EDGE_PX) {
+      dir = 1;
+      speed = (clientY - (h - AUTO_SCROLL_EDGE_PX)) / AUTO_SCROLL_EDGE_PX;
+    }
+    dragInfo.autoScrollDir = dir;
+    dragInfo.autoScrollSpeed = Math.min(1, speed);
+    if (dir !== 0 && !dragInfo.autoScrollRAF) {
+      dragInfo.autoScrollRAF = requestAnimationFrame(autoScrollTick);
+    }
+  }
+
+  function autoScrollTick() {
+    if (!dragInfo || dragInfo.autoScrollDir === 0) {
+      if (dragInfo) dragInfo.autoScrollRAF = null;
+      return;
+    }
+    window.scrollBy(0, dragInfo.autoScrollDir * AUTO_SCROLL_MAX_PX_PER_FRAME * dragInfo.autoScrollSpeed);
+    resetMoveModeTimeout();
+    // The page moved under a stationary pointer — re-run reflow/hover-detection against the
+    // last known pointer position, since no new pointermove event fires from scrolling alone.
+    processDragPosition(dragInfo.lastClientX, dragInfo.lastClientY);
+    dragInfo.autoScrollRAF = requestAnimationFrame(autoScrollTick);
+  }
+
+  function stopAutoScroll() {
+    if (dragInfo && dragInfo.autoScrollRAF) {
+      cancelAnimationFrame(dragInfo.autoScrollRAF);
+      dragInfo.autoScrollRAF = null;
+    }
+    if (dragInfo) dragInfo.autoScrollDir = 0;
+  }
+
   function handleTileDragMove(e) {
     if (!dragInfo) return;
     resetMoveModeTimeout();
+    dragInfo.lastClientX = e.clientX;
+    dragInfo.lastClientY = e.clientY;
 
     if (e.clientX < 0 || e.clientY < 0 || e.clientX > window.innerWidth || e.clientY > window.innerHeight) {
       cancelTileDrag();
       return;
     }
 
-    const under = document.elementFromPoint(e.clientX, e.clientY);
-    const headerUnder = under && under.closest && under.closest('.category-header');
-
-    if (headerUnder) {
-      handleHeaderHover(headerUnder);
-    } else {
-      clearHeaderHover();
-      // Nearest-tile-center (rather than exact hit-test under the cursor) so a fast or
-      // coalesced drag still resolves to the correct slot even if intermediate pointermove
-      // events over specific sibling tiles never actually get dispatched.
-      const nearest = findNearestTile(dragInfo.grid, dragInfo.tileEl, e.clientX, e.clientY);
-      if (nearest) {
-        dragInfo.tileEl.style.transform = 'none';
-        const ownRect = dragInfo.tileEl.getBoundingClientRect();
-        const ownCx = ownRect.left + ownRect.width / 2;
-        const ownCy = ownRect.top + ownRect.height / 2;
-        const distToOwnSq = (ownCx - e.clientX) * (ownCx - e.clientX) + (ownCy - e.clientY) * (ownCy - e.clientY);
-        const nr = nearest.getBoundingClientRect();
-        const ncx = nr.left + nr.width / 2;
-        const ncy = nr.top + nr.height / 2;
-        const distToNearestSq = (ncx - e.clientX) * (ncx - e.clientX) + (ncy - e.clientY) * (ncy - e.clientY);
-        // Only reorder when the pointer is genuinely closer to the candidate's slot than to the
-        // dragged tile's own current slot. With very few siblings (e.g. exactly one other tile in
-        // the category), "nearest" is otherwise trivially always that same tile regardless of real
-        // proximity, which would flip the order back and forth on every single move event.
-        if (distToNearestSq < distToOwnSq) {
-          const siblings = Array.from(dragInfo.grid.children).filter(
-            (c) => c.classList.contains('tile') && !c.classList.contains('tile-add')
-          );
-          const draggedIndex = siblings.indexOf(dragInfo.tileEl);
-          const targetIndex = siblings.indexOf(nearest);
-          if (draggedIndex !== -1 && targetIndex !== -1 && draggedIndex !== targetIndex) {
-            if (draggedIndex < targetIndex) nearest.after(dragInfo.tileEl);
-            else nearest.before(dragInfo.tileEl);
-          }
-        }
-      }
-    }
-
-    dragInfo.tileEl.style.transform = 'none';
-    const rect = dragInfo.tileEl.getBoundingClientRect();
-    const dx = e.clientX - dragInfo.grabDX - rect.left;
-    const dy = e.clientY - dragInfo.grabDY - rect.top;
-    dragInfo.tileEl.style.transform = 'translate(' + dx + 'px, ' + dy + 'px) rotate(-3deg) scale(1.05)';
+    updateAutoScroll(e.clientY);
+    processDragPosition(e.clientX, e.clientY);
   }
 
   function markDragJustFinished() {
@@ -790,16 +931,30 @@
     const info = dragInfo;
     const crossTargetId = info.crossTargetId;
     info.cleanup();
+    stopAutoScroll();
     info.tileEl.style.transform = '';
     info.tileEl.style.zIndex = '';
     info.tileEl.style.pointerEvents = '';
-    info.tileEl.classList.remove('move-dragging');
+    info.tileEl.classList.remove('move-dragging', 'move-grabbed');
     if (info.lastHeaderEl) info.lastHeaderEl.classList.remove('move-drop-target');
 
     const sourceCategoryId = info.grid.closest('.category').dataset.categoryId;
     const tileId = info.tileEl.dataset.tileId;
+    const liveCategoryId = info.currentGrid.closest('.category').dataset.categoryId;
+    // Wherever the tile actually ends up — the header-hover branch below persists into
+    // crossTargetId regardless of currentGrid, so liveCategoryId alone would be wrong for
+    // deciding which auto-expanded category should stay open after the drop.
+    let finalCategoryId = liveCategoryId;
 
     if (crossTargetId && crossTargetId !== sourceCategoryId) {
+      // A different category's header is (or was, as of the last processed move) highlighted —
+      // trust that as the destination and append to the end of its list. Hovering a header and
+      // hovering a grid are mutually exclusive at any instant, so a header still highlighted
+      // right up to release is the more recent, more relevant signal — even if the tile was
+      // transiently live-reflowed into some other grid it merely passed through earlier in the
+      // drag (e.g. a sibling subcategory revealed in passing by cascading hover-expand on the
+      // way to the true target).
+      finalCategoryId = crossTargetId;
       const destGrid = categoryGrids.get(crossTargetId);
       if (destGrid) {
         const sourceTiles = loadCategoryTiles(sourceCategoryId);
@@ -810,12 +965,28 @@
           const destTiles = loadCategoryTiles(crossTargetId);
           destTiles.push(moved);
           saveCategoryTiles(crossTargetId, destTiles);
-          const destAddBtn = destGrid.querySelector('.tile-add');
-          destGrid.insertBefore(info.tileEl, destAddBtn);
+          destGrid.insertBefore(info.tileEl, destGrid.querySelector('.tile-add'));
         }
       }
+    } else if (liveCategoryId !== sourceCategoryId) {
+      // Real cross-category move: the tile is already live-reflowed into currentGrid at the
+      // exact position it should land — persist source removal and destination insertion there.
+      const sourceTiles = loadCategoryTiles(sourceCategoryId);
+      const idx = sourceTiles.findIndex((t) => t.id === tileId);
+      const movedData = idx !== -1 ? sourceTiles.splice(idx, 1)[0] : null;
+      if (idx !== -1) saveCategoryTiles(sourceCategoryId, sourceTiles);
+      if (movedData) {
+        const destTiles = loadCategoryTiles(liveCategoryId);
+        const byId = new Map(destTiles.map((t) => [t.id, t]));
+        byId.set(tileId, movedData);
+        const orderedIds = Array.from(info.currentGrid.children)
+          .filter((c) => c.classList.contains('tile') && !c.classList.contains('tile-add'))
+          .map((c) => c.dataset.tileId);
+        const reordered = orderedIds.map((id) => byId.get(id)).filter(Boolean);
+        saveCategoryTiles(liveCategoryId, reordered);
+      }
     } else {
-      const orderedIds = Array.from(info.grid.children)
+      const orderedIds = Array.from(info.currentGrid.children)
         .filter((c) => c.classList.contains('tile') && !c.classList.contains('tile-add'))
         .map((c) => c.dataset.tileId);
       const tiles = loadCategoryTiles(sourceCategoryId);
@@ -824,6 +995,7 @@
       saveCategoryTiles(sourceCategoryId, reordered);
     }
 
+    collapseAutoExpanded(info, finalCategoryId);
     dragInfo = null;
     markDragJustFinished();
     resetMoveModeTimeout();
@@ -833,11 +1005,13 @@
     if (!dragInfo) return;
     const info = dragInfo;
     info.cleanup();
+    stopAutoScroll();
     info.tileEl.style.transform = '';
     info.tileEl.style.zIndex = '';
     info.tileEl.style.pointerEvents = '';
-    info.tileEl.classList.remove('move-dragging');
+    info.tileEl.classList.remove('move-dragging', 'move-grabbed');
     if (info.lastHeaderEl) info.lastHeaderEl.classList.remove('move-drop-target');
+    collapseAutoExpanded(info, null);
     info.grid.insertBefore(info.tileEl, info.originalNextSibling);
     dragInfo = null;
     markDragJustFinished();
