@@ -1120,7 +1120,11 @@
   function exitSelectMode() {
     if (selectMode) {
       selectMode.grid.classList.remove('select-mode');
-      selectMode.grid.querySelectorAll('.tile-selected').forEach((t) => t.classList.remove('tile-selected'));
+      // Query the whole document, not just selectMode.grid — confirmMoveSelected already
+      // reparents moved tiles into the destination grid before calling this, so scoping the
+      // cleanup to the (now smaller) source grid missed them and left the moved tiles stuck
+      // showing the selected outline/checkmark in their new category.
+      document.querySelectorAll('.tile-selected').forEach((t) => t.classList.remove('tile-selected'));
     }
     selectMode = null;
     pickingDestination = false;

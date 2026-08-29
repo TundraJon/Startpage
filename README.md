@@ -879,6 +879,14 @@ _Five queued items, all built and verified together in one pass, per "Go ahead a
 
 - [x] Full Playwright sweep: global exclusivity at every depth (including jumping between unrelated top-level categories with a 3-level chain open), leaf-only collapse button visibility, collapse-all, path persistence across reload, re-tapping an open leaf (idempotent) and a mid-chain parent (falls back to own links), the empty-own-grid "+" tile fix from Build 41 still reachable, Home unaffected, cross-category and same-category Move Entry, multi-select end to end, popup z-index, and clock context-menu prevention — zero console/page errors throughout.
 
+## Build Log 43 (completed)
+
+### Multi-select: moved tiles stayed visually selected after the move
+
+- [x] **Reported behavior:** after moving a selected group of tiles to another category, they stay showing the selected outline/checkmark in their new category instead of clearing.
+- [x] **Root cause:** `exitSelectMode`'s cleanup queried `selectMode.grid.querySelectorAll('.tile-selected')` to strip the class — but `confirmMoveSelected` already reparents each moved tile element into the *destination* grid before calling `exitSelectMode`, so a query scoped to the (now smaller) *source* grid no longer finds them.
+- [x] **Fix:** scope that cleanup query to the whole document instead of `selectMode.grid` — safe since select mode is always exclusive to one source category, so no tile outside it could ever have picked up `.tile-selected` in the first place. Verified directly: a 2-tile batch move now leaves zero `.tile-selected` elements anywhere afterward.
+
 ## Build Queue
 
 ### Weather widget: long-press blocks vertical scroll
