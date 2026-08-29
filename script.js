@@ -131,49 +131,125 @@
     localStorage.setItem('searchEngine', searchEngine.value);
   });
 
-  // categoryId -> { setExpanded(bool), get expanded() } — used by the accordion itself and, later,
-  // by Move Entry's cross-category cascading hover-to-expand (which needs to open a subcategory's
-  // header on hover without going through a real click / without persisting that as the user's choice).
+  // --- Global single-open category navigation ---
+  // Exactly one category/subcategory chain is expanded anywhere on the page at a time (Home is
+  // exempt — it has no accordion state). openPath is an ordered list of category ids from a
+  // top-level category down to whichever leaf is currently selected; opening any category or
+  // subcategory replaces the whole path, collapsing everything else at any depth. categoryToggles
+  // maps categoryId -> { section, contentEl, ownGridEl, mainBtn, collapseBtn } and is also used by
+  // Move Entry's cross-category cascading hover-to-open.
   const categoryToggles = new Map();
+  const CATEGORY_OPEN_PATH_KEY = 'category-open-path';
+  let openPath = [];
+  // Multi-select batch move state (declared here, ahead of renderOpenPath's first call below,
+  // since updateSelectActionBar reads it and function declarations alone don't save a `let` from
+  // its temporal dead zone). The rest of the feature is implemented further down, after Move Entry.
+  let selectMode = null;
+  let pickingDestination = false;
+  const selectActionBar = document.getElementById('select-action-bar');
+  const selectActionStatus = document.getElementById('select-action-status');
+  const selectActionMoveBtn = document.getElementById('select-action-move');
 
-  document.querySelectorAll('.category:not(.category--home) .category-header').forEach((btn) => {
-    const section = btn.closest('.category');
-    const id = section.dataset.categoryId;
-    // A category with subcategories wraps them + its own tile-grid in .category-content;
-    // a flat category (no subcategories) has .tile-grid as its direct child instead.
-    const content = section.querySelector(':scope > .category-content') || section.querySelector(':scope > .tile-grid');
-    const stored = localStorage.getItem('category-collapsed-' + id);
-    const collapsed = stored === null ? true : stored === 'true';
-    setExpanded(!collapsed);
-
-    function setExpanded(expanded) {
-      content.hidden = !expanded;
-      btn.setAttribute('aria-expanded', String(expanded));
+  // Ancestor chain (root -> id) for a category, walked via the live DOM rather than stored state,
+  // so it's always correct regardless of what was previously open.
+  function categoryAncestorChain(id) {
+    const chain = [];
+    let section = categoryToggles.has(id) ? categoryToggles.get(id).section : null;
+    while (section) {
+      chain.unshift(section.dataset.categoryId);
+      const parentContent = section.parentElement;
+      section = parentContent && parentContent.closest ? parentContent.closest('.category') : null;
     }
+    return chain;
+  }
 
-    categoryToggles.set(id, {
-      setExpanded,
-      get expanded() {
-        return btn.getAttribute('aria-expanded') === 'true';
-      },
+  function isPathLeaf(id) {
+    return openPath.length > 0 && openPath[openPath.length - 1] === id;
+  }
+
+  function renderOpenPath() {
+    categoryToggles.forEach((entry, id) => {
+      const onPath = openPath.includes(id);
+      entry.contentEl.hidden = !onPath;
+      entry.mainBtn.setAttribute('aria-expanded', String(onPath));
+      // Own direct links are the default child shown when a category-with-subcategories opens —
+      // visible only while this category is the deepest (leaf) selection, hidden as soon as one
+      // of its subcategories becomes the active child instead.
+      if (entry.ownGridEl) entry.ownGridEl.hidden = !(onPath && isPathLeaf(id));
+      entry.collapseBtn.hidden = !isPathLeaf(id);
     });
+    localStorage.setItem(CATEGORY_OPEN_PATH_KEY, JSON.stringify(openPath));
+    // No-op until select mode's destination-picking UI is defined further down (hoisted function
+    // declaration) — keeps the "current destination" status text in sync with navigation.
+    updateSelectActionBar();
+  }
 
-    btn.addEventListener('click', () => {
-      const expanded = btn.getAttribute('aria-expanded') === 'true';
-      setExpanded(!expanded);
-      localStorage.setItem('category-collapsed-' + id, String(expanded));
+  function openCategoryPath(id) {
+    openPath = categoryAncestorChain(id);
+    renderOpenPath();
+  }
+
+  function collapseLeafCategory() {
+    openPath.pop();
+    renderOpenPath();
+  }
+
+  function collapseAllCategories() {
+    openPath = [];
+    renderOpenPath();
+  }
+
+  document.querySelectorAll('.category:not(.category--home) > .category-header').forEach((header) => {
+    const section = header.closest('.category');
+    const id = section.dataset.categoryId;
+    const contentEl = section.querySelector(':scope > .category-content') || section.querySelector(':scope > .tile-grid');
+    // Only categories with subcategories (.category-content) have a separate own-grid that needs
+    // its own visibility toggle; a flat category's tile-grid IS its content, already handled above.
+    const ownGridEl = contentEl.classList.contains('category-content')
+      ? contentEl.querySelector(':scope > .tile-grid')
+      : null;
+    const mainBtn = header.querySelector('.category-header-main');
+    const collapseBtn = header.querySelector('.category-collapse-btn');
+
+    // Title-only indent by true nesting depth. A pure-CSS self-incrementing custom property
+    // (`.category-content { --depth: calc(var(--depth, 0) + 1); } `) looks like it should work but
+    // doesn't — Chromium treats a custom property that references its own name, even meaning "the
+    // inherited value", as a circular reference and resolves it to nothing at every level. Setting
+    // --depth explicitly per element from the real DOM ancestor count sidesteps that entirely.
+    let depth = 0;
+    let ancestor = section.parentElement;
+    while (ancestor) {
+      if (ancestor.classList && ancestor.classList.contains('category-content')) depth++;
+      ancestor = ancestor.parentElement;
+    }
+    mainBtn.querySelector('.category-name').style.setProperty('--depth', String(depth));
+
+    categoryToggles.set(id, { section, contentEl, ownGridEl, mainBtn, collapseBtn });
+
+    mainBtn.addEventListener('click', () => openCategoryPath(id));
+    collapseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      collapseLeafCategory();
     });
   });
 
-  function setAllCategoriesExpanded(expanded) {
-    categoryToggles.forEach((toggle, id) => {
-      toggle.setExpanded(expanded);
-      localStorage.setItem('category-collapsed-' + id, String(!expanded));
-    });
+  // Restore the persisted open path, but only if it's still a real, unbroken ancestor chain —
+  // categories can be removed/reordered between sessions, so re-derive and compare rather than
+  // trusting the stored array outright.
+  try {
+    const stored = JSON.parse(localStorage.getItem(CATEGORY_OPEN_PATH_KEY) || '[]');
+    if (Array.isArray(stored) && stored.length > 0 && categoryToggles.has(stored[stored.length - 1])) {
+      const recomputed = categoryAncestorChain(stored[stored.length - 1]);
+      if (recomputed.length === stored.length && recomputed.every((v, i) => v === stored[i])) {
+        openPath = recomputed;
+      }
+    }
+  } catch (e) {
+    openPath = [];
   }
+  renderOpenPath();
 
-  document.getElementById('expand-all-btn').addEventListener('click', () => setAllCategoriesExpanded(true));
-  document.getElementById('collapse-all-btn').addEventListener('click', () => setAllCategoriesExpanded(false));
+  document.getElementById('collapse-all-btn').addEventListener('click', () => collapseAllCategories());
 
   // --- Tile Grid: "+" add-tile mechanic, persisted tiles, and Phase 2 Part 1 tile actions ---
   const TILE_STORAGE_PREFIX = 'category-tiles-';
@@ -341,14 +417,21 @@
     a.appendChild(span);
 
     a.addEventListener('contextmenu', (e) => e.preventDefault());
-    attachLongPress(a, () => openTileMenu(a), () => moveMode && moveMode.grid === a.parentElement);
+    attachLongPress(a, () => openTileMenu(a), () => (moveMode && moveMode.grid === a.parentElement) || (selectMode && selectMode.grid === a.parentElement));
 
     // While this tile's grid is in move mode, a plain tap must not navigate away — pointerdown
-    // (below, wired once move mode is entered) already handles grabbing/dragging it.
+    // (below, wired once move mode is entered) already handles grabbing/dragging it. While its
+    // grid is in select mode, a tap toggles this tile's selected state instead of navigating.
     a.addEventListener('click', (e) => {
       if (moveMode && moveMode.grid === a.parentElement) {
         e.preventDefault();
         e.stopPropagation();
+        return;
+      }
+      if (selectMode && selectMode.grid === a.parentElement) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleTileSelected(a);
       }
     }, true);
 
@@ -629,6 +712,7 @@
   }
 
   function enterMoveMode(tileEl) {
+    if (selectMode) exitSelectMode();
     const grid = tileEl.parentElement;
     if (moveMode && moveMode.grid !== grid) exitMoveMode();
     if (!moveMode) {
@@ -653,44 +737,12 @@
     moveMode = null;
   }
 
-  function categorySectionFor(categoryId) {
-    const grid = categoryGrids.get(categoryId);
-    return grid && grid.closest('.category');
-  }
-
-  // True if `ancestorId`'s category section contains (or is) `id`'s section — used to decide
-  // which auto-expanded categories are still "on the path" to wherever the drag currently is.
-  function isAncestorOrSelfCategory(ancestorId, id) {
-    if (ancestorId === id) return true;
-    const anc = categorySectionFor(ancestorId);
-    const sec = categorySectionFor(id);
-    return !!(anc && sec && anc !== sec && anc.contains(sec));
-  }
-
-  // Collapses every category this drag auto-expanded, except those still on the path to
-  // `keepPathToId` (pass null to collapse all of them, e.g. on a voided/cancelled drag).
-  function collapseAutoExpanded(info, keepPathToId) {
-    info.autoExpandedIds.forEach((id) => {
-      if (keepPathToId && isAncestorOrSelfCategory(id, keepPathToId)) return;
-      const toggle = categoryToggles.get(id);
-      if (toggle) toggle.setExpanded(false);
-    });
-    info.autoExpandedIds = [];
-  }
-
-  // Collapses any previously auto-expanded category that is no longer an ancestor of (or equal
-  // to) wherever the drag currently is — called live on every move so categories close again as
-  // soon as the drag moves past/away from them, not just at the end.
-  function updateAutoCollapse(activeCategoryId) {
-    if (!dragInfo) return;
-    dragInfo.autoExpandedIds = dragInfo.autoExpandedIds.filter((id) => {
-      if (isAncestorOrSelfCategory(id, activeCategoryId)) return true;
-      const toggle = categoryToggles.get(id);
-      if (toggle) toggle.setExpanded(false);
-      return false;
-    });
-  }
-
+  // Opening a category via header-hover during a drag now just calls openCategoryPath — the
+  // global single-open-path system (above) already collapses whatever else was open, including
+  // the drag's own source category, as a direct consequence of the same rule normal browsing
+  // uses. This replaces Build 41's bespoke per-drag auto-collapse tracking (autoExpandedIds /
+  // updateAutoCollapse), which existed only because the old accordion had no exclusivity of its
+  // own to lean on.
   function handleHeaderHover(headerEl) {
     if (dragInfo.lastHeaderEl === headerEl) return;
     if (dragInfo.lastHeaderEl) dragInfo.lastHeaderEl.classList.remove('move-drop-target');
@@ -699,13 +751,11 @@
     const section = headerEl.closest('.category');
     if (!section) return;
     const id = section.dataset.categoryId;
-    const sourceCategoryId = dragInfo.grid.closest('.category').dataset.categoryId;
-    if (id === sourceCategoryId) return; // hovering the tile's own category header: no-op
-    const toggle = categoryToggles.get(id);
-    if (toggle && !toggle.expanded) {
-      toggle.setExpanded(true);
-      dragInfo.autoExpandedIds.push(id);
-    }
+    // Re-hovering the drag's own original source header (e.g. dragging away then back) is
+    // handled the same as any other header — it reopens via the same global rule. finishTileDrag
+    // separately guards against treating crossTargetId === sourceCategoryId as a real
+    // cross-category append, so this is safe either way.
+    openCategoryPath(id);
     headerEl.classList.add('move-drop-target');
     dragInfo.lastHeaderEl = headerEl;
     dragInfo.crossTargetId = id;
@@ -732,7 +782,6 @@
       crossTargetId: null,
       lastHeaderEl: null,
       originalNextSibling: tileEl.nextSibling,
-      autoExpandedIds: [],
       lastClientX: e.clientX,
       lastClientY: e.clientY,
       autoScrollDir: 0,
@@ -847,8 +896,6 @@
 
     if (headerUnder) {
       handleHeaderHover(headerUnder);
-      const section = headerUnder.closest('.category');
-      if (section) updateAutoCollapse(section.dataset.categoryId);
     } else {
       clearHeaderHover();
       // Prefer whichever visible grid is directly under the pointer (picking up a newly-revealed
@@ -856,8 +903,6 @@
       const gridUnder = under && under.closest && under.closest('.tile-grid:not([hidden])');
       enterGrid(gridUnder || dragInfo.currentGrid);
       reflowWithinCurrentGrid(clientX, clientY);
-      const liveSection = dragInfo.currentGrid.closest('.category');
-      if (liveSection) updateAutoCollapse(liveSection.dataset.categoryId);
     }
 
     followPointer(clientX, clientY);
@@ -941,10 +986,6 @@
     const sourceCategoryId = info.grid.closest('.category').dataset.categoryId;
     const tileId = info.tileEl.dataset.tileId;
     const liveCategoryId = info.currentGrid.closest('.category').dataset.categoryId;
-    // Wherever the tile actually ends up — the header-hover branch below persists into
-    // crossTargetId regardless of currentGrid, so liveCategoryId alone would be wrong for
-    // deciding which auto-expanded category should stay open after the drop.
-    let finalCategoryId = liveCategoryId;
 
     if (crossTargetId && crossTargetId !== sourceCategoryId) {
       // A different category's header is (or was, as of the last processed move) highlighted —
@@ -954,7 +995,6 @@
       // transiently live-reflowed into some other grid it merely passed through earlier in the
       // drag (e.g. a sibling subcategory revealed in passing by cascading hover-expand on the
       // way to the true target).
-      finalCategoryId = crossTargetId;
       const destGrid = categoryGrids.get(crossTargetId);
       if (destGrid) {
         const sourceTiles = loadCategoryTiles(sourceCategoryId);
@@ -995,7 +1035,6 @@
       saveCategoryTiles(sourceCategoryId, reordered);
     }
 
-    collapseAutoExpanded(info, finalCategoryId);
     dragInfo = null;
     markDragJustFinished();
     resetMoveModeTimeout();
@@ -1011,7 +1050,6 @@
     info.tileEl.style.pointerEvents = '';
     info.tileEl.classList.remove('move-dragging', 'move-grabbed');
     if (info.lastHeaderEl) info.lastHeaderEl.classList.remove('move-drop-target');
-    collapseAutoExpanded(info, null);
     info.grid.insertBefore(info.tileEl, info.originalNextSibling);
     dragInfo = null;
     markDragJustFinished();
@@ -1023,6 +1061,109 @@
     closeTileMenu();
     if (!tileEl) return;
     enterMoveMode(tileEl);
+  });
+
+  // --- Multi-select batch move — additive to single-tile Move Entry above, which is untouched.
+  // Long-press a tile -> tile menu -> Select enters select mode for that tile's grid; tapping
+  // other tiles in the same grid toggles their selection; "Move Selected" hands off to the normal
+  // single-open-path category navigation to pick a destination, then "Move Here" appends the whole
+  // batch to the end of that category's list (no live reflow, matching Move Entry's own
+  // header-drop append-to-end behavior for a single tile). ---
+  const selectActionCancelBtn = document.getElementById('select-action-cancel');
+
+  function toggleTileSelected(tileEl) {
+    if (!selectMode) return;
+    const id = tileEl.dataset.tileId;
+    if (selectMode.selectedIds.has(id)) {
+      selectMode.selectedIds.delete(id);
+      tileEl.classList.remove('tile-selected');
+    } else {
+      selectMode.selectedIds.add(id);
+      tileEl.classList.add('tile-selected');
+    }
+    updateSelectActionBar();
+  }
+
+  function updateSelectActionBar() {
+    if (!selectMode) {
+      selectActionBar.hidden = true;
+      return;
+    }
+    selectActionBar.hidden = false;
+    const n = selectMode.selectedIds.size;
+    if (!pickingDestination) {
+      selectActionStatus.textContent = n + ' selected';
+      selectActionMoveBtn.textContent = 'Move Selected (' + n + ')';
+      selectActionMoveBtn.disabled = n === 0;
+    } else {
+      const destId = openPath.length > 0 ? openPath[openPath.length - 1] : null;
+      if (destId) {
+        const nameEl = document.querySelector('.category[data-category-id="' + CSS.escape(destId) + '"] > .category-header .category-name');
+        selectActionStatus.textContent = 'Destination: ' + (nameEl ? nameEl.textContent : destId);
+      } else {
+        selectActionStatus.textContent = 'Choose a destination category above, then tap Move Here';
+      }
+      selectActionMoveBtn.textContent = 'Move Here (' + n + ')';
+      selectActionMoveBtn.disabled = !destId;
+    }
+  }
+
+  function enterSelectMode(tileEl) {
+    if (moveMode) exitMoveMode();
+    const grid = tileEl.parentElement;
+    selectMode = { grid, categoryId: grid.closest('.category').dataset.categoryId, selectedIds: new Set() };
+    pickingDestination = false;
+    grid.classList.add('select-mode');
+    toggleTileSelected(tileEl);
+  }
+
+  function exitSelectMode() {
+    if (selectMode) {
+      selectMode.grid.classList.remove('select-mode');
+      selectMode.grid.querySelectorAll('.tile-selected').forEach((t) => t.classList.remove('tile-selected'));
+    }
+    selectMode = null;
+    pickingDestination = false;
+    updateSelectActionBar();
+  }
+
+  function confirmMoveSelected() {
+    if (!selectMode || openPath.length === 0) return;
+    const destId = openPath[openPath.length - 1];
+    const sourceId = selectMode.categoryId;
+    if (destId !== sourceId) {
+      const sourceTiles = loadCategoryTiles(sourceId);
+      const moving = sourceTiles.filter((t) => selectMode.selectedIds.has(t.id));
+      const remaining = sourceTiles.filter((t) => !selectMode.selectedIds.has(t.id));
+      saveCategoryTiles(sourceId, remaining);
+      const destTiles = loadCategoryTiles(destId).concat(moving);
+      saveCategoryTiles(destId, destTiles);
+      const destGrid = categoryGrids.get(destId);
+      moving.forEach((t) => {
+        const el = selectMode.grid.querySelector('[data-tile-id="' + t.id + '"]');
+        if (el && destGrid) destGrid.insertBefore(el, destGrid.querySelector('.tile-add'));
+      });
+    }
+    exitSelectMode();
+  }
+
+  selectActionCancelBtn.addEventListener('click', () => exitSelectMode());
+  selectActionMoveBtn.addEventListener('click', () => {
+    if (!selectMode) return;
+    if (!pickingDestination) {
+      pickingDestination = true;
+      updateSelectActionBar();
+    } else {
+      confirmMoveSelected();
+    }
+  });
+
+  const tileMenuSelectBtn = document.getElementById('tile-menu-select');
+  tileMenuSelectBtn.addEventListener('click', () => {
+    const tileEl = tileMenuTargetEl;
+    closeTileMenu();
+    if (!tileEl) return;
+    enterSelectMode(tileEl);
   });
 
   const CLOCK_SETTINGS_KEY = 'clockSettings';
@@ -1353,6 +1494,10 @@
     });
   });
 
+  // Same class of native-context-menu conflict already fixed for tiles (Build 37) — the clock's
+  // own long-press options menu needs contextmenu suppressed on its link, or Android Chrome (and
+  // any other non-iOS-Safari browser) offers to open the image in a new tab on long-press instead.
+  document.querySelector('#clock-widget .clock-inner').addEventListener('contextmenu', (e) => e.preventDefault());
   attachLongPress(document.getElementById('clock-widget'), openClockOptions);
 
   const uvBadge = document.querySelector('.uv-badge');

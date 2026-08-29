@@ -179,14 +179,28 @@ main {
   border-bottom: none;
 }
 
+/* .category-header is now a plain (non-button) container so it can hold two independently
+   clickable controls side by side — .category-header-main (opens the category, matches the old
+   header's full styling) and .category-collapse-btn (closes just this level, shown only while
+   this category/subcategory is the currently open leaf). A <button> can't contain another
+   <button>, which is why this moved off the header element itself — same pattern already used by
+   .category-header--home's .home-header-actions. */
 .category-header {
   width: 100%;
   display: flex;
+  align-items: stretch;
+  background: var(--surface);
+  border-top: 3px solid var(--stripe-color, transparent);
+}
+
+.category-header-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--surface);
+  background: transparent;
   border: none;
-  border-top: 3px solid var(--stripe-color, transparent);
   padding: 6px 14px 10px;
   cursor: pointer;
   font-size: 1rem;
@@ -198,15 +212,40 @@ main {
   font-weight: 600;
   font-size: 1rem;
   margin: 0;
+  /* Self-incrementing custom property: each nested .category-content bumps --depth by 1, so a
+     subcategory's title indents by nesting depth with no per-level CSS needed. Only the title
+     text indents — the header row itself (stripe, background, touch target, collapse button)
+     stays full width at every depth, so neither shrinks no matter how deep the nesting goes. */
+  padding-left: calc(var(--depth, 0) * 2ch);
 }
 
 .chevron {
   transition: transform 0.15s ease;
   color: var(--fg-muted);
+  flex-shrink: 0;
 }
 
-.category-header[aria-expanded="true"] .chevron {
+.category-header-main[aria-expanded="true"] .chevron {
   transform: rotate(180deg);
+}
+
+.category-collapse-btn {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 6px 12px;
+}
+
+.category-collapse-btn:hover,
+.category-collapse-btn:focus-visible {
+  color: var(--fg);
+}
+
+.category-collapse-btn[hidden] {
+  display: none;
 }
 
 .category-header--home {
@@ -274,15 +313,14 @@ main {
   display: none;
 }
 
-/* Nested subcategory sections indent from the left (title/stripe) and outdent from the right
-   (chevron) by 2ch each, so a subcategory's own chevron doesn't sit flush with its parent's at
-   the same x-position — .category-header is space-between, so only margin-left would leave the
-   chevron untouched. Applies only to actual nested .category sections, not the sibling .tile-grid
-   that holds the parent category's own direct tiles. Compounds naturally at deeper nesting. */
-.category-content > .category {
-  margin-left: 2ch;
-  margin-right: 2ch;
-}
+/* --depth itself is set per .category-name element from script.js (a real DOM ancestor count,
+   not a CSS self-incrementing custom property — that looked like the obvious approach but
+   Chromium resolves a custom property referencing its own name to nothing, even when the intent
+   is "the inherited value", treating it as circular). A top-level category's --depth is 0 (no
+   indent); each level of nesting adds another 2ch, to any depth. Supersedes Build 41's
+   margin-left/margin-right on `.category-content > .category`, which shrank the entire header
+   (stripe, touch target, and all) by 4ch per level — unusable at ~5 levels deep. The header row
+   itself stays full width now; only the title text indents. */
 
 .tile {
   aspect-ratio: 1 / 1;
@@ -864,7 +902,9 @@ main {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  z-index: 10;
+  /* Above .pinned-header (100) so popups never render with their top hidden behind the sticky
+     header — was 10, which lost to the header once it became sticky+layered in Build 41. */
+  z-index: 200;
 }
 
 .help-overlay:not([hidden]) {
@@ -1117,4 +1157,120 @@ main {
 .analog-style-preview-svg {
   width: 64px;
   height: 64px;
+}
+
+/* --- Tile menu: tile-style action buttons (Rename, Move, Select, Delete) --- */
+
+.tile-menu-actions {
+  display: grid;
+  /* Sized for 5 columns, matching .tile-grid's own repeat(5, 1fr), even though only 4 actions
+     exist today — leaves room for a 5th action later with no layout rework. */
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.tile-menu-action {
+  aspect-ratio: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--fg);
+  font-family: inherit;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.tile-menu-action:hover,
+.tile-menu-action:focus-visible {
+  background: var(--home-header-bg);
+  color: #fff;
+}
+
+.tile-menu-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.tile-menu-action-label {
+  font-size: 0.65rem;
+  line-height: 1.1;
+  text-align: center;
+}
+
+/* --- Multi-select batch move --- */
+
+.tile.tile-selected {
+  position: relative;
+  outline: 3px solid var(--stripe-color, var(--home-header-bg));
+  outline-offset: -3px;
+}
+
+.tile.tile-selected::after {
+  content: '\2713';
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--stripe-color, var(--home-header-bg));
+  color: #fff;
+  font-size: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.select-action-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 10px 14px;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.15);
+}
+
+.select-action-bar[hidden] {
+  display: none;
+}
+
+.select-action-status {
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  flex: 1;
+  min-width: 0;
+}
+
+.select-action-bar button {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  background: var(--surface);
+  color: var(--fg);
+}
+
+.select-action-move {
+  background: var(--home-header-bg);
+  color: var(--home-header-fg);
+  border-color: var(--home-header-bg);
+}
+
+.select-action-move:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
