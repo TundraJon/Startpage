@@ -917,8 +917,8 @@ _Five queued items, all built and verified together in one pass, per "Go ahead a
   Wan Cresc.  outer 0  0  0  0  0  0  1  1  1  1  1  0
               inner 0  0  0  0  0  0  0  1  1  1  0  0
   ```
-  `*` = genuinely borderline (position sits almost exactly on the terminator line at the 6/12 o'clock points for the two quarter phases) — pick either way, it's a coin flip at that exact pixel.
-- [ ] **Implementation approach:** in `renderDualRingNumbers` (script.js), replace the fixed `fill: '#000'` (outer) and `fill: '#c0392b'` (inner) with a per-position lookup against the table above, keyed by `weatherState.moonPhase` and the ring — dark-side positions get a light color (e.g. white or cream) instead.
+  `*` = the 6/12 o'clock positions on the two quarter phases, sitting almost exactly on the terminator line — **resolved:** these get a medium grey number color instead of picking a side, so they read fine against either the bright or dark half regardless of exactly where the terminator falls on a given device/font.
+- [ ] **Implementation approach:** in `renderDualRingNumbers` (script.js), replace the fixed `fill: '#000'` (outer) and `fill: '#c0392b'` (inner) with a per-position lookup against the table above, keyed by `weatherState.moonPhase` and the ring — dark-side positions get a light color (e.g. white or cream), bright-side positions keep today's dark color, and the four `*` positions (6 & 12, outer and inner, on First Quarter and Last Quarter only) get a medium grey.
 - [ ] **Caveat to flag to the user once built:** this table was derived from pixel-sampling *this sandbox's* emoji font. The overall shape/logic should generalize (all standard emoji sets follow the same basic phase convention), but worth a quick real-device spot-check after building, since a visually different font could shift exactly where the terminator falls for the in-between phases.
 
 ### Separate, smaller bug found while investigating the above: moon phase briefly wrong on page load
