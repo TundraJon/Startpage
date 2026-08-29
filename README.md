@@ -893,6 +893,39 @@ _Five queued items, all built and verified together in one pass, per "Go ahead a
 
 ## Build Queue
 
+### Moon-dial clock: numbers on the moon's dark side are unreadable
+
+- [ ] **Reported:** on the moon-phase analog clock face, the hour numbers sitting over the dark (unlit) side of the moon are hard to read — they're the same fixed black (outer ring)/dark-red (inner ring) as the numbers over the bright side.
+- [ ] **User asked whether real-time brightness detection is feasible — investigated directly, answer is no:** the moon face is a plain Unicode emoji (`WX_MOON_PHASE_ICONS`) rendered as an SVG `<text>` element (`renderMoonDialFace`, script.js) — there's no pixel data available from a text glyph without rendering it to a canvas and reading it back on every draw, and critically, the actual shading is produced by *the viewer's own OS/browser emoji font*, which varies (Apple vs. Google vs. Samsung vs. this Linux sandbox's font can all draw the terminator line slightly differently). A hardcoded table is more reliable than trying to detect this live.
+- [ ] **Built the lookup table by direct pixel-sampling, not guessing:** rendered each of the 8 standard phases exactly as the app does (same emoji, same 50,50 center / 85 font-size), then sampled the actual pixel luminance at all 24 label positions the numbers sit at — outer ring (radius 38, hours 1-12) and inner ring (radius 30, hours 13-23/00) — using the exact same `polarPoint` angle math already in the code. Below, `1`=bright (needs a dark number, today's behavior is fine) / `0`=dark (needs a light-colored number instead). Position order is 1-12 clockwise from just past 12 o'clock; outer/inner can differ at the same angle since the terminator curve isn't a straight radial line:
+  ```
+                    1  2  3  4  5  6  7  8  9 10 11 12
+  New Moon    outer 0  0  0  0  0  0  0  0  0  0  0  0
+              inner 0  0  0  0  0  0  0  0  0  0  0  0
+  Wax Cresc.  outer 1  1  1  1  1  0  0  0  0  0  0  0
+              inner 0  1  1  1  0  0  0  0  0  0  0  0
+  1st Quarter outer 1  1  1  1  1  *  0  0  0  0  0  *
+              inner 1  1  1  1  1  *  0  0  0  0  0  *
+  Wax Gibbous outer 1  1  1  1  1  1  0  0  0  0  0  1
+              inner 1  1  1  1  1  1  1  0  0  0  1  1
+  Full Moon   outer 1  1  1  1  1  1  1  1  1  1  1  1
+              inner 1  1  1  1  1  1  1  1  1  1  1  1
+  Wan Gibbous outer 0  0  0  0  0  1  1  1  1  1  1  1
+              inner 1  0  0  0  1  1  1  1  1  1  1  1
+  Last Quart. outer 0  0  0  0  0  *  1  1  1  1  1  *
+              inner 0  0  0  0  0  *  1  1  1  1  1  *
+  Wan Cresc.  outer 0  0  0  0  0  0  1  1  1  1  1  0
+              inner 0  0  0  0  0  0  0  1  1  1  0  0
+  ```
+  `*` = genuinely borderline (position sits almost exactly on the terminator line at the 6/12 o'clock points for the two quarter phases) — pick either way, it's a coin flip at that exact pixel.
+- [ ] **Implementation approach:** in `renderDualRingNumbers` (script.js), replace the fixed `fill: '#000'` (outer) and `fill: '#c0392b'` (inner) with a per-position lookup against the table above, keyed by `weatherState.moonPhase` and the ring — dark-side positions get a light color (e.g. white or cream) instead.
+- [ ] **Caveat to flag to the user once built:** this table was derived from pixel-sampling *this sandbox's* emoji font. The overall shape/logic should generalize (all standard emoji sets follow the same basic phase convention), but worth a quick real-device spot-check after building, since a visually different font could shift exactly where the terminator falls for the in-between phases.
+
+### Separate, smaller bug found while investigating the above: moon phase briefly wrong on page load
+
+- [ ] **Found via testing, not reported by the user:** the analog clock's `updateClock()` (which redraws the moon-dial background) only runs once immediately at page load and then again on each real minute-boundary tick (`scheduleNextClockTick`) — it never re-runs specifically when the weather fetch resolves. Since `weatherState.moonPhase` defaults to `'Full Moon'` until the real data arrives, anyone loading the page with the moon-dial style active sees the wrong phase (always a full moon) for however long the fetch takes, correcting itself only at the next whole minute.
+- [ ] **Fix:** have the weather-load success path (`applyLiveWeatherData` or its caller) trigger an immediate `updateClock()` (or at least a re-render of the analog face) once `weatherState.moonPhase` actually updates, instead of waiting for the next scheduled tick.
+
 ### Per-category collapse button: one control (not a duplicate), double-duty behavior, outdented on subcategories
 
 - [ ] **Glyph — resolved, no duplicate:** exactly one control does the collapsing, styled like Home's collapse-all button (▲) — not a second, separate glyph next to it. Since the chevron currently *also* rotates into ▲ when a category opens (`.category-header-main[aria-expanded="true"] .chevron`), that rotation needs to stop (chevron stays static, e.g. always ▾) so `.category-collapse-btn`'s ▲ is the only thing that ever shows that glyph on an open header — removes the "✕" from Build 42/43 entirely.
