@@ -4,6 +4,10 @@ Personal homepage, hosted on GitHub Pages.
 
 Live at: https://tundrajon.github.io/Startpage/
 
+## Working rules
+
+- **Never build or edit code without explicit instruction.** A bug report or feature request gets logged to `## Build Queue` below — with a precise description and, where possible, a root-cause diagnosis — and nothing else. Code only gets written once the user explicitly says to build it (e.g. "Go ahead and build," "Build them sequentially"). Reporting a bug is not, by itself, a request to fix it.
+
 ## Status
 
 Foundation in progress, per `homepage-build-spec-v7`:
