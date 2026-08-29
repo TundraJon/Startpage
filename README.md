@@ -891,6 +891,12 @@ _Five queued items, all built and verified together in one pass, per "Go ahead a
 - [x] **Root cause:** `exitSelectMode`'s cleanup queried `selectMode.grid.querySelectorAll('.tile-selected')` to strip the class — but `confirmMoveSelected` already reparents each moved tile element into the *destination* grid before calling `exitSelectMode`, so a query scoped to the (now smaller) *source* grid no longer finds them.
 - [x] **Fix:** scope that cleanup query to the whole document instead of `selectMode.grid` — safe since select mode is always exclusive to one source category, so no tile outside it could ever have picked up `.tile-selected` in the first place. Verified directly: a 2-tile batch move now leaves zero `.tile-selected` elements anywhere afterward.
 
+## Build Log 44 (completed)
+
+### Weather widget: long-press blocks vertical scroll — resolved, no code change needed
+
+- [x] **Confirmed fixed by the user on a real device.** The popup z-index fix (Build 42) was enough on its own — the original complaint was actually the weather-options popup rendering with its top behind the pinned header, not the background page's scroll gesture being mechanically blocked, matching the user's own hypothesis from when this was first logged. `touch-action: pan-y` was never applied, since it wasn't needed.
+
 ## Build Queue
 
 ### Moon-dial clock: numbers on the moon's dark side are unreadable
@@ -954,10 +960,6 @@ _Five queued items, all built and verified together in one pass, per "Go ahead a
   - Re-run hover/position detection after every `openCategoryPath`-triggered reflow during an active drag, the same way `autoScrollTick` already does for scroll-driven shifts — directly closes the gap, but on every single hover-open, not just scroll ticks.
   - Require a hover to "settle" briefly (a short delay, similar in spirit to `attachLongPress`'s timer) before it actually opens/collapses anything, so a fast sweep passing near a subcategory doesn't trigger the collapse/expand churn that causes the jump in the first place.
   - Some combination of both, or a different approach — worth discussing before building.
-
-### Weather widget: long-press blocks vertical scroll
-
-- [ ] **Still open, pending re-test on a real device.** The popup z-index fix above is now shipped — per the original build order, please re-test this specific complaint on-device before anything else changes here. This sandbox can't reproduce real mobile touch-gesture-arbitration timing, so it can't confirm on its own whether the z-index fix already resolved this (if the complaint was really "can't reach the rest of the popup") or whether it's still reproducible. If still reproducible, the next step is `touch-action: pan-y` on `.weather-widget` (removes the pan-direction ambiguity `touch-action: manipulation` currently leaves) — logged and ready to build on confirmation, not applied speculatively.
 
 ## Build Planner
 
