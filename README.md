@@ -893,6 +893,12 @@ _Five queued items, all built and verified together in one pass, per "Go ahead a
 
 ## Build Queue
 
+### Home header: collapse-all button should be right-justified
+
+- [ ] **Reported:** the collapse-all button on the Home header should sit at the right edge of the row.
+- [ ] **Root cause confirmed — a Build 42 regression:** the base `.category-header` rule (styles.css) lost its `justify-content: space-between` when it was restructured from a single flex row into a header-wrapper (needed so a collapse button could sit as a sibling of the open-button, since a `<button>` can't contain another `<button>` — see Build 42's log). Regular category headers still look correct only by coincidence: their `.category-header-main` has `flex: 1`, which fills the row and pushes `.category-collapse-btn` to the true right edge regardless of the parent's `justify-content`. Home's header never got that wrapper — it's still a plain `<h2 class="category-name">Home</h2>` sitting directly beside `.home-header-actions`, with no `flex: 1` anywhere to push the button over — so it renders flush against "Home" instead.
+- [ ] **Fix:** add `justify-content: space-between` back to `.category-header`, or (more targeted) `margin-left: auto` on `.home-header-actions` — either pushes the button to the right edge without touching the regular (already-correct) category headers.
+
 ### Move Entry: dragging past nested/subcategory content can skip over categories, including the intended target
 
 - [ ] **Reported behavior:** while dragging a tile, hovering toward "Sample Sub A-1" (`test-c-suba-1`, 3 levels deep) never opened it — the drag jumped straight from wherever it was to "Sample Category E," skipping over it entirely.
