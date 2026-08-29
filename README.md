@@ -893,6 +893,12 @@ _Five queued items, all built and verified together in one pass, per "Go ahead a
 
 ## Build Queue
 
+### Per-category collapse button: drop the "✕" glyph, match the real collapse button; outdent it on subcategories
+
+- [ ] **Requested:** individual categories' small collapse button (`.category-collapse-btn`, currently "✕") shouldn't use "✕" — it should use the same glyph/style as "the collapse button," i.e. Home's collapse-all button (▲). Subcategories' collapse button should also be outdented, matching the established "outdent = shift left, to set it apart" convention already used for subcategory chevrons/titles.
+- [ ] **Open question to resolve during the build, not guessed at:** the chevron already rotates to ▲ when a category is open (`.category-header-main[aria-expanded="true"] .chevron`), and the per-category collapse button is only ever shown while that same category is open (it's the current path's leaf) — so if the collapse button also uses ▲, it will sit directly next to the chevron's own rotated ▲, looking like two copies of the same glyph rather than two distinct controls. This is exactly why "✕" was chosen originally (Build 42's log — a real duplicate-glyph bug found and fixed during that build). Asked the user directly how to resolve this; the answer confirmed the *function* (open category's collapse button closes it) but didn't settle the glyph clash. Options for the build: stop the chevron from rotating (so only the collapse button ever shows ▲) — this seems most consistent with "use the same glyph as the collapse button" and is the leading candidate; or accept both showing ▲ side by side; worth a quick visual check before committing either way.
+- [ ] **Outdent on subcategories:** shift the collapse button left proportional to nesting depth (mirroring the title's existing `--depth`-based indent from Build 42, just in the opposite direction) so a deeply-nested open subcategory's collapse button visually sets itself apart the same way its indented title already does. Exact amount (e.g. same 2ch-per-level as the title) to match during the build.
+
 ### Home header: collapse-all button should be right-justified
 
 - [ ] **Reported:** the collapse-all button on the Home header should sit at the right edge of the row.
