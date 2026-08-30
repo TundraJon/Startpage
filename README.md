@@ -897,67 +897,45 @@ _Five queued items, all built and verified together in one pass, per "Go ahead a
 
 - [x] **Confirmed fixed by the user on a real device.** The popup z-index fix (Build 42) was enough on its own — the original complaint was actually the weather-options popup rendering with its top behind the pinned header, not the background page's scroll gesture being mechanically blocked, matching the user's own hypothesis from when this was first logged. `touch-action: pan-y` was never applied, since it wasn't needed.
 
+## Build Log 45 (completed)
+
+_Five queued items, all built and verified together in one pass, per "Go ahead and build the build queue"._
+
+### Moon-dial clock: numbers on the moon's dark side are now readable
+
+- [x] `renderDualRingNumbers` (script.js) now looks up each label's color from `WX_MOON_DIAL_BRIGHTNESS`, keyed by `weatherState.moonPhase` — the exact table built earlier by pixel-sampling the real rendering (see Build Queue history), confirmed against the user's own real-device read of New Moon (all bright) and Full Moon (all dark). Bright-side positions keep today's black/dark-red; dark-side positions get white (outer) / light coral (inner); the four genuinely-borderline positions (6 & 12 o'clock, both rings, on the two quarter phases only) get medium grey. Only `moon-dial` is affected — the plain `dual-ring` 24-hour style (no moon background) keeps its fixed colors unchanged, since it doesn't pass a `moonPhase` argument.
+- [x] Verified directly: rendered First Quarter and pixel-checked all 24 label fills against the table exactly (`#000`/`#fff`/`#888` outer, `#c0392b`/`#ff8a80`/`#888` inner) — matched perfectly.
+- [x] **Caveat that still stands:** the table was derived from this sandbox's emoji font; a visually different font on the user's real device could shift exactly where the terminator falls for the in-between (crescent/gibbous) phases. New Moon and Full Moon are confirmed correct by the user already, since those two don't depend on the terminator's exact position at all.
+
+### Moon phase no longer briefly wrong on page load
+
+- [x] `applyLiveWeatherData` now calls `updateClock()` once the real `weatherState.moonPhase` is in, instead of leaving the analog face showing its placeholder default until the next minute-boundary tick. Verified directly: the moon-dial face shows the real phase emoji within ~1s of load, well before any minute tick.
+
+### Per-category collapse button: one control, double-duty behavior, outdented on subcategories
+
+- [x] The chevron no longer rotates (removed `.category-header-main[aria-expanded="true"] .chevron` transform rule) — it's a static indicator now, so `.category-collapse-btn`'s ▲ (changed back from Build 42/43's "✕") is the only thing that ever shows that glyph on an open header. No more duplicate.
+- [x] Double-duty behavior implemented via a new `leafLinksCollapsed` flag alongside `openPath`: a with-subcategories leaf's first collapse-button tap hides just its own links while staying on the path (subcategory rows stay visible/tappable); a second tap (or a flat category's only tap) fully closes the level, same as before. Reset to `false` on any real navigation so own-links always show fresh per the existing fallback rule.
+- [x] Outdent implemented by moving where `--depth` gets set — from directly on `.category-name` to the shared `.category-header` wrapper, so it also inherits down to `.category-collapse-btn` (a sibling, not a descendant of `.category-name`). `margin-right: calc(var(--depth, 0) * 2ch)` mirrors the title's `padding-left` indent in the opposite direction.
+- [x] Verified directly: chevron computed transform is `none` on an open header; a with-subcategories category needs exactly two taps to fully close (own links hide first, subcategory rows stay reachable, then the second tap closes it); a flat category still closes in one tap; the collapse button visibly shifts left with depth in a 2-level-deep screenshot.
+
+### Home header: collapse-all button now right-justified
+
+- [x] `margin-left: auto` added to `.home-header-actions` — pushes just this element to the header's right edge without touching the already-correct regular category headers (whose `.category-header-main` flex: 1 was doing this incidentally). Verified directly: button sits flush against the header's right edge (14px gap, matching its own padding) instead of flush against "Home."
+
+### Move Entry: drag-hover skip-over-categories bug — hover-settle, with a real gap found and closed during the build
+
+- [x] Implemented the decided approach: `handleHeaderHover` now gates the actual `openCategoryPath` call behind a 220ms settle timer (`HOVER_SETTLE_MS`), mirroring `attachLongPress`'s timer pattern — cancelled immediately if the pointer moves to a different header, or if the drag ends, before it fires. The `.move-drop-target` highlight and `crossTargetId` (read at drop time) still update immediately on hover, so feedback stays instant even though the actual open/collapse waits.
+- [x] **Verified the settle delay alone wasn't sufficient — found via direct testing, not assumed:** a scripted slow, continuous, one-directional drag still skipped straight past `test-c`/`test-c-suba`/`test-c-suba-1` to `test-d` even with the settle timer in place. Root cause: the settle delay only stops a *fast sweep that never truly pauses* from opening anything — once a hover does genuinely settle and open a subcategory (the whole point of this feature), the exact same collapse/expand height-asymmetry jump from the original bug still fires right after, since nothing was re-checking the pointer's position against the post-shift layout.
+- [x] **Fixed by adding one more piece, not present in the original plan:** immediately after the settle timer fires and calls `openCategoryPath`, it now also re-runs `processDragPosition` against the last known pointer coordinates — the same justification `autoScrollTick` already uses for scroll-driven shifts. This re-syncs the hover state to whatever the just-completed open actually moved under the pointer, so the next real category is correctly detected instead of the app silently holding onto a stale target.
+- [x] **Verified directly, and the distinction matters:** a scripted drag that deliberately pauses at each header in turn — moving to that header's live, current position and waiting, the way a real user visually tracking the changing layout would — reaches `test-c-suba-1` correctly every time. A synthetic one-directional sweep that never adjusts to what's now on-screen can still end up past where a target has moved to, since that's a genuine physical consequence of the layout shift itself (the target's on-screen position moved out of the pointer's fixed path), not something a hover-timing change alone can fully eliminate. This matches what the user described wanting (deliberate hover-to-open, no instant cascading) and is confirmed working for that interaction pattern.
+
+### Regression check
+
+- [x] Full Playwright sweep across everything from Build 42-44 plus this build's changes: global exclusivity navigation, Move Entry (single-tile cross-category and same-category), multi-select batch move (including the Build 43 stuck-selection fix), popup z-index, clock context-menu prevention, and all five items above — zero console/page errors throughout.
+
 ## Build Queue
 
-### Moon-dial clock: numbers on the moon's dark side are unreadable
-
-- [ ] **Reported:** on the moon-phase analog clock face, the hour numbers sitting over the dark (unlit) side of the moon are hard to read — they're the same fixed black (outer ring)/dark-red (inner ring) as the numbers over the bright side.
-- [ ] **User asked whether real-time brightness detection is feasible — investigated directly, answer is no:** the moon face is a plain Unicode emoji (`WX_MOON_PHASE_ICONS`) rendered as an SVG `<text>` element (`renderMoonDialFace`, script.js) — there's no pixel data available from a text glyph without rendering it to a canvas and reading it back on every draw, and critically, the actual shading is produced by *the viewer's own OS/browser emoji font*, which varies (Apple vs. Google vs. Samsung vs. this Linux sandbox's font can all draw the terminator line slightly differently). A hardcoded table is more reliable than trying to detect this live.
-- [ ] **Built the lookup table by direct pixel-sampling, not guessing:** rendered each of the 8 standard phases exactly as the app does (same emoji, same 50,50 center / 85 font-size), then sampled the actual pixel luminance at all 24 label positions the numbers sit at — outer ring (radius 38, hours 1-12) and inner ring (radius 30, hours 13-23/00) — using the exact same `polarPoint` angle math already in the code. Below, `1`=bright (needs a dark number, today's behavior is fine) / `0`=dark (needs a light-colored number instead). Position order is 1-12 clockwise from just past 12 o'clock; outer/inner can differ at the same angle since the terminator curve isn't a straight radial line:
-  ```
-                    1  2  3  4  5  6  7  8  9 10 11 12
-  New Moon    outer 0  0  0  0  0  0  0  0  0  0  0  0
-              inner 0  0  0  0  0  0  0  0  0  0  0  0
-  Wax Cresc.  outer 1  1  1  1  1  0  0  0  0  0  0  0
-              inner 0  1  1  1  0  0  0  0  0  0  0  0
-  1st Quarter outer 1  1  1  1  1  *  0  0  0  0  0  *
-              inner 1  1  1  1  1  *  0  0  0  0  0  *
-  Wax Gibbous outer 1  1  1  1  1  1  0  0  0  0  0  1
-              inner 1  1  1  1  1  1  1  0  0  0  1  1
-  Full Moon   outer 1  1  1  1  1  1  1  1  1  1  1  1
-              inner 1  1  1  1  1  1  1  1  1  1  1  1
-  Wan Gibbous outer 0  0  0  0  0  1  1  1  1  1  1  1
-              inner 1  0  0  0  1  1  1  1  1  1  1  1
-  Last Quart. outer 0  0  0  0  0  *  1  1  1  1  1  *
-              inner 0  0  0  0  0  *  1  1  1  1  1  *
-  Wan Cresc.  outer 0  0  0  0  0  0  1  1  1  1  1  0
-              inner 0  0  0  0  0  0  0  1  1  1  0  0
-  ```
-  `*` = the 6/12 o'clock positions on the two quarter phases, sitting almost exactly on the terminator line — **resolved:** these get a medium grey number color instead of picking a side, so they read fine against either the bright or dark half regardless of exactly where the terminator falls on a given device/font.
-- [ ] **Implementation approach:** in `renderDualRingNumbers` (script.js), replace the fixed `fill: '#000'` (outer) and `fill: '#c0392b'` (inner) with a per-position lookup against the table above, keyed by `weatherState.moonPhase` and the ring — dark-side positions get a light color (e.g. white or cream), bright-side positions keep today's dark color, and the four `*` positions (6 & 12, outer and inner, on First Quarter and Last Quarter only) get a medium grey.
-- [ ] **Caveat to flag to the user once built:** this table was derived from pixel-sampling *this sandbox's* emoji font. The overall shape/logic should generalize (all standard emoji sets follow the same basic phase convention), but worth a quick real-device spot-check after building, since a visually different font could shift exactly where the terminator falls for the in-between phases.
-
-### Separate, smaller bug found while investigating the above: moon phase briefly wrong on page load
-
-- [ ] **Found via testing, not reported by the user:** the analog clock's `updateClock()` (which redraws the moon-dial background) only runs once immediately at page load and then again on each real minute-boundary tick (`scheduleNextClockTick`) — it never re-runs specifically when the weather fetch resolves. Since `weatherState.moonPhase` defaults to `'Full Moon'` until the real data arrives, anyone loading the page with the moon-dial style active sees the wrong phase (always a full moon) for however long the fetch takes, correcting itself only at the next whole minute.
-- [ ] **Fix:** have the weather-load success path (`applyLiveWeatherData` or its caller) trigger an immediate `updateClock()` (or at least a re-render of the analog face) once `weatherState.moonPhase` actually updates, instead of waiting for the next scheduled tick.
-
-### Per-category collapse button: one control (not a duplicate), double-duty behavior, outdented on subcategories
-
-- [ ] **Glyph — resolved, no duplicate:** exactly one control does the collapsing, styled like Home's collapse-all button (▲) — not a second, separate glyph next to it. Since the chevron currently *also* rotates into ▲ when a category opens (`.category-header-main[aria-expanded="true"] .chevron`), that rotation needs to stop (chevron stays static, e.g. always ▾) so `.category-collapse-btn`'s ▲ is the only thing that ever shows that glyph on an open header — removes the "✕" from Build 42/43 entirely.
-- [ ] **Double-duty behavior — new, more precise than what Build 42 shipped:**
-  - **A category that has subcategories:** tapping its collapse button while its own links are showing hides just the own-links tile-grid — the category stays on the open path (its header stays "open," its subcategory rows stay visible/tappable, exactly like they already are today whenever this category is on path). Tapping the collapse button *again*, now that nothing is shown under it, fully closes this level (pops it off the path, falls back to the parent the same way it does today).
-  - **A flat category with no subcategories** (News, Shopping, Entertainment, and most of the current sample content): there's nothing to stay open *for*, so it keeps today's single-tap full collapse — no reason to add a second tap where there's no deeper content to preserve access to.
-  - **Technical note for the build:** this needs one more piece of transient state beyond the existing `openPath` array — something like a `leafLinksCollapsed` flag, true only right after the first tap on a with-subcategories leaf, false whenever navigation actually changes the leaf (a fresh `openCategoryPath` call, or popping to a *different* leaf) so own-links always show fresh again the normal way, per the existing "falls back to own links" rule. `ownGridEl.hidden` needs this flag folded in alongside the existing `onPath(id) && isPathLeaf(id)` check.
-- [ ] **Outdent on subcategories:** shift the collapse button left proportional to nesting depth (mirroring the title's existing `--depth`-based indent from Build 42, just in the opposite direction) so a deeply-nested open subcategory's collapse button visually sets itself apart the same way its indented title already does. Exact amount (e.g. same 2ch-per-level as the title) to match during the build.
-
-### Home header: collapse-all button should be right-justified
-
-- [ ] **Reported:** the collapse-all button on the Home header should sit at the right edge of the row.
-- [ ] **Root cause confirmed — a Build 42 regression:** the base `.category-header` rule (styles.css) lost its `justify-content: space-between` when it was restructured from a single flex row into a header-wrapper (needed so a collapse button could sit as a sibling of the open-button, since a `<button>` can't contain another `<button>` — see Build 42's log). Regular category headers still look correct only by coincidence: their `.category-header-main` has `flex: 1`, which fills the row and pushes `.category-collapse-btn` to the true right edge regardless of the parent's `justify-content`. Home's header never got that wrapper — it's still a plain `<h2 class="category-name">Home</h2>` sitting directly beside `.home-header-actions`, with no `flex: 1` anywhere to push the button over — so it renders flush against "Home" instead.
-- [ ] **Fix:** add `justify-content: space-between` back to `.category-header`, or (more targeted) `margin-left: auto` on `.home-header-actions` — either pushes the button to the right edge without touching the regular (already-correct) category headers.
-
-### Move Entry: dragging past nested/subcategory content can skip over categories, including the intended target
-
-- [ ] **Reported behavior:** while dragging a tile, hovering toward "Sample Sub A-1" (`test-c-suba-1`, 3 levels deep) never opened it — the drag jumped straight from wherever it was to "Sample Category E," skipping over it entirely.
-- [ ] **Reproduced and root-caused directly** (not guessed) — a step-by-step Playwright trace of a slow, continuous drag down through the category list, dumping the real open path and every header's on-screen position at each 2px increment, isolated the exact mechanism:
-  1. Hovering opens a category via `openCategoryPath`, which — per Build 42's global-exclusive navigation — collapses whatever else was open anywhere else, including something opened just moments earlier by this same drag's own hovering (e.g. a sibling subcategory revealed in passing).
-  2. If the thing that just collapsed had **real height** (a subcategory showing several tiles) while the thing that just opened has **little or none** (an empty subcategory with just its "+" button), the net effect is strongly *negative* — everything below jumps sharply *upward*.
-  3. That jump can be large enough to land a completely unrelated, much-further-down header (in the reproduction: `test-d`, two categories past the intended `test-c-suba-1`) exactly under the pointer's **current, unmoved** screen position — the content moved, not the cursor.
-  4. Move Entry only re-evaluates what's under the pointer on a real `pointermove` event (the one exception being auto-scroll's tick loop, which deliberately re-runs position processing each frame specifically because "the page moved under a stationary pointer"). An ordinary hover-triggered collapse/expand has no equivalent re-check, so the very next real pointer event — even a 2px one — evaluates the *post-shift* position and treats whatever landed there as the new target. The categories in between (here: `test-c`, `test-c-suba`, `test-c-suba-1`) are never actually detected as hovered at any point — the pointer's on-screen coordinates never coincided with their headers at a moment a pointermove event fired, because the header moved instead of the pointer.
-- [ ] **This is a design-level consequence of Build 42's global exclusivity applied to live drag-hover, not an isolated coding slip.** The original Build 42 planning notes anticipated the drag's own *source* category collapsing mid-drag and judged that fine (the tile is detached, doesn't get lost) — but didn't anticipate that hovering can also collapse *other, unrelated* content the same drag opened only moments before, and that an asymmetric height swap there can throw the hover target somewhere far away in a single step, skipping real categories — including, as reported, the one the user was actually trying to reach.
-- [ ] **Decided: hover must "settle" briefly before it opens/collapses anything** — a short delay, similar in spirit to `attachLongPress`'s timer, applied to every header hover during a drag, not just the first one. This means the churn that causes the jump never fires in the first place: a fast sweep passing near a subcategory doesn't trigger anything until the pointer actually holds still over that header for the settle period. The user specifically likes the added effect of this beyond just fixing the skip bug: after opening a category with several subcategories, sweeping down through its subcategory list won't instantly cascade-open each one in turn as the pointer passes over them — each still needs its own brief hover to actually open. (The alternative — re-running hover detection after every layout shift, the same way `autoScrollTick` already does for scroll-driven ones — was considered but not chosen.)
-- [ ] **Implementation sketch for the build:** `handleHeaderHover` currently calls `openCategoryPath(id)` immediately on the first hover of a new header. Needs a `setTimeout` gate instead (mirroring `attachLongPress`'s `pressTimer` pattern) — start a timer when a new header is hovered, only call `openCategoryPath(id)` if the pointer is still over that same header when it fires; cancel the timer immediately if the header changes or the drag ends before it fires. Exact delay to tune during the build (something shorter than `attachLongPress`'s 550ms `LONG_PRESS_MS` likely feels right here, since this is a hover-while-already-dragging gesture, not an initial press-and-hold).
+_Empty — nothing currently queued. New reports and requests get logged here first, per the working rule above; nothing gets built until an explicit go-ahead._
 
 ## Build Planner
 

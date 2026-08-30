@@ -212,21 +212,19 @@ main {
   font-weight: 600;
   font-size: 1rem;
   margin: 0;
-  /* Self-incrementing custom property: each nested .category-content bumps --depth by 1, so a
-     subcategory's title indents by nesting depth with no per-level CSS needed. Only the title
-     text indents — the header row itself (stripe, background, touch target, collapse button)
-     stays full width at every depth, so neither shrinks no matter how deep the nesting goes. */
+  /* --depth is set per-header (on .category-header, the wrapper both this and .category-collapse-btn
+     live under) from script.js — a real DOM ancestor count, not a CSS self-incrementing custom
+     property (that looked like the obvious approach but Chromium resolves a custom property
+     referencing its own name to nothing, even meaning "the inherited value", treating it as
+     circular). Only the title text indents — the header row itself (stripe, background, touch
+     target, collapse button) stays full width at every depth, so neither shrinks no matter how
+     deep the nesting goes. */
   padding-left: calc(var(--depth, 0) * 2ch);
 }
 
 .chevron {
-  transition: transform 0.15s ease;
   color: var(--fg-muted);
   flex-shrink: 0;
-}
-
-.category-header-main[aria-expanded="true"] .chevron {
-  transform: rotate(180deg);
 }
 
 .category-collapse-btn {
@@ -237,6 +235,10 @@ main {
   cursor: pointer;
   font-size: 0.8rem;
   padding: 6px 12px;
+  /* Outdents on subcategories, mirroring .category-name's indent in the opposite direction, so a
+     deeply-nested open subcategory's collapse button visually sets itself apart the same way its
+     indented title already does. */
+  margin-right: calc(var(--depth, 0) * 2ch);
 }
 
 .category-collapse-btn:hover,
@@ -263,6 +265,12 @@ main {
 .home-header-actions {
   display: flex;
   gap: 2px;
+  /* .category-header lost justify-content: space-between in Build 42's restructuring; regular
+     category headers still push their collapse button to the right edge by coincidence
+     (.category-header-main's flex: 1 fills the row regardless), but Home's plain <h2> + this div
+     has nothing to do that — margin-left: auto pushes just this element over instead, without
+     touching the (already-correct) regular category headers. */
+  margin-left: auto;
 }
 
 .home-header-action-btn {

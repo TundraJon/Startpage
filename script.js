@@ -141,6 +141,12 @@
   const categoryToggles = new Map();
   const CATEGORY_OPEN_PATH_KEY = 'category-open-path';
   let openPath = [];
+  // True right after a first tap on a with-subcategories leaf's collapse button hides its own
+  // links while keeping it on the path (its subcategory rows stay visible/tappable) — double-duty
+  // collapse: a second tap, now that nothing is shown under it, fully closes that level. Reset to
+  // false whenever navigation actually changes the leaf, so own-links always show fresh again per
+  // the normal "falls back to own links" rule.
+  let leafLinksCollapsed = false;
   // Multi-select batch move state (declared here, ahead of renderOpenPath's first call below,
   // since updateSelectActionBar reads it and function declarations alone don't save a `let` from
   // its temporal dead zone). The rest of the feature is implemented further down, after Move Entry.
@@ -174,8 +180,9 @@
       entry.mainBtn.setAttribute('aria-expanded', String(onPath));
       // Own direct links are the default child shown when a category-with-subcategories opens —
       // visible only while this category is the deepest (leaf) selection, hidden as soon as one
-      // of its subcategories becomes the active child instead.
-      if (entry.ownGridEl) entry.ownGridEl.hidden = !(onPath && isPathLeaf(id));
+      // of its subcategories becomes the active child instead, or the leaf's collapse button has
+      // hidden them via the double-duty behavior below.
+      if (entry.ownGridEl) entry.ownGridEl.hidden = !(onPath && isPathLeaf(id) && !leafLinksCollapsed);
       entry.collapseBtn.hidden = !isPathLeaf(id);
     });
     localStorage.setItem(CATEGORY_OPEN_PATH_KEY, JSON.stringify(openPath));
@@ -186,16 +193,29 @@
 
   function openCategoryPath(id) {
     openPath = categoryAncestorChain(id);
+    leafLinksCollapsed = false;
     renderOpenPath();
   }
 
+  // Double duty: a with-subcategories leaf's first tap hides just its own links, staying on the
+  // path so its subcategory rows remain visible/tappable — a second tap (nothing shown under it
+  // anymore) fully closes this level. A flat category (no subcategories) has nothing to stay open
+  // for, so it keeps a single-tap full collapse.
   function collapseLeafCategory() {
-    openPath.pop();
+    const leafId = openPath[openPath.length - 1];
+    const entry = categoryToggles.get(leafId);
+    if (entry && entry.ownGridEl && !leafLinksCollapsed) {
+      leafLinksCollapsed = true;
+    } else {
+      openPath.pop();
+      leafLinksCollapsed = false;
+    }
     renderOpenPath();
   }
 
   function collapseAllCategories() {
     openPath = [];
+    leafLinksCollapsed = false;
     renderOpenPath();
   }
 
@@ -222,7 +242,10 @@
       if (ancestor.classList && ancestor.classList.contains('category-content')) depth++;
       ancestor = ancestor.parentElement;
     }
-    mainBtn.querySelector('.category-name').style.setProperty('--depth', String(depth));
+    // Set on the header wrapper (not directly on .category-name) so it inherits down to both
+    // .category-name (nested inside .category-header-main) and .category-collapse-btn (its
+    // sibling) — the collapse button outdents by the same depth, in the opposite direction.
+    header.style.setProperty('--depth', String(depth));
 
     categoryToggles.set(id, { section, contentEl, ownGridEl, mainBtn, collapseBtn });
 
@@ -737,32 +760,60 @@
     moveMode = null;
   }
 
-  // Opening a category via header-hover during a drag now just calls openCategoryPath — the
-  // global single-open-path system (above) already collapses whatever else was open, including
-  // the drag's own source category, as a direct consequence of the same rule normal browsing
-  // uses. This replaces Build 41's bespoke per-drag auto-collapse tracking (autoExpandedIds /
-  // updateAutoCollapse), which existed only because the old accordion had no exclusivity of its
-  // own to lean on.
+  // A hover must "settle" briefly before it actually opens/collapses anything — opening a
+  // category via header-hover collapses whatever else was open (the same global single-open-path
+  // rule normal browsing uses), and if the thing collapsing was tall while the thing opening is
+  // short, a fast sweep could jump the hover target somewhere far away in a single step, skipping
+  // real categories in between (including the one being dragged toward). Gating the actual
+  // openCategoryPath call behind a short timer — cancelled if the pointer moves off before it
+  // fires — means that churn never starts in the first place for a sweep that's just passing
+  // through. This also means sweeping down through a freshly-opened category's own subcategory
+  // list won't cascade-open each one in turn; each still needs its own brief hover to open.
+  const HOVER_SETTLE_MS = 220;
+
   function handleHeaderHover(headerEl) {
     if (dragInfo.lastHeaderEl === headerEl) return;
     if (dragInfo.lastHeaderEl) dragInfo.lastHeaderEl.classList.remove('move-drop-target');
+    if (dragInfo.hoverSettleTimer) {
+      clearTimeout(dragInfo.hoverSettleTimer);
+      dragInfo.hoverSettleTimer = null;
+    }
     dragInfo.lastHeaderEl = null;
     dragInfo.crossTargetId = null;
     const section = headerEl.closest('.category');
     if (!section) return;
     const id = section.dataset.categoryId;
-    // Re-hovering the drag's own original source header (e.g. dragging away then back) is
-    // handled the same as any other header — it reopens via the same global rule. finishTileDrag
-    // separately guards against treating crossTargetId === sourceCategoryId as a real
-    // cross-category append, so this is safe either way.
-    openCategoryPath(id);
+    // The highlight shows immediately (instant feedback this is the current hover target) and
+    // crossTargetId (read at drop time) tracks it immediately too — only the actual navigation
+    // (openCategoryPath, which is what causes the collapse/expand churn) waits for the settle
+    // timer. Re-hovering the drag's own original source header (e.g. dragging away then back) is
+    // handled the same as any other header — it reopens via the same global rule once settled.
+    // finishTileDrag separately guards against treating crossTargetId === sourceCategoryId as a
+    // real cross-category append, so this is safe either way.
     headerEl.classList.add('move-drop-target');
     dragInfo.lastHeaderEl = headerEl;
     dragInfo.crossTargetId = id;
+    dragInfo.hoverSettleTimer = setTimeout(() => {
+      dragInfo.hoverSettleTimer = null;
+      openCategoryPath(id);
+      // The settle delay only stops a *fast sweep* from ever triggering an open — once a hover
+      // genuinely does settle and open something, the same collapse/expand height-asymmetry jump
+      // from the original bug can still throw an unrelated header under the pointer's current,
+      // unmoved position (confirmed directly: without this line, a slow, deliberate drag still
+      // skipped straight from one subcategory to a much-further category). Re-running position
+      // detection against the last known pointer coordinates immediately after — the same
+      // justification autoScrollTick already uses for scroll-driven shifts — catches whatever the
+      // open itself just moved, so the very next real category actually gets detected.
+      if (dragInfo) processDragPosition(dragInfo.lastClientX, dragInfo.lastClientY);
+    }, HOVER_SETTLE_MS);
   }
 
   function clearHeaderHover() {
     if (dragInfo.lastHeaderEl) dragInfo.lastHeaderEl.classList.remove('move-drop-target');
+    if (dragInfo.hoverSettleTimer) {
+      clearTimeout(dragInfo.hoverSettleTimer);
+      dragInfo.hoverSettleTimer = null;
+    }
     dragInfo.lastHeaderEl = null;
     dragInfo.crossTargetId = null;
   }
@@ -781,6 +832,7 @@
       grabDY: e.clientY - rect.top,
       crossTargetId: null,
       lastHeaderEl: null,
+      hoverSettleTimer: null,
       originalNextSibling: tileEl.nextSibling,
       lastClientX: e.clientX,
       lastClientY: e.clientY,
@@ -805,6 +857,9 @@
       document.removeEventListener('pointermove', onTileDragMove);
       document.removeEventListener('pointerup', onTileDragUp);
       document.removeEventListener('pointercancel', onTileDragUp);
+      // A pending hover-settle timer captures `id`/the header via closure, not dragInfo itself —
+      // without this it would still fire openCategoryPath after the drag has already ended.
+      if (dragInfo && dragInfo.hoverSettleTimer) clearTimeout(dragInfo.hoverSettleTimer);
     };
   }
 
@@ -1211,6 +1266,30 @@
   // also carries the matching 24-hour number at the same angle, closer to center.
   const WX_DUAL_RING_INNER = { 1: '13', 2: '14', 3: '15', 4: '16', 5: '17', 6: '18', 7: '19', 8: '20', 9: '21', 10: '22', 11: '23', 12: '00' };
 
+  // 'moon-dial' only: which of the 12 outer/inner label positions sit over the moon emoji's lit
+  // vs. unlit side, per phase — derived by pixel-sampling the actual rendered emoji at each
+  // position (not guessed), since the moon face has no accessible pixel data at render time and
+  // the real shading depends on the viewer's own emoji font. 1 = lit (today's dark number color
+  // stays readable), 0 = unlit (needs a light number instead), 'g' = sits almost exactly on the
+  // terminator line on the two quarter phases — gets a medium grey that reads fine either way.
+  // Index 0 is hour 1 (or 13, on the inner ring), index 11 is hour 12 (or 00).
+  const WX_MOON_DIAL_BRIGHTNESS = {
+    'New Moon': { outer: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], inner: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+    'Waxing Crescent': { outer: [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0], inner: [0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0] },
+    'First Quarter': { outer: [1, 1, 1, 1, 1, 'g', 0, 0, 0, 0, 0, 'g'], inner: [1, 1, 1, 1, 1, 'g', 0, 0, 0, 0, 0, 'g'] },
+    'Waxing Gibbous': { outer: [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1], inner: [1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1] },
+    'Full Moon': { outer: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], inner: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] },
+    'Waning Gibbous': { outer: [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1], inner: [1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1] },
+    'Last Quarter': { outer: [0, 0, 0, 0, 0, 'g', 1, 1, 1, 1, 1, 'g'], inner: [0, 0, 0, 0, 0, 'g', 1, 1, 1, 1, 1, 'g'] },
+    'Waning Crescent': { outer: [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0], inner: [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0] },
+  };
+
+  function moonDialNumberColor(brightness, ring) {
+    if (brightness === 'g') return '#888';
+    if (brightness === 1) return ring === 'outer' ? '#000' : '#c0392b';
+    return ring === 'outer' ? '#fff' : '#ff8a80';
+  }
+
   function renderNumberedBadgeNumbers(svg, cx, cy) {
     for (let i = 1; i <= 12; i++) {
       const p = polarPoint(cx, cy, 36, i * 30);
@@ -1223,8 +1302,10 @@
 
   // Shared by 'dual-ring' (24-hour) and 'moon-dial' (both): outer black 1-12, inner red 13-23/00
   // at the same angle as their outer counterpart, plus a tick mark only at each of the 12
-  // positions (no minute ticks).
-  function renderDualRingNumbers(svg, cx, cy) {
+  // positions (no minute ticks). moonPhase is only passed by 'moon-dial' — 'dual-ring' has no
+  // moon background, so its numbers always keep the fixed default colors.
+  function renderDualRingNumbers(svg, cx, cy, moonPhase) {
+    const brightness = moonPhase && WX_MOON_DIAL_BRIGHTNESS[moonPhase];
     for (let i = 1; i <= 12; i++) {
       const angle = i * 30;
       const outer = polarPoint(cx, cy, 46, angle);
@@ -1232,12 +1313,14 @@
       svg.appendChild(svgEl('line', {
         x1: outer.x, y1: outer.y, x2: inner.x, y2: inner.y, stroke: '#333', 'stroke-width': 1.2,
       }));
+      const outerFill = brightness ? moonDialNumberColor(brightness.outer[i - 1], 'outer') : '#000';
       const op = polarPoint(cx, cy, 38, angle);
-      const ot = svgEl('text', { x: op.x, y: op.y + 3.5, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 'bold', fill: '#000' });
+      const ot = svgEl('text', { x: op.x, y: op.y + 3.5, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 'bold', fill: outerFill });
       ot.textContent = String(i);
       svg.appendChild(ot);
+      const innerFill = brightness ? moonDialNumberColor(brightness.inner[i - 1], 'inner') : '#c0392b';
       const ip = polarPoint(cx, cy, 30, angle);
-      const it = svgEl('text', { x: ip.x, y: ip.y + 2.5, 'text-anchor': 'middle', 'font-size': 7, fill: '#c0392b' });
+      const it = svgEl('text', { x: ip.x, y: ip.y + 2.5, 'text-anchor': 'middle', 'font-size': 7, fill: innerFill });
       it.textContent = WX_DUAL_RING_INNER[i];
       svg.appendChild(it);
     }
@@ -1255,7 +1338,7 @@
     moonText.textContent = moonEmoji;
     svg.appendChild(moonText);
 
-    renderDualRingNumbers(svg, cx, cy);
+    renderDualRingNumbers(svg, cx, cy, weatherState.moonPhase);
   }
 
   function renderAnalogFace(svg, hour12, analogStyle) {
@@ -3205,6 +3288,12 @@
       const tzPill = document.getElementById('clock-tz-pill');
       if (abbr && tzPill) tzPill.textContent = abbr;
     }
+
+    // The analog clock only otherwise redraws once at load (before this data exists) and again
+    // on each real minute-boundary tick — without this, the moon-dial style would keep showing
+    // weatherState.moonPhase's placeholder default (always a full moon) for however long the
+    // fetch took, correcting itself only once the next minute ticked over.
+    updateClock();
   }
 
   async function loadLiveWeather(force) {
