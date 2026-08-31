@@ -935,6 +935,16 @@ _Five queued items, all built and verified together in one pass, per "Go ahead a
 
 ## Build Queue
 
+### Tile usage statistics: creation date, last-used date, use count
+
+- [ ] **Requested:** track, per tile, when it was created, when it was last opened, and how many times it's been opened.
+- [ ] **Not surfaced anywhere yet, by design:** recorded silently for now — no UI change. The user confirmed this could later feed a "sort by most-used" or "flag unused tiles for cleanup" feature, but that's explicitly out of scope for this entry; surfacing it is a separate future request.
+- [ ] **Schema:** each tile object (currently `{id, name, url}` in the `category-tiles-<categoryId>` localStorage arrays) gains three fields: `createdAt` (timestamp, set once), `lastUsedAt` (timestamp, `null` until first opened), `useCount` (integer, starts at 0).
+- [ ] **New tiles:** the add-tile flow (`addTileSubmit`'s click handler, script.js) sets `createdAt: Date.now(), lastUsedAt: null, useCount: 0` on the object pushed to storage, alongside the existing `id`/`name`/`url`.
+- [ ] **Existing tiles — backfill decided:** `createdAt` shows today's date (the date this ships) for every tile that already exists, same "best available proxy" reasoning already used for the one-time seed-tile migration. Implementation: extend `loadCategoryTiles`'s existing per-tile safety-net loop (script.js — currently backfills a missing `id` via `newTileId()`) to also backfill any tile missing `createdAt`/`lastUsedAt`/`useCount` the same way, reusing the same `changed` flag and `saveCategoryTiles` write-back already there. No new migration-flag key needed — the per-field `undefined` check is enough, and it naturally covers tiles added between now and whenever this actually ships too.
+- [ ] **Recording a use:** `buildTileElement`'s existing click listener (script.js) already branches on `moveMode`/`selectMode` to intercept taps during those modes — add a final branch for the ordinary case (neither mode active, so the click is a real navigation) that looks up the tile's `id` in its category's stored array, sets `lastUsedAt = Date.now()`, increments `useCount`, and saves. Since tiles open via `target="_blank"` (a new tab), the current page never unloads, so there's no race to worry about — the write completes normally in the same synchronous handler.
+- [ ] **Out of scope for this entry:** Move Entry and multi-select both relocate the *same* tile object between categories rather than recreating it, so a moved tile's stats already carry over automatically — no extra work needed there.
+
 ### Move Entry: dragged tile visually disappears while dragging back up over unrelated categories
 
 - [ ] **Reported behavior:** moving a tile downward works fine; after opening a subcategory along the way and then dragging back up, the tile disappears from under the finger — it reappears only once dragging back down again.
