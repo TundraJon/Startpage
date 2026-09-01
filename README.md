@@ -1005,6 +1005,12 @@ _Five queued items, all built and verified together in one pass, per "Build the 
 - [x] **Confirmed with the user:** also reroll the placeholder weather figures to match, not just the location name.
 - [ ] **Fix:** change `weatherState.locationName`'s default (script.js) and the static text inside `#weather-location` (index.html) to `'McMurdo Station, Antarctica'`. Reroll the rest of the placeholder object to something Antarctic and internally consistent, e.g. condition code `1117` ("Blizzard," already in `WX_CONDITIONS` — matches McMurdo's real, famous "Condition One" storms) with `tempF: -20, hiF: -10, loF: -30, feelsF: -35, windMph: 35, humidity: 60, dewPointF: -25, uv: 0, visibilityMi: 1`. `moonPhase` stays as-is — unrelated to location.
 
+### Weather widget: FALLBACK_COORDS should default to Orlando, FL
+
+- [ ] **Requested:** `FALLBACK_COORDS` should default to Orlando, FL.
+- [ ] **Confirmed this is a different constant from the McMurdo placeholder above, not a duplicate ask:** `FALLBACK_COORDS` (script.js, currently `{ lat: 35.1497, lon: -106.6764 }` — Albuquerque) is what `getCoords()` hands to the *real* WeatherAPI fetch when actual geolocation is unavailable, declined, or times out — it's real coordinates fed to a real API call, not placeholder display text, so no separate location-name string needs changing alongside it: the API returns Orlando's real name/region itself once fetched with Orlando's coordinates.
+- [ ] **Fix:** change `FALLBACK_COORDS` to Orlando, FL's coordinates: `{ lat: 28.5383, lon: -81.3792 }`. Update the comment above it (currently references "the original placeholder text (Los Ranchos de Albuquerque, NM)," which will no longer be accurate once the McMurdo Station item above ships) to describe the new default instead.
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
