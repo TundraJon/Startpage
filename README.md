@@ -978,7 +978,14 @@ _Five queued items, all built and verified together in one pass, per "Build the 
 
 ## Build Queue
 
-_Empty — nothing currently queued. Log new bug reports and feature requests here; only build them on explicit "Go ahead and build" instruction._
+### Weather widget: auto-update every 15 minutes while the page stays open (including location)
+
+- [ ] **Requested:** the weather widget should store the time it was last updated, check every minute whether 15+ minutes have passed, and if so, update — re-fetching location too.
+- [ ] **Root-caused against the actual code — partially already exists, one real piece missing:**
+  - `loadLiveWeather` (script.js) already stores an update timestamp (`fetchedAt`) alongside the fetched data in `WEATHER_CACHE_KEY`'s localStorage cache, and already has a 15-minute staleness threshold (`WEATHER_STALE_MS = 15 * 60 * 1000`) that it checks against `fetchedAt` to decide whether to serve the cache or fetch fresh — including re-fetching location via `getCoords()` whenever it does fetch fresh (not just on first load). So the storage and staleness-comparison logic requested already exist correctly.
+  - **What's actually missing:** nothing currently re-invokes that staleness check on any kind of timer. `loadLiveWeather`/`refreshLiveWeather` is only ever called (a) once at page load (`refreshLiveWeather(false)`), and (b) once when the user edits the WeatherAPI key in Settings (`refreshLiveWeather(true)`). There is no periodic re-check while the page stays open — so today, a tab left open past 15 minutes keeps showing increasingly stale weather indefinitely, only correcting itself on the next manual reload.
+  - The clock already has a working per-minute self-scheduling tick (`scheduleNextClockTick`, aligned to real minute boundaries via `setTimeout`) that calls `updateClock()` and reschedules itself — the natural, already-proven pattern to reuse for a once-a-minute weather-staleness check, rather than introducing a second, separate timing mechanism.
+- [ ] **Proposed fix:** add a call to `refreshLiveWeather(false)` into the per-minute tick (either inside `scheduleNextClockTick`'s callback directly, or a small sibling function scheduled the same way) — `loadLiveWeather` already no-ops cheaply (serves cache, no network call) when the cache isn't stale yet, so this is safe to call every minute without adding real overhead; it only actually fetches (location + weather) once 15+ minutes have genuinely passed.
 
 ## Build Planner
 
