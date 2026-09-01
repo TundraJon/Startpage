@@ -935,6 +935,12 @@ _Five queued items, all built and verified together in one pass, per "Go ahead a
 
 ## Build Queue
 
+### Weather widget: severe-alert ticker scrolls way too fast
+
+- [ ] **Reported:** the scrolling weather-alert banner runs by super fast.
+- [ ] **Root-caused via direct measurement, not just reasoning about the CSS:** `.weather-alert-track` (styles.css) animates with a *fixed* `animation-duration: 14s`, translating `transform: translateX(-100%)`. CSS percentage transforms are relative to the element's *own* box, not its container — so a longer alert message (wider track, since it's `white-space: nowrap`) travels a proportionally larger pixel distance in that same fixed 14 seconds, meaning its actual on-screen speed (px/sec) scales directly with how long the message is. Measured directly: a short 13-character test string ("Heat Advisory") moves at 13px/s, a realistic full-length severe-weather alert (228 characters, the kind the National Weather Service actually sends) moves at 97px/s — 7.5x faster. Real alerts read as very long paragraphs, which is exactly the case that ends up fastest and least readable — matching the report.
+- [ ] **Fix:** stop using a fixed CSS `animation-duration` and instead compute it in JS, in `applyAlertTicker()` (script.js) right after `alertTrack.textContent` is set — measure the track's actual rendered width (`alertTrack.getBoundingClientRect().width`) and set `alertTrack.style.animationDuration = (trackWidth / DESIRED_PX_PER_SEC) + 's'`, so every alert scrolls at the same constant, readable pace regardless of message length. `DESIRED_PX_PER_SEC` needs an actual value chosen/tuned during the build (something in the 40-60px/s range is a reasonable starting point for 0.7rem text, but worth a real visual check rather than guessing blind).
+
 ### Tile usage statistics: creation date, last-used date, use count
 
 - [ ] **Requested:** track, per tile, when it was created, when it was last opened, and how many times it's been opened.
