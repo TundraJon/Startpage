@@ -147,11 +147,13 @@
   // false whenever navigation actually changes the leaf, so own-links always show fresh again per
   // the normal "falls back to own links" rule.
   let leafLinksCollapsed = false;
-  // Multi-select batch move state (declared here, ahead of renderOpenPath's first call below,
-  // since updateSelectActionBar reads it and function declarations alone don't save a `let` from
-  // its temporal dead zone). The rest of the feature is implemented further down, after Move Entry.
+  // Multi-select batch move state, and Move Entry's dragInfo, declared here, ahead of
+  // renderOpenPath's first call below, since renderOpenPath (via updateSelectActionBar, and now
+  // its own drag-pinning logic) reads them and function declarations alone don't save a `let`
+  // from its temporal dead zone. The rest of each feature is implemented further down.
   let selectMode = null;
   let pickingDestination = false;
+  let dragInfo = null;
   const selectActionBar = document.getElementById('select-action-bar');
   const selectActionStatus = document.getElementById('select-action-status');
   const selectActionMoveBtn = document.getElementById('select-action-move');
@@ -174,16 +176,31 @@
   }
 
   function renderOpenPath() {
+    // While a Move Entry drag is live, also pin open the chain of ancestors leading to wherever
+    // the dragged tile currently sits (dragInfo.currentGrid) — on top of, not instead of, the
+    // normal openPath. Otherwise ordinary hover-navigation elsewhere (e.g. backing out of a
+    // subcategory the tile was dragged through) can collapse the tile's own category out from
+    // under it, leaving it invisible until the pointer re-enters a visible grid. Deliberately
+    // shows two paths open at once during a drag — an intentional exception, not a bug.
+    const pinnedGrid = dragInfo ? dragInfo.currentGrid : null;
+    const pinnedCategoryId = pinnedGrid ? pinnedGrid.closest('.category').dataset.categoryId : null;
+    const pinnedChain = pinnedCategoryId ? categoryAncestorChain(pinnedCategoryId) : [];
     categoryToggles.forEach((entry, id) => {
-      const onPath = openPath.includes(id);
+      const onPath = openPath.includes(id) || pinnedChain.includes(id);
       entry.contentEl.hidden = !onPath;
       entry.mainBtn.setAttribute('aria-expanded', String(onPath));
       // Own direct links are the default child shown when a category-with-subcategories opens —
       // visible only while this category is the deepest (leaf) selection, hidden as soon as one
       // of its subcategories becomes the active child instead, or the leaf's collapse button has
-      // hidden them via the double-duty behavior below.
-      if (entry.ownGridEl) entry.ownGridEl.hidden = !(onPath && isPathLeaf(id) && !leafLinksCollapsed);
-      entry.collapseBtn.hidden = !isPathLeaf(id);
+      // hidden them via the double-duty behavior below — except while the dragged tile is sitting
+      // directly in this category's own grid, which forces it visible regardless.
+      const pinnedOwnGrid = pinnedGrid && entry.ownGridEl === pinnedGrid;
+      if (entry.ownGridEl) {
+        entry.ownGridEl.hidden = !(pinnedOwnGrid || (onPath && isPathLeaf(id) && !leafLinksCollapsed));
+      }
+      // Every category on the current path gets its own collapse button now that the chevron
+      // (redundant with tapping the header to open) is gone — not just the deepest leaf.
+      entry.collapseBtn.hidden = !onPath;
     });
     localStorage.setItem(CATEGORY_OPEN_PATH_KEY, JSON.stringify(openPath));
     // No-op until select mode's destination-picking UI is defined further down (hoisted function
@@ -197,17 +214,22 @@
     renderOpenPath();
   }
 
-  // Double duty: a with-subcategories leaf's first tap hides just its own links, staying on the
-  // path so its subcategory rows remain visible/tappable — a second tap (nothing shown under it
-  // anymore) fully closes this level. A flat category (no subcategories) has nothing to stay open
+  // Every category on the current path has its own collapse button now, outdented to match its
+  // own indent depth. Tapping a non-leaf ancestor's button truncates the path back to just before
+  // it, closing it and everything open beneath it in one tap. Tapping the leaf's button keeps the
+  // old double duty: a with-subcategories leaf's first tap hides just its own links, staying on
+  // the path so its subcategory rows remain visible/tappable — a second tap (nothing shown under
+  // it anymore) fully closes this level. A flat leaf (no subcategories) has nothing to stay open
   // for, so it keeps a single-tap full collapse.
-  function collapseLeafCategory() {
-    const leafId = openPath[openPath.length - 1];
-    const entry = categoryToggles.get(leafId);
-    if (entry && entry.ownGridEl && !leafLinksCollapsed) {
+  function collapseFromCategory(id) {
+    const index = openPath.indexOf(id);
+    if (index === -1) return;
+    const isLeaf = index === openPath.length - 1;
+    const entry = categoryToggles.get(id);
+    if (isLeaf && entry && entry.ownGridEl && !leafLinksCollapsed) {
       leafLinksCollapsed = true;
     } else {
-      openPath.pop();
+      openPath = openPath.slice(0, index);
       leafLinksCollapsed = false;
     }
     renderOpenPath();
@@ -252,7 +274,7 @@
     mainBtn.addEventListener('click', () => openCategoryPath(id));
     collapseBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      collapseLeafCategory();
+      collapseFromCategory(id);
     });
   });
 
@@ -386,9 +408,24 @@
     }
 
     // Safety net: any pre-migration tile saved without an id (old {name,url}-only schema) gets one now.
+    // Same treatment for usage-stats fields added later — createdAt backfills to today (the best
+    // available proxy; there's no real history for tiles that already existed), lastUsedAt starts
+    // unset, useCount starts at 0. Naturally covers both old and newly-added tiles alike.
     tiles.forEach((t) => {
       if (!t.id) {
         t.id = newTileId();
+        changed = true;
+      }
+      if (t.createdAt === undefined) {
+        t.createdAt = Date.now();
+        changed = true;
+      }
+      if (t.lastUsedAt === undefined) {
+        t.lastUsedAt = null;
+        changed = true;
+      }
+      if (t.useCount === undefined) {
+        t.useCount = 0;
         changed = true;
       }
     });
@@ -399,6 +436,19 @@
 
   function saveCategoryTiles(categoryId, tiles) {
     localStorage.setItem(TILE_STORAGE_PREFIX + categoryId, JSON.stringify(tiles));
+  }
+
+  // Usage stats recorded silently — nothing surfaces this yet, it's collected for later features
+  // (sort-by-usage, reports, flagging unused tiles for cleanup).
+  function recordTileUsage(tileEl) {
+    const categoryId = tileEl.closest('.category').dataset.categoryId;
+    const tileId = tileEl.dataset.tileId;
+    const tiles = loadCategoryTiles(categoryId);
+    const entry = tiles.find((t) => t.id === tileId);
+    if (!entry) return;
+    entry.lastUsedAt = Date.now();
+    entry.useCount = (entry.useCount || 0) + 1;
+    saveCategoryTiles(categoryId, tiles);
   }
 
   function faviconUrlForDomain(domain) {
@@ -455,7 +505,11 @@
         e.preventDefault();
         e.stopPropagation();
         toggleTileSelected(a);
+        return;
       }
+      // Ordinary tap — a real navigation (opens in a new tab via target="_blank", so the current
+      // page never unloads and this write always completes normally).
+      recordTileUsage(a);
     }, true);
 
     a.addEventListener('pointerdown', (e) => {
@@ -515,7 +569,7 @@
     addTileTargetGrid.insertBefore(tile, addTileTargetGrid.querySelector('.tile-add'));
     updateTileNameWrapClass(tile);
     const tiles = loadCategoryTiles(addTileTargetCategoryId);
-    tiles.push({ id, name, url });
+    tiles.push({ id, name, url, createdAt: Date.now(), lastUsedAt: null, useCount: 0 });
     saveCategoryTiles(addTileTargetCategoryId, tiles);
     closeAddTile();
   });
@@ -710,7 +764,8 @@
   //     what same-category reorder and cross-category reflow both operate on.
   let moveMode = null;
   let moveModeTimeoutId = null;
-  let dragInfo = null;
+  // dragInfo itself is declared earlier, alongside selectMode, so renderOpenPath's drag-pinning
+  // logic can read it — see the comment there.
   let justFinishedDrag = false;
 
   function resetMoveModeTimeout() {
@@ -900,6 +955,9 @@
     const nearest = findNearestTile(grid, dragInfo.tileEl, dragInfo.lastClientX, dragInfo.lastClientY);
     if (nearest) nearest.before(dragInfo.tileEl);
     else grid.insertBefore(dragInfo.tileEl, grid.querySelector('.tile-add'));
+    // Re-pin the open-path chain to the tile's new live location so it can't be hidden by
+    // navigation elsewhere while the drag continues.
+    renderOpenPath();
   }
 
   // Reorders dragInfo.currentGrid around the dragged tile based on cursor position. Nearest-tile-
@@ -1091,6 +1149,7 @@
     }
 
     dragInfo = null;
+    renderOpenPath();
     markDragJustFinished();
     resetMoveModeTimeout();
   }
@@ -1107,6 +1166,7 @@
     if (info.lastHeaderEl) info.lastHeaderEl.classList.remove('move-drop-target');
     info.grid.insertBefore(info.tileEl, info.originalNextSibling);
     dragInfo = null;
+    renderOpenPath();
     markDragJustFinished();
   }
 
@@ -2295,12 +2355,12 @@
   };
   const HAIL_FADE_FRAMES = 6;
 
-  // How many rendered frames pass between re-rolling a thunderstorm flash's opacity. Default 1
-  // matches the original every-frame flicker exactly; a Testing Panel slider (1-60, a fixed
-  // 60fps assumption rather than a live per-device measurement, since real frame rate varies by
-  // display) can slow it down to see the flash hold steady longer between re-rolls.
+  // How many rendered frames pass between re-rolling a thunderstorm flash's opacity. Default 3
+  // holds each flash's opacity steady for 3 frames between re-rolls, calmer than the original
+  // every-frame flicker; a Testing Panel slider (1-60, a fixed 60fps assumption rather than a
+  // live per-device measurement, since real frame rate varies by display) can adjust it live.
   const WX_LIGHTNING_TUNABLES = {
-    rerollFrames: 1,
+    rerollFrames: 3,
   };
 
   // Fog: previously a fixed 0.14 peak opacity at a baked-in pixel radius — too faint to notice.
@@ -3068,8 +3128,8 @@
       fogSpeedSlider.value = 3; fogSpeedValue.textContent = '3x';
       WX_HAIL_TUNABLES.gravity = 0.5;
       hailGravitySlider.value = 0.5; hailGravityValue.textContent = '0.5';
-      WX_LIGHTNING_TUNABLES.rerollFrames = 1;
-      lightningRerollSlider.value = 1; lightningRerollValue.textContent = '1';
+      WX_LIGHTNING_TUNABLES.rerollFrames = 3;
+      lightningRerollSlider.value = 3; lightningRerollValue.textContent = '3';
       lastParticleKey = '';
       renderWeatherExtras();
       renderWeatherSkin();
@@ -3110,12 +3170,20 @@
   const alertTicker = document.getElementById('weather-alert-ticker');
   const alertTrack = document.getElementById('weather-alert-track');
   const weatherFooter = document.getElementById('weather-footer');
+  // The scroll animation's CSS translateX(-100%) is relative to the track's own (text-driven)
+  // width, not the container's — with a fixed animation-duration, a longer message covers a
+  // proportionally larger pixel distance in the same time, so its on-screen speed scales directly
+  // with message length. Computing the duration from the track's actual rendered width instead
+  // keeps every alert scrolling at this same constant, readable pace regardless of length.
+  const ALERT_TICKER_PX_PER_SEC = 50;
   function applyAlertTicker() {
     const show = shouldShowAlert();
     alertTicker.hidden = !show;
     weatherFooter.hidden = show;
     if (show) {
       alertTrack.textContent = currentAlert().text;
+      const trackWidth = alertTrack.getBoundingClientRect().width;
+      alertTrack.style.animationDuration = (trackWidth / ALERT_TICKER_PX_PER_SEC) + 's';
     }
   }
   applyAlertTicker();

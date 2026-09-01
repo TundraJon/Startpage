@@ -222,11 +222,6 @@ main {
   padding-left: calc(var(--depth, 0) * 2ch);
 }
 
-.chevron {
-  color: var(--fg-muted);
-  flex-shrink: 0;
-}
-
 .category-collapse-btn {
   flex-shrink: 0;
   border: none;
@@ -888,6 +883,11 @@ main {
   font-size: 0.7rem;
   font-weight: 600;
   animation-name: wx-alert-scroll;
+  /* animation-duration is set inline by applyAlertTicker() (script.js), computed from the
+     track's actual rendered width so every message scrolls at the same constant px/sec
+     regardless of length — a fixed duration here would scale on-screen speed with message
+     length instead (translateX(-100%) is relative to this element's own width, not the
+     container's). This value only matters for the instant before that JS ever runs. */
   animation-duration: 14s;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
