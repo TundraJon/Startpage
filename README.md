@@ -995,6 +995,15 @@ _Five queued items, all built and verified together in one pass, per "Build the 
 - [ ] **Proposed fix — enlarge the trigger zone so a real thumb can reach it:** raise `AUTO_SCROLL_EDGE_PX` (script.js) from `70` to something like `120`, giving real headroom past a typical status bar/notch, and consider raising `AUTO_SCROLL_MAX_PX_PER_FRAME` (currently `14`) a bit too, since a larger zone means more distance may need covering once it does trigger. Both are simple constant changes, no structural rework — low-risk either way even if the ergonomic read above isn't the full story.
 - [ ] **Caveat:** diagnosed without a real touch device in hand — the "reach" explanation is the strongest one that survived direct testing of the code itself (which ruled out an actual scroll-logic bug), but worth a real-device check after the constants change to confirm it's actually enough headroom.
 
+### Weather widget: placeholder location before load should be McMurdo Station, Antarctica
+
+- [ ] **Requested:** before the real location/weather finishes loading, the widget should start out showing McMurdo Station, Antarctica instead of whatever it currently shows.
+- [ ] **Root-caused: the current pre-load placeholder is "Los Ranchos de Albuquerque, NM," set in two places that need to change together:**
+  - `weatherState.locationName` (script.js) defaults to `'Los Ranchos de Albuquerque, NM'` alongside the rest of the placeholder weather figures (temp, condition, etc.) — this is what `renderWeatherTemps`/the location line render until `applyLiveWeatherData` overwrites it with the real fetched location.
+  - index.html's `#weather-location` markup also hardcodes the same text directly, so the very first paint (before script.js even runs) shows it too — both need to change together or they'd drift out of sync.
+- [ ] **Not the same thing as `FALLBACK_COORDS`:** there's a separate constant (`FALLBACK_COORDS = { lat: 35.1497, lon: -106.6764 }`, also Albuquerque-based) used by `getCoords()` only if real geolocation is unavailable, declined, or times out — that's what real weather data ends up being fetched *for* in a no-geolocation case, not the pre-load placeholder text this request is about. Left alone unless asked — changing it would mean an actual geolocation failure shows fake Antarctic weather as if it were real, which seems like a different, riskier thing than what was asked (a placeholder shown only until the real fetch resolves).
+- [ ] **Proposed fix:** change `weatherState.locationName`'s default (script.js) and the static text inside `#weather-location` (index.html) to `'McMurdo Station, Antarctica'`. **Open question:** the same placeholder object also carries made-up weather figures (88°F, "Moderate or heavy freezing rain," etc.) that were never in scope for this request as stated — leave those as-is, or also reroll them to something more Antarctic (e.g. sub-zero temps, a snow/blizzard condition) for a more convincing placeholder? Worth confirming before building.
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
