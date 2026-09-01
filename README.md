@@ -935,6 +935,12 @@ _Five queued items, all built and verified together in one pass, per "Go ahead a
 
 ## Build Queue
 
+### Weather widget: lightning flash should re-roll every 3 frames, not every frame
+
+- [ ] **Requested:** the thunderstorm flash's opacity re-roll rate should be every 3 rendered frames instead of every frame.
+- [ ] **Already a tunable, just needs its default changed:** `WX_LIGHTNING_TUNABLES.rerollFrames` (script.js) already exists exactly for this — a Testing Panel slider (1-60) already lets it be adjusted live, currently defaulting to `1` ("matches the original every-frame flicker exactly," per its own comment). This is a one-value change, not new functionality.
+- [ ] **Fix:** change the default from `1` to `3` in two places that need to agree — the constant itself (`const WX_LIGHTNING_TUNABLES = { rerollFrames: 1 }`) and the Testing Panel's reset-to-defaults handler (`WX_LIGHTNING_TUNABLES.rerollFrames = 1; lightningRerollSlider.value = 1; lightningRerollValue.textContent = '1';`) — otherwise hitting reset would silently revert to the old every-frame behavior instead of the new default.
+
 ### Category headers: remove the chevron, give every open ancestor its own outdented collapse button
 
 - [ ] **This corrects/extends Build 45's shipped collapse-button behavior — the outdent itself was already confirmed correct** (measured directly: 0px at depth 0, 14.2px/2ch at depth 1, 28.5px/4ch at depth 2), but it only ever applied to the single deepest leaf, since `collapseBtn.hidden = !isPathLeaf(id)` only shows it there. The user's actual ask, clarified: every category currently open along the chain should get its own collapse button at its own depth's outdent — not just the leaf.
