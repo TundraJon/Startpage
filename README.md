@@ -935,6 +935,18 @@ _Five queued items, all built and verified together in one pass, per "Go ahead a
 
 ## Build Queue
 
+### Category headers: remove the chevron, give every open ancestor its own outdented collapse button
+
+- [ ] **This corrects/extends Build 45's shipped collapse-button behavior — the outdent itself was already confirmed correct** (measured directly: 0px at depth 0, 14.2px/2ch at depth 1, 28.5px/4ch at depth 2), but it only ever applied to the single deepest leaf, since `collapseBtn.hidden = !isPathLeaf(id)` only shows it there. The user's actual ask, clarified: every category currently open along the chain should get its own collapse button at its own depth's outdent — not just the leaf.
+- [ ] **1. Remove the chevron (▾) entirely, from every category header (12 in index.html) and its CSS (`.chevron`, styles.css)** — since tapping anywhere on the header already opens it (`.category-header-main`), the chevron is a pure redundant indicator with no function of its own, per the user's explicit call.
+- [ ] **2. Every on-path category shows its own collapse button, not just the leaf.** In the reported example (Category C → Sub A → Sub A-1 open), Category C (depth 0, no outdent) and Sub A (depth 1, 2ch outdent) should each show their *own* collapse button alongside Sub A-1's (depth 2, 4ch outdent) — each already gets the correct outdent automatically once shown, since that's driven by each header's own `--depth` (already set correctly per-category, no CSS change needed there).
+- [ ] **Technical approach:**
+  - `renderOpenPath` (script.js): change `entry.collapseBtn.hidden = !isPathLeaf(id)` to `entry.collapseBtn.hidden = !openPath.includes(id)` — shows it on every category that's part of the current chain, not just the last one.
+  - Generalize `collapseLeafCategory()` into something like `collapseFromCategory(id)`, called with the *specific* category id whose button was tapped (each button's click handler already has its own `id` in closure scope from the header-wiring `forEach`) instead of always acting on `openPath`'s last element:
+    - If `id` is the current leaf, has subcategories, and its own links aren't hidden yet — same first-tap double-duty as today (hide links, stay open).
+    - Otherwise (an ancestor further up the chain, or a leaf whose links are already hidden/it's flat) — truncate `openPath` to everything *before* `id`'s index, closing it and everything nested beneath it in one tap. This is the new capability: closing from a higher level no longer requires collapsing one level at a time from the bottom up.
+  - Each `.category-collapse-btn`'s click listener (currently wired once per header in the same `forEach` that sets up `mainBtn`) needs to call `collapseFromCategory(id)` instead of the old parameterless `collapseLeafCategory()`.
+
 ### Weather widget: severe-alert ticker scrolls way too fast
 
 - [ ] **Reported:** the scrolling weather-alert banner runs by super fast.
