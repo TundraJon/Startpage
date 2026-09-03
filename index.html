@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home</title>
-<link rel="stylesheet" href="styles.css?v=37">
+<link rel="stylesheet" href="styles.css?v=38">
 </head>
 <body>
 
@@ -131,6 +131,7 @@
     <div class="category-header category-header--home">
       <h2 class="category-name">Home</h2>
       <div class="home-header-actions">
+        <button type="button" class="home-header-action-btn" id="create-btn" aria-label="Add tile or category">+</button>
         <button type="button" class="home-header-action-btn" id="collapse-all-btn" aria-label="Collapse all categories">▲</button>
       </div>
     </div>
@@ -472,6 +473,29 @@
   </div>
 </div>
 
+<div class="help-overlay" id="create-menu-overlay" hidden>
+  <div class="help-panel options-panel">
+    <button class="help-close" id="create-menu-close" aria-label="Close">&times;</button>
+    <h2>Add</h2>
+    <div class="tile-menu-actions">
+      <button type="button" class="tile-menu-action" id="create-menu-tile"><span class="tile-menu-icon">🔗</span><span class="tile-menu-action-label">+ Tile</span></button>
+      <button type="button" class="tile-menu-action" id="create-menu-category"><span class="tile-menu-icon">📁</span><span class="tile-menu-action-label">+ Category</span></button>
+    </div>
+  </div>
+</div>
+
+<div class="help-overlay" id="add-category-overlay" hidden>
+  <div class="help-panel options-panel">
+    <button class="help-close" id="add-category-close" aria-label="Close add category">&times;</button>
+    <h2>Add Category</h2>
+    <section class="options-section">
+      <div class="option-row"><span>Name</span><input type="text" id="add-category-name" autocomplete="off" placeholder="Category name" style="width: 55%; min-width: 0;"></div>
+    </section>
+    <p class="add-category-error" id="add-category-error" hidden></p>
+    <button type="button" class="testing-reset-btn" id="add-category-submit">Add Category</button>
+  </div>
+</div>
+
 <div class="help-overlay" id="tile-menu-overlay" hidden>
   <div class="help-panel options-panel">
     <button class="help-close" id="tile-menu-close" aria-label="Close tile menu">&times;</button>
@@ -511,6 +535,6 @@
   </div>
 </div>
 
-<script src="script.js?v=42"></script>
+<script src="script.js?v=43"></script>
 </body>
 </html>

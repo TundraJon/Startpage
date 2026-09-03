@@ -241,6 +241,19 @@
     renderOpenPath();
   }
 
+  // Home's category header is sticky, anchored just below .pinned-header rather than at a
+  // hardcoded pixel offset — .pinned-header's real height varies (alert ticker, hourly-forecast
+  // content, window resize/orientation), so a ResizeObserver keeps --pinned-header-height in sync
+  // with whatever it actually is at any moment, rather than drifting stale after any of those.
+  const pinnedHeaderEl = document.querySelector('.pinned-header');
+  if (pinnedHeaderEl && 'ResizeObserver' in window) {
+    const pinnedHeaderObserver = new ResizeObserver((entries) => {
+      const height = entries[0].contentRect.height;
+      document.documentElement.style.setProperty('--pinned-header-height', height + 'px');
+    });
+    pinnedHeaderObserver.observe(pinnedHeaderEl);
+  }
+
   // --- Category data model: categories (everything except Home, which stays static/special-cased)
   // are now persisted data rendered into DOM at load, instead of hand-authored HTML being the
   // source of truth. Mirrors the tile system's own storage/migration pattern (TILE_STORAGE_PREFIX,
@@ -368,42 +381,49 @@
 
   renderCategoryTree();
 
-  document.querySelectorAll('.category:not(.category--home) > .category-header').forEach((header) => {
-    const section = header.closest('.category');
-    const id = section.dataset.categoryId;
-    const contentEl = section.querySelector(':scope > .category-content') || section.querySelector(':scope > .tile-grid');
-    // Only categories with subcategories (.category-content) have a separate own-grid that needs
-    // its own visibility toggle; a flat category's tile-grid IS its content, already handled above.
-    const ownGridEl = contentEl.classList.contains('category-content')
-      ? contentEl.querySelector(':scope > .tile-grid')
-      : null;
-    const mainBtn = header.querySelector('.category-header-main');
-    const collapseBtn = header.querySelector('.category-collapse-btn');
+  // Wires categoryToggles/depth/click-listeners for a set of category headers — factored out so
+  // it can run again against freshly-rendered headers after a category is added later, not just
+  // once at initial load.
+  function wireCategoryHeaders(headers) {
+    headers.forEach((header) => {
+      const section = header.closest('.category');
+      const id = section.dataset.categoryId;
+      const contentEl = section.querySelector(':scope > .category-content') || section.querySelector(':scope > .tile-grid');
+      // Only categories with subcategories (.category-content) have a separate own-grid that needs
+      // its own visibility toggle; a flat category's tile-grid IS its content, already handled above.
+      const ownGridEl = contentEl.classList.contains('category-content')
+        ? contentEl.querySelector(':scope > .tile-grid')
+        : null;
+      const mainBtn = header.querySelector('.category-header-main');
+      const collapseBtn = header.querySelector('.category-collapse-btn');
 
-    // Title-only indent by true nesting depth. A pure-CSS self-incrementing custom property
-    // (`.category-content { --depth: calc(var(--depth, 0) + 1); } `) looks like it should work but
-    // doesn't — Chromium treats a custom property that references its own name, even meaning "the
-    // inherited value", as a circular reference and resolves it to nothing at every level. Setting
-    // --depth explicitly per element from the real DOM ancestor count sidesteps that entirely.
-    let depth = 0;
-    let ancestor = section.parentElement;
-    while (ancestor) {
-      if (ancestor.classList && ancestor.classList.contains('category-content')) depth++;
-      ancestor = ancestor.parentElement;
-    }
-    // Set on the header wrapper (not directly on .category-name) so it inherits down to both
-    // .category-name (nested inside .category-header-main) and .category-collapse-btn (its
-    // sibling) — the collapse button outdents by the same depth, in the opposite direction.
-    header.style.setProperty('--depth', String(depth));
+      // Title-only indent by true nesting depth. A pure-CSS self-incrementing custom property
+      // (`.category-content { --depth: calc(var(--depth, 0) + 1); } `) looks like it should work but
+      // doesn't — Chromium treats a custom property that references its own name, even meaning "the
+      // inherited value", as a circular reference and resolves it to nothing at every level. Setting
+      // --depth explicitly per element from the real DOM ancestor count sidesteps that entirely.
+      let depth = 0;
+      let ancestor = section.parentElement;
+      while (ancestor) {
+        if (ancestor.classList && ancestor.classList.contains('category-content')) depth++;
+        ancestor = ancestor.parentElement;
+      }
+      // Set on the header wrapper (not directly on .category-name) so it inherits down to both
+      // .category-name (nested inside .category-header-main) and .category-collapse-btn (its
+      // sibling) — the collapse button outdents by the same depth, in the opposite direction.
+      header.style.setProperty('--depth', String(depth));
 
-    categoryToggles.set(id, { section, contentEl, ownGridEl, mainBtn, collapseBtn });
+      categoryToggles.set(id, { section, contentEl, ownGridEl, mainBtn, collapseBtn });
 
-    mainBtn.addEventListener('click', () => openCategoryPath(id));
-    collapseBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      collapseFromCategory(id);
+      mainBtn.addEventListener('click', () => openCategoryPath(id));
+      collapseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        collapseFromCategory(id);
+      });
     });
-  });
+  }
+
+  wireCategoryHeaders(document.querySelectorAll('.category:not(.category--home) > .category-header'));
 
   // Restore the persisted open path, but only if it's still a real, unbroken ancestor chain —
   // categories can be removed/reordered between sessions, so re-derive and compare rather than
@@ -705,18 +725,137 @@
   // drop target's grid directly, without re-querying the DOM on every drag.
   const categoryGrids = new Map();
 
-  document.querySelectorAll('.tile-grid').forEach((grid) => {
-    const categoryId = grid.closest('.category').dataset.categoryId;
-    categoryGrids.set(categoryId, grid);
-    const addBtn = grid.querySelector('.tile-add');
-    loadCategoryTiles(categoryId).forEach((t) => {
-      const tile = buildTileElement(t.id, t.name, t.url);
-      grid.insertBefore(tile, addBtn);
-      updateTileNameWrapClass(tile);
+  // Wires categoryGrids + loads/renders each grid's tiles + wires its own "+" button — factored
+  // out (like wireCategoryHeaders above) so it can run again against freshly-rendered grids after
+  // a category is added, not just once at initial load.
+  function wireTileGrids(grids) {
+    grids.forEach((grid) => {
+      const categoryId = grid.closest('.category').dataset.categoryId;
+      categoryGrids.set(categoryId, grid);
+      const addBtn = grid.querySelector('.tile-add');
+      loadCategoryTiles(categoryId).forEach((t) => {
+        const tile = buildTileElement(t.id, t.name, t.url);
+        grid.insertBefore(tile, addBtn);
+        updateTileNameWrapClass(tile);
+      });
+      if (addBtn) {
+        addBtn.addEventListener('click', () => openAddTile(grid, categoryId));
+      }
     });
-    if (addBtn) {
-      addBtn.addEventListener('click', () => openAddTile(grid, categoryId));
+  }
+
+  wireTileGrids(document.querySelectorAll('.tile-grid'));
+
+  // Adding a category can't just insert one new element — a category gaining its very first
+  // subcategory needs its own DOM to switch shape (a flat .tile-grid becomes a .category-content
+  // wrapper instead; buildCategorySection already renders either shape correctly, but only ever
+  // did so once, at initial load). Rather than hand-writing that flat-to-nested transition as
+  // surgical DOM patching, this just tears down and re-renders everything under #categories except
+  // Home (untouched — it's not part of categoryTree at all) and re-wires it the same way initial
+  // load does. Trivial overhead for a personal homepage's category count; correct with no special
+  // cases. Scoped to :not(.category--home) throughout so Home's own header/grid (never destroyed)
+  // isn't re-wired a second time, which would duplicate its already-rendered tiles.
+  function rebuildCategoriesAndTiles() {
+    exitMoveMode();
+    exitSelectMode();
+    document.querySelectorAll('#categories > .category:not(.category--home)').forEach((el) => el.remove());
+    renderCategoryTree();
+    wireCategoryHeaders(document.querySelectorAll('.category:not(.category--home) > .category-header'));
+    wireTileGrids(document.querySelectorAll('.category:not(.category--home) .tile-grid'));
+    renderOpenPath();
+  }
+
+  function newCategoryId() {
+    return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'cat-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+  }
+
+  // Wherever "+ Tile" / "+ Category" should add to: the deepest currently-open category, or Home
+  // if nothing is open. Shared by both the tile and category creation flows below.
+  function currentLocationId() {
+    return openPath.length > 0 ? openPath[openPath.length - 1] : 'home';
+  }
+
+  // --- Create UI: a "+" on Home's (now-sticky) header, opening a small "+ Tile" / "+ Category"
+  // menu targeting currentLocationId(). "+ Tile" reuses the existing add-tile overlay as-is;
+  // "+ Category" is new.
+  const createBtn = document.getElementById('create-btn');
+  const createMenuOverlay = document.getElementById('create-menu-overlay');
+  const createMenuClose = document.getElementById('create-menu-close');
+  const createMenuTileBtn = document.getElementById('create-menu-tile');
+  const createMenuCategoryBtn = document.getElementById('create-menu-category');
+
+  function openCreateMenu() {
+    createMenuOverlay.hidden = false;
+  }
+  function closeCreateMenu() {
+    createMenuOverlay.hidden = true;
+  }
+  createBtn.addEventListener('click', openCreateMenu);
+  createMenuClose.addEventListener('click', closeCreateMenu);
+  createMenuOverlay.addEventListener('click', (e) => {
+    if (e.target === createMenuOverlay) closeCreateMenu();
+  });
+
+  createMenuTileBtn.addEventListener('click', () => {
+    closeCreateMenu();
+    const destId = currentLocationId();
+    const grid = categoryGrids.get(destId);
+    if (grid) openAddTile(grid, destId);
+  });
+
+  const addCategoryOverlay = document.getElementById('add-category-overlay');
+  const addCategoryClose = document.getElementById('add-category-close');
+  const addCategoryNameInput = document.getElementById('add-category-name');
+  const addCategoryError = document.getElementById('add-category-error');
+  const addCategorySubmit = document.getElementById('add-category-submit');
+
+  function openAddCategory() {
+    addCategoryNameInput.value = '';
+    addCategoryError.hidden = true;
+    addCategoryOverlay.hidden = false;
+    addCategoryNameInput.focus();
+  }
+  function closeAddCategory() {
+    addCategoryOverlay.hidden = true;
+  }
+  function showAddCategoryError(text) {
+    addCategoryError.textContent = text;
+    addCategoryError.hidden = false;
+  }
+
+  createMenuCategoryBtn.addEventListener('click', () => {
+    closeCreateMenu();
+    openAddCategory();
+  });
+  addCategoryClose.addEventListener('click', closeAddCategory);
+  addCategoryOverlay.addEventListener('click', (e) => {
+    if (e.target === addCategoryOverlay) closeAddCategory();
+  });
+
+  addCategorySubmit.addEventListener('click', () => {
+    const name = addCategoryNameInput.value.trim();
+    if (!name) {
+      showAddCategoryError('Name required.');
+      return;
     }
+    const currentId = currentLocationId();
+    const parentId = currentId === 'home' ? null : currentId;
+    const isDuplicate = Object.values(categoryTree).some(
+      (n) => n.parentId === parentId && n.name.trim().toLowerCase() === name.toLowerCase()
+    );
+    if (isDuplicate) {
+      showAddCategoryError('A category named "' + name + '" already exists here.');
+      return;
+    }
+    const siblingOrders = Object.values(categoryTree)
+      .filter((n) => n.parentId === parentId)
+      .map((n) => n.order);
+    const order = siblingOrders.length > 0 ? Math.max(...siblingOrders) + 1 : 0;
+    const id = newCategoryId();
+    categoryTree[id] = { name, parentId, order, stripeColor: null, createdAt: Date.now() };
+    saveCategoryTree(categoryTree);
+    rebuildCategoriesAndTiles();
+    closeAddCategory();
   });
 
   // --- Phase 2 Part 1: tile long-press action menu (Remove Entry / Move Entry / Rename Entry) ---

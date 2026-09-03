@@ -259,6 +259,15 @@ main {
   color: var(--home-header-fg);
   border-top: none;
   padding: 10px 14px;
+  /* Anchored just below .pinned-header (also sticky, at top: 0) rather than the rest of Home's
+     tiles, which keep scrolling away normally. --pinned-header-height is kept in sync by a
+     ResizeObserver (script.js) since the pinned header's real height varies (alert ticker,
+     hourly-forecast content, window resize) — a hardcoded pixel offset would drift out of sync
+     with any of those. z-index sits below .pinned-header's (100) so that one stays on top when
+     both are visible, but above ordinary scrolling content beneath it. */
+  position: sticky;
+  top: var(--pinned-header-height, 0px);
+  z-index: 90;
 }
 
 .category--home .category-header--home .category-name {
@@ -1073,6 +1082,19 @@ main {
 
 .option-row:last-child {
   border-bottom: none;
+}
+
+.add-category-error {
+  color: var(--action-stop-fg);
+  background: var(--action-stop-bg);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  margin: 8px 0 0;
+}
+
+.add-category-error[hidden] {
+  display: none;
 }
 
 .option-row input[type="checkbox"],
