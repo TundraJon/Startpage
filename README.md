@@ -1065,7 +1065,13 @@ All five queued items, built in order and verified together at the end.
 
 ## Build Queue
 
-_Nothing queued right now — promote items from the Build Planner below when ready to start._
+### Weather widget clears/resets every minute — should only happen every 15 minutes
+
+- [ ] **Reported:** the weather widget visibly clears and resets on every clock minute-tick, not just once every 15 minutes.
+- [ ] **Root-caused:** `scheduleNextClockTick()`'s once-a-minute timer (script.js:1707-1719) calls `refreshLiveWeather(false)` every single minute. Its own comment claims this is cheap because "`loadLiveWeather` no-ops against the cache when it isn't stale yet" — that's only half true. `loadLiveWeather`'s fresh-cache branch (script.js:3544-3551, gated on `!force && cache && !isStale`) does correctly skip the network fetch, but it still unconditionally calls `applyLiveWeatherData(cache.data)` — the full data-apply pipeline (`renderWeatherTemps`, `renderWind`, `renderWeatherExtras`, `renderWeatherSkin`, `applyAlertTicker`, plus `weatherLiveConditions.clear()` + rebuild — script.js:3506-3514) — every single time it's called, whether or not the underlying data actually changed. So the "no-op" only ever applies to the network request; the entire widget still fully re-renders every 60 seconds regardless, which is what reads as "clears and resets." `WEATHER_STALE_MS` (script.js:3362) is correctly `15 * 60 * 1000`, so the *data* really is only 15 minutes stale — it's the *rendering* that isn't gated the same way.
+  - Ruled out as the cause: `renderWeatherSkin()`'s cloud layer specifically — Build Log 12 already hardened it to preserve existing cloud elements across repeated calls rather than re-scattering them, so that part isn't the flicker source.
+  - Not yet pinned down to one specific visual symptom (would need to watch it live to say for sure whether `applyAlertTicker()`'s marquee restarting, or the plain text re-renders in `renderWeatherTemps()`/`renderWeatherExtras()`, is the most visible part of the reset) — but the underlying cause is confirmed either way: the whole pipeline re-runs unnecessarily every minute.
+- [ ] **Proposed fix:** make the fresh-cache branch a genuine no-op — track whether `applyLiveWeatherData` has already been applied for the current cached fetch (e.g. a `lastAppliedFetchedAt` guard compared against `cache.fetchedAt`) and skip re-running the whole pipeline when it has. If something in the widget (e.g. the sunrise/sunset gradient) genuinely needs to keep progressing every minute independent of new weather data, that narrow piece should be split out and called directly from the clock tick instead of dragging the entire `applyLiveWeatherData` pipeline along with it.
 
 ## Build Planner
 
