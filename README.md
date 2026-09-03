@@ -978,6 +978,30 @@ _Five queued items, all built and verified together in one pass, per "Build the 
 
 ## Build Queue
 
+### Category data model: persisted, ordered category tree (foundation for the organizational system overhaul)
+
+- [ ] **Promoted from the Build Planner's "Organizational system overhaul" entry, item 1** — the piece everything else in that spec (category create/rename/delete/move, color picker, search, etc.) depends on. This entry is scoped to just the data model + rendering it replaces — none of those downstream features are in scope here.
+- [ ] **Root problem:** categories currently have zero persistence. Every category (except Home) is a hand-authored `<section class="category" data-category-id="...">` block directly in index.html — nesting, `--stripe-color`, and order are all baked into static markup, not data. Tiles already have exactly the kind of system this needs (`TILE_STORAGE_PREFIX`, `newTileId()`, a one-time seed migration) — this brings categories up to the same footing.
+- [ ] **Proposed schema — one JSON blob, flat map by id (not nested), mirroring how tiles are already stored per-category rather than as one giant nested tree:**
+  ```
+  localStorage['categoryTree'] = {
+    "<categoryId>": {
+      name: string,
+      parentId: string | null,   // null = top-level (sibling of News/Shopping/Entertainment)
+      order: number,             // sort key among siblings
+      stripeColor: string | null,// top-level only for now, per the color-picker item's scope
+      createdAt: number
+    },
+    ...
+  }
+  ```
+  A flat map keyed by id (rather than nested `children` arrays) means moving a category later is a one-field `parentId` reassignment, not splicing arrays at two nesting depths — consistent with how tile moves already work against flat per-category arrays.
+- [ ] **Home stays exactly as it is today** — not part of this tree. It's already special-cased out of `categoryToggles`/`openPath` entirely, and the spec's own color/create/nesting rules don't apply to it either.
+- [ ] **One-time migration, same pattern as `TILE_MIGRATION_FLAG_PREFIX`:** on first load after this ships, a `categoryTreeMigrated` flag gates a one-time seed of the *current* static hierarchy (News, Shopping, Entertainment, and the test-a…test-e sample tree with their existing nesting and `--stripe-color` values) into `categoryTree`, so nobody's existing layout is lost. After that, index.html's hardcoded `<section class="category">` blocks (everything except Home) get removed — they're replaced by categories rendered from `categoryTree` at load time.
+- [ ] **Rendering:** a new `renderCategoryTree()` (script.js), parallel to how `buildTileElement` builds tiles today, walks `categoryTree` in parent→child, `order`-sorted sequence and builds each `.category` section (header, collapse button, content wrapper, own tile-grid) into `<main id="categories">` after Home, before the existing category-wiring logic runs.
+- [ ] **What does *not* need to change:** `categoryToggles`, `openPath`/`renderOpenPath`, `categoryAncestorChain`, and the collapse-button wiring all already operate generically on `.category:not(.category--home) > .category-header` via a live `document.querySelectorAll` pass — they don't care whether those elements came from static HTML or were just inserted by `renderCategoryTree()`, as long as rendering happens first. Tile storage/rendering (`loadCategoryTiles`, `categoryGrids`) is also untouched — it already keys off `data-category-id`, which will still exist, just assigned dynamically now instead of hand-typed.
+- [ ] **Explicitly out of scope for this entry** (each is its own Build Planner item, still not promoted): create/rename/delete UI for categories, the color-picker UI itself (this entry only adds the `stripeColor` field to the schema), category move/reparent UI, and anything from the multi-select-for-categories or search items.
+
 ### Weather widget: auto-update every 15 minutes while the page stays open (including location)
 
 - [ ] **Requested:** the weather widget should store the time it was last updated, check every minute whether 15+ minutes have passed, and if so, update — re-fetching location too.
@@ -1054,7 +1078,7 @@ _The user supplied a full written spec for a Solid-Explorer-style file-manager U
 
 This is a big, multi-part foundation, not a single buildable unit — promote pieces to the Build Queue individually once each is ready, rather than as one giant build. Broken down by what the document asked for, cross-referenced against what already exists:
 
-- [ ] **1. Category data model — the real foundation, everything else depends on this.** Categories currently have *zero* persistence: they're hand-authored `<section data-category-id>` blocks in index.html, no id-generation, no parent/child data, no stored stripe color. Tiles already have exactly this kind of system (`TILE_STORAGE_PREFIX`, `newTileId()`, seed-data migration) — the category system needs its own equivalent: a persisted, ordered tree (id, name, parentId or nesting via storage key, `--stripe-color`, ordered child list) that gets *rendered* into `.category` DOM elements at load, instead of the DOM elements being the source of truth as they are today. Every other item below assumes this exists first.
+- [x] **1. Category data model — promoted to the Build Queue** (see "Category data model: persisted, ordered category tree" above). Every item below still depends on it landing first.
 - [ ] **2. Long-press multi-select, extended to categories, with range-select and select-all/invert/clear.** Tile long-press-to-select already exists (`enterSelectMode`/`toggleTileSelected`/`selectMode`, script.js) but is tap-to-toggle only, one grid at a time — no range-select ("subsequent long-presses select ranges"), no Select All/Invert/Clear. Extending selection to categories (not just tiles) means the same mechanics need to work on `.category-header` elements too, including selecting a category that itself contains subcategories/tiles (the whole subtree moves as a unit).
 - [ ] **3. Create: "+" for both Tile and Category, at "current location."** Tile creation already exists (`openAddTile`, the `.tile-add` `+` button per grid). Category creation is new (depends on item 1) — needs a UI entry point (FAB or button, per the doc) offering both, and "current location" needs a precise definition once single-open-path navigation is in the mix: the deepest entry in `openPath`, defaulting to Home when nothing is open. Name validation + conflict detection (no two sibling categories sharing a name) is new — nothing like it exists today.
 - [ ] **4. Color picker for primary (top-level) categories.** `--stripe-color` exists today only as a hand-typed inline style per category in index.html — no picker UI anywhere. Needs: a preset palette + custom color UI, storing the chosen color in the new category data model (item 1), and applying it the same way `--stripe-color` already works. Scoped to primary/top-level categories per the doc — subcategories' color treatment (inherit vs. their own lighter variant) is left open, not decided.
