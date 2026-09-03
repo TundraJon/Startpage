@@ -241,6 +241,133 @@
     renderOpenPath();
   }
 
+  // --- Category data model: categories (everything except Home, which stays static/special-cased)
+  // are now persisted data rendered into DOM at load, instead of hand-authored HTML being the
+  // source of truth. Mirrors the tile system's own storage/migration pattern (TILE_STORAGE_PREFIX,
+  // newTileId, seed-data migration) one level up the tree.
+  const CATEGORY_TREE_KEY = 'categoryTree';
+  const CATEGORY_TREE_MIGRATED_FLAG = 'categoryTreeMigrated';
+
+  // One-time seed: the hierarchy that used to be hand-authored directly in index.html, captured
+  // here so upgrading doesn't lose anyone's existing categories or their stripe colors. Every
+  // category (not just top-level) keeps its own stripeColor in the data model, matching how they
+  // actually render today — only the future color-*picker UI* is scoped to top-level categories,
+  // not the underlying data.
+  const CATEGORY_SEED_DATA = {
+    'news': { name: 'News', parentId: null, order: 0, stripeColor: '#3B82C4' },
+    'shopping': { name: 'Shopping', parentId: null, order: 1, stripeColor: '#2E8B57' },
+    'entertainment': { name: 'Entertainment', parentId: null, order: 2, stripeColor: '#8E44AD' },
+    'test-a': { name: 'Sample Category A', parentId: null, order: 3, stripeColor: '#E74C3C' },
+    'test-b': { name: 'Sample Category B', parentId: null, order: 4, stripeColor: '#16A085' },
+    'test-b-sub1': { name: 'Sample Sub 1', parentId: 'test-b', order: 0, stripeColor: '#1ABC9C' },
+    'test-b-sub2': { name: 'Sample Sub 2', parentId: 'test-b', order: 1, stripeColor: '#48C9B0' },
+    'test-c': { name: 'Sample Category C', parentId: null, order: 5, stripeColor: '#F39C12' },
+    'test-c-suba': { name: 'Sample Sub A', parentId: 'test-c', order: 0, stripeColor: '#F5B041' },
+    'test-c-suba-1': { name: 'Sample Sub A-1', parentId: 'test-c-suba', order: 0, stripeColor: '#F8C471' },
+    'test-d': { name: 'Sample Category D', parentId: null, order: 6, stripeColor: '#9B59B6' },
+    'test-e': { name: 'Sample Category E', parentId: null, order: 7, stripeColor: '#7F8C8D' },
+  };
+
+  function saveCategoryTree(tree) {
+    localStorage.setItem(CATEGORY_TREE_KEY, JSON.stringify(tree));
+  }
+
+  function loadCategoryTree() {
+    let tree;
+    try {
+      tree = JSON.parse(localStorage.getItem(CATEGORY_TREE_KEY) || '{}');
+    } catch (e) {
+      tree = {};
+    }
+    if (!tree || typeof tree !== 'object') tree = {};
+    if (localStorage.getItem(CATEGORY_TREE_MIGRATED_FLAG) !== 'true') {
+      Object.keys(CATEGORY_SEED_DATA).forEach((id) => {
+        if (!tree[id]) tree[id] = Object.assign({ createdAt: Date.now() }, CATEGORY_SEED_DATA[id]);
+      });
+      localStorage.setItem(CATEGORY_TREE_MIGRATED_FLAG, 'true');
+      saveCategoryTree(tree);
+    }
+    return tree;
+  }
+
+  const categoryTree = loadCategoryTree();
+
+  // Sorted [id, node] pairs for a given parent (null = top-level) — order determines both render
+  // order and, via presence/absence, whether a category renders as flat (a plain .tile-grid) or as
+  // a .category-content wrapper (own links + nested subcategories). Deriving this from the data at
+  // render time, rather than baking the flat-vs-nested shape into hand-authored markup, is what
+  // lets a future "add subcategory under a currently-flat category" op just work automatically.
+  function categoryChildren(parentId) {
+    return Object.keys(categoryTree)
+      .filter((id) => categoryTree[id].parentId === parentId)
+      .sort((a, b) => categoryTree[a].order - categoryTree[b].order)
+      .map((id) => [id, categoryTree[id]]);
+  }
+
+  function buildTileAddButton() {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'tile tile-add';
+    btn.setAttribute('aria-label', 'Add tile');
+    btn.textContent = '+';
+    return btn;
+  }
+
+  function buildCategorySection(id, node) {
+    const section = document.createElement('section');
+    section.className = 'category';
+    section.dataset.categoryId = id;
+    if (node.stripeColor) section.style.setProperty('--stripe-color', node.stripeColor);
+
+    const header = document.createElement('div');
+    header.className = 'category-header';
+    const mainBtn = document.createElement('button');
+    mainBtn.type = 'button';
+    mainBtn.className = 'category-header-main';
+    mainBtn.setAttribute('aria-expanded', 'false');
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'category-name';
+    nameSpan.textContent = node.name;
+    mainBtn.appendChild(nameSpan);
+    header.appendChild(mainBtn);
+    const collapseBtn = document.createElement('button');
+    collapseBtn.type = 'button';
+    collapseBtn.className = 'category-collapse-btn';
+    collapseBtn.setAttribute('aria-label', 'Collapse ' + node.name);
+    collapseBtn.hidden = true;
+    collapseBtn.textContent = '▲';
+    header.appendChild(collapseBtn);
+    section.appendChild(header);
+
+    const children = categoryChildren(id);
+    if (children.length > 0) {
+      const contentEl = document.createElement('div');
+      contentEl.className = 'category-content';
+      contentEl.hidden = true;
+      const ownGrid = document.createElement('div');
+      ownGrid.className = 'tile-grid';
+      ownGrid.hidden = true;
+      ownGrid.appendChild(buildTileAddButton());
+      contentEl.appendChild(ownGrid);
+      children.forEach(([childId, childNode]) => contentEl.appendChild(buildCategorySection(childId, childNode)));
+      section.appendChild(contentEl);
+    } else {
+      const grid = document.createElement('div');
+      grid.className = 'tile-grid';
+      grid.hidden = true;
+      grid.appendChild(buildTileAddButton());
+      section.appendChild(grid);
+    }
+    return section;
+  }
+
+  function renderCategoryTree() {
+    const main = document.getElementById('categories');
+    categoryChildren(null).forEach(([id, node]) => main.appendChild(buildCategorySection(id, node)));
+  }
+
+  renderCategoryTree();
+
   document.querySelectorAll('.category:not(.category--home) > .category-header').forEach((header) => {
     const section = header.closest('.category');
     const id = section.dataset.categoryId;
@@ -1021,8 +1148,12 @@
     followPointer(clientX, clientY);
   }
 
-  const AUTO_SCROLL_EDGE_PX = 70;
-  const AUTO_SCROLL_MAX_PX_PER_FRAME = 14;
+  // 120px (not the original 70px) gives real headroom past a typical phone's status bar/notch —
+  // a real thumb dragging a tile one-handed generally can't push into a zone that small, which
+  // made the top edge effectively unreachable in practice even though the scroll mechanism itself
+  // was never broken. Speed raised to match, since a larger zone means covering more distance.
+  const AUTO_SCROLL_EDGE_PX = 120;
+  const AUTO_SCROLL_MAX_PX_PER_FRAME = 20;
 
   function updateAutoScroll(clientY) {
     if (!dragInfo) return;
@@ -1180,10 +1311,11 @@
 
   // --- Multi-select batch move — additive to single-tile Move Entry above, which is untouched.
   // Long-press a tile -> tile menu -> Select enters select mode for that tile's grid; tapping
-  // other tiles in the same grid toggles their selection; "Move Selected" hands off to the normal
-  // single-open-path category navigation to pick a destination, then "Move Here" appends the whole
+  // other tiles in the same grid toggles their selection; "Cut" hands off to the normal
+  // single-open-path category navigation to pick a destination, then "Paste" appends the whole
   // batch to the end of that category's list (no live reflow, matching Move Entry's own
-  // header-drop append-to-end behavior for a single tile). ---
+  // header-drop append-to-end behavior for a single tile) — this is a move, not a real clipboard
+  // copy: the same tile objects relocate, nothing is duplicated. ---
   const selectActionCancelBtn = document.getElementById('select-action-cancel');
 
   function toggleTileSelected(tileEl) {
@@ -1208,7 +1340,7 @@
     const n = selectMode.selectedIds.size;
     if (!pickingDestination) {
       selectActionStatus.textContent = n + ' selected';
-      selectActionMoveBtn.textContent = 'Move Selected (' + n + ')';
+      selectActionMoveBtn.textContent = 'Cut (' + n + ')';
       selectActionMoveBtn.disabled = n === 0;
     } else {
       const destId = openPath.length > 0 ? openPath[openPath.length - 1] : null;
@@ -1216,9 +1348,9 @@
         const nameEl = document.querySelector('.category[data-category-id="' + CSS.escape(destId) + '"] > .category-header .category-name');
         selectActionStatus.textContent = 'Destination: ' + (nameEl ? nameEl.textContent : destId);
       } else {
-        selectActionStatus.textContent = 'Choose a destination category above, then tap Move Here';
+        selectActionStatus.textContent = 'Choose a destination category above, then tap Paste';
       }
-      selectActionMoveBtn.textContent = 'Move Here (' + n + ')';
+      selectActionMoveBtn.textContent = 'Paste (' + n + ')';
       selectActionMoveBtn.disabled = !destId;
     }
   }
@@ -1553,6 +1685,11 @@
     const msToNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
     setTimeout(() => {
       updateClock();
+      // Piggybacks on the clock's own once-a-minute tick rather than a second timer.
+      // refreshLiveWeather(false) is cheap to call every minute — loadLiveWeather no-ops against
+      // the cache when it isn't stale yet — and only actually re-fetches (location + weather)
+      // once WEATHER_STALE_MS (15 minutes) has genuinely passed.
+      refreshLiveWeather(false);
       scheduleNextClockTick();
     }, msToNextMinute);
   }
@@ -1684,10 +1821,10 @@
   }
 
   const weatherState = {
-    tempF: 88, hiF: 91, loF: 72, feelsF: 92, windMph: 8, cloudPct: 20,
-    humidity: 55, dewPointF: 68, uv: 6, visibilityMi: 10, moonPhase: 'Full Moon',
-    conditionCode: 1201, conditionText: 'Moderate or heavy freezing rain',
-    locationName: 'Los Ranchos de Albuquerque, NM', tzId: null,
+    tempF: -20, hiF: -10, loF: -30, feelsF: -35, windMph: 35, cloudPct: 100,
+    humidity: 60, dewPointF: -25, uv: 0, visibilityMi: 1, moonPhase: 'Full Moon',
+    conditionCode: 1117, conditionText: 'Blizzard',
+    locationName: 'McMurdo Station, Antarctica', tzId: null,
     sunrise: null, sunset: null, alerts: [], hourly: [],
   };
   let displayTempUnit = weatherSettings.tempUnit;
@@ -3199,9 +3336,10 @@
   // --- Live WeatherAPI.com integration ---
   const WEATHER_CACHE_KEY = 'weatherLiveCache';
   const WEATHER_STALE_MS = 15 * 60 * 1000;
-  // Fallback location matches the original placeholder text (Los Ranchos de Albuquerque, NM),
-  // used only if geolocation is unavailable, declined, or times out.
-  const FALLBACK_COORDS = { lat: 35.1497, lon: -106.6764 };
+  // Fallback location (Orlando, FL) — used only if real geolocation is unavailable, declined, or
+  // times out. Fed to the real WeatherAPI fetch, so the location shown is Orlando's actual live
+  // weather, not placeholder text.
+  const FALLBACK_COORDS = { lat: 28.5383, lon: -81.3792 };
 
   // --- Temporary Live Weather diagnostics (Testing Panel) ---
   // Tracks what actually happened on the last loadLiveWeather() call, since real live-data bugs

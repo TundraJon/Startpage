@@ -12,6 +12,10 @@
   --clock-fg: #ffffff;
   --clock-analog-day: #ffffff;
   --clock-analog-night: #c9c9c9;
+  --action-go-bg: #c8f2c0;
+  --action-go-fg: #14531f;
+  --action-stop-bg: #f7c9c9;
+  --action-stop-fg: #6b1414;
 }
 
 :root[data-theme="dark"] {
@@ -23,6 +27,10 @@
   --border: #2c3238;
   --clock-analog-day: #8a8a8a;
   --clock-analog-night: #4a4a4a;
+  --action-go-bg: #1f3d24;
+  --action-go-fg: #a3e8a3;
+  --action-stop-bg: #3d1f1f;
+  --action-stop-fg: #e8a3a3;
 }
 
 * { box-sizing: border-box; }
@@ -1272,13 +1280,21 @@ main {
   color: var(--fg);
 }
 
-.select-action-move {
-  background: var(--home-header-bg);
-  color: var(--home-header-fg);
-  border-color: var(--home-header-bg);
+/* Both qualified with .select-action-bar to out-specificity ".select-action-bar button" above
+   (a class + type selector otherwise beats a lone class selector regardless of source order). */
+.select-action-bar .select-action-move {
+  background: var(--action-go-bg);
+  color: var(--action-go-fg);
+  border-color: var(--action-go-bg);
 }
 
 .select-action-move:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+.select-action-bar .select-action-cancel {
+  background: var(--action-stop-bg);
+  color: var(--action-stop-fg);
+  border-color: var(--action-stop-bg);
 }

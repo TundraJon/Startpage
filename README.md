@@ -976,74 +976,47 @@ _Five queued items, all built and verified together in one pass, per "Build the 
 
 - [x] Full Playwright sweep covering all five items above plus the existing collapse/outdent, alert-ticker, and drag-disappear reproductions: zero console/page errors throughout. Confirmed `node --check script.js` passes (catches the dragInfo TDZ issue that would otherwise only surface at runtime).
 
+## Build Log 47 (completed)
+
+_Six queued items, all built and verified together in one pass, per "Go ahead and build everything in the build queue."_
+
+### Category data model: categories are now persisted, ordered data instead of hand-authored HTML
+
+- [x] Added `categoryTree` (localStorage): a flat map keyed by category id, each entry `{name, parentId, order, stripeColor, createdAt}`. A one-time `categoryTreeMigrated` flag gates seeding it from `CATEGORY_SEED_DATA` (script.js) — the exact hierarchy and `--stripe-color` values that used to be hand-typed in index.html (News/Shopping/Entertainment plus the test-a…test-e sample tree), so nobody's layout changes on upgrade. Every category keeps its own `stripeColor` in the data (not just top-level) — matches how they actually rendered before; only the *future color-picker UI* is scoped to top-level, not the underlying schema.
+- [x] `renderCategoryTree()` (script.js) walks the tree parent→child, `order`-sorted, and builds each `.category` section from scratch (header, collapse button, and either a flat `.tile-grid` or a `.category-content` wrapper depending on whether it actually has children) into `<main id="categories">`, right after Home and before any of the existing category-wiring code runs. index.html's hardcoded category sections (everything except Home, which stays static/special-cased) are gone — replaced by this render pass.
+- [x] Nothing else needed to change: `categoryToggles`, `openPath`/`renderOpenPath`, `categoryAncestorChain`, the collapse-button wiring, `categoryGrids`, and tile loading/rendering all already worked off live `document.querySelectorAll` passes keyed by `data-category-id` — they don't know or care whether an element was hand-typed or just rendered by JS, as long as rendering happens first.
+- [x] Verified directly: all 13 categories (Home + 12 migrated) render with correct names, stripe colors, and nesting; deep navigation (3 levels), per-ancestor collapse buttons and their outdent, adding a tile into a dynamically-rendered category, and collapse-all all work identically to before. Re-ran the Build 45/46 hover-settle, drag-disappear, and stuck-selection regression tests against the new rendering — all still pass.
+
+### Weather widget: now auto-updates every 15 minutes while the page stays open
+
+- [x] `scheduleNextClockTick`'s existing per-minute tick (script.js) now also calls `refreshLiveWeather(false)` — cheap every time (a no-op against the cache unless genuinely stale), so it only actually re-fetches (weather *and* location) once 15 minutes have really passed. No new timer introduced; reuses the clock's own proven scheduling.
+
+### Move Entry: up-scroll-to-Home reach fixed by enlarging the trigger zone
+
+- [x] `AUTO_SCROLL_EDGE_PX` raised from `70` to `120` (script.js), `AUTO_SCROLL_MAX_PX_PER_FRAME` from `14` to `20` to cover the larger distance — gives real headroom past a typical phone's status bar/notch, which a one-handed thumb drag couldn't reach into before. Verified directly: the auto-scroll mechanism already reached `scrollY = 0` correctly in isolation: this is an ergonomics fix, not a logic fix, per last build's diagnosis.
+
+### Weather widget: pre-load placeholder is now McMurdo Station, Antarctica (Blizzard)
+
+- [x] `weatherState`'s defaults (script.js) and the matching static markup (index.html, for the very first paint before script.js runs) both changed together: location → "McMurdo Station, Antarctica"; condition → Blizzard (code `1117`); `tempF: -20, hiF: -10, loF: -30, feelsF: -35, windMph: 35, cloudPct: 100, humidity: 60, dewPointF: -25, uv: 0, visibilityMi: 1` — internally consistent (blizzard = high wind, low visibility, full overcast), per the user's confirmed call to reroll the whole placeholder, not just the location text. `moonPhase` untouched (unrelated).
+
+### Weather widget: FALLBACK_COORDS now defaults to Orlando, FL
+
+- [x] `FALLBACK_COORDS` (script.js) changed to `{ lat: 28.5383, lon: -81.3792 }` — real coordinates fed to a real WeatherAPI fetch when geolocation fails, so the location shown is genuinely Orlando's live weather, not placeholder text. Comment above it updated to match (no longer references the old Albuquerque placeholder text, which no longer exists after the McMurdo change above).
+
+### Multi-select move: renamed to Cut/Paste, color-coded — plus a real CSS specificity bug found and fixed
+
+- [x] `updateSelectActionBar()` (script.js) now shows `'Cut (N)'` while selecting and `'Paste (N)'` while picking a destination, replacing "Move Selected"/"Move Here"; Cancel unchanged. Move-only, not a real clipboard copy — same tile objects relocate, matching everything else already decided about this flow.
+- [x] Added `--action-go-bg`/`fg` (light green) and `--action-stop-bg`/`fg` (light red) tokens, light/dark pairs, applied to `.select-action-move` and the newly-classed `.select-action-cancel`.
+- [x] **Found and fixed a real pre-existing bug while wiring this up:** the color rules weren't rendering at all at first — `.select-action-bar button` (a class + element selector, specificity (0,1,1)) was silently beating a lone `.select-action-move`/`.select-action-cancel` class selector (0,1,0), regardless of source order. This was already true of the *original* blue background before this build, it just apparently was never visually caught. Fixed by qualifying both selectors as `.select-action-bar .select-action-move`/`.select-action-bar .select-action-cancel` (0,2,0), which now correctly wins. Verified directly in both themes: light green `#c8f2c0`/dark green text, light red `#f7c9c9`/dark red text in light mode; the matching dark-mode pairs in dark mode.
+- [x] Colors used are the ones already proposed and logged — the user said they'd supply their own; these are a swap-ready placeholder (four CSS variables, styles.css `:root`/`:root[data-theme="dark"]`) until real values arrive.
+
+### Regression check
+
+- [x] Full Playwright sweep: category tree rendering/migration/nesting, deep navigation, per-ancestor collapse buttons, tile-add against dynamic categories, multi-select stuck-selection fix, Move Entry drag-disappear fix, hover-settle (both the deliberate-pause and fast-sweep cases, matching prior documented behavior), chevron removal, alert ticker speed, tile usage stats, lightning reroll default, McMurdo placeholder (all fields), FALLBACK_COORDS, and Cut/Paste labels + colors in both themes — zero console/page errors throughout. Also diffed an old Build 41-era test script (`test_move_entry_cross_v41.js`) against both the pre- and post-this-build code and got identical results either way, confirming its several stale failures predate this build (it doesn't account for Build 45's hover-settle timer) rather than being a regression.
+
 ## Build Queue
 
-### Category data model: persisted, ordered category tree (foundation for the organizational system overhaul)
-
-- [ ] **Promoted from the Build Planner's "Organizational system overhaul" entry, item 1** — the piece everything else in that spec (category create/rename/delete/move, color picker, search, etc.) depends on. This entry is scoped to just the data model + rendering it replaces — none of those downstream features are in scope here.
-- [ ] **Root problem:** categories currently have zero persistence. Every category (except Home) is a hand-authored `<section class="category" data-category-id="...">` block directly in index.html — nesting, `--stripe-color`, and order are all baked into static markup, not data. Tiles already have exactly the kind of system this needs (`TILE_STORAGE_PREFIX`, `newTileId()`, a one-time seed migration) — this brings categories up to the same footing.
-- [ ] **Proposed schema — one JSON blob, flat map by id (not nested), mirroring how tiles are already stored per-category rather than as one giant nested tree:**
-  ```
-  localStorage['categoryTree'] = {
-    "<categoryId>": {
-      name: string,
-      parentId: string | null,   // null = top-level (sibling of News/Shopping/Entertainment)
-      order: number,             // sort key among siblings
-      stripeColor: string | null,// top-level only for now, per the color-picker item's scope
-      createdAt: number
-    },
-    ...
-  }
-  ```
-  A flat map keyed by id (rather than nested `children` arrays) means moving a category later is a one-field `parentId` reassignment, not splicing arrays at two nesting depths — consistent with how tile moves already work against flat per-category arrays.
-- [ ] **Home stays exactly as it is today** — not part of this tree. It's already special-cased out of `categoryToggles`/`openPath` entirely, and the spec's own color/create/nesting rules don't apply to it either.
-- [ ] **One-time migration, same pattern as `TILE_MIGRATION_FLAG_PREFIX`:** on first load after this ships, a `categoryTreeMigrated` flag gates a one-time seed of the *current* static hierarchy (News, Shopping, Entertainment, and the test-a…test-e sample tree with their existing nesting and `--stripe-color` values) into `categoryTree`, so nobody's existing layout is lost. After that, index.html's hardcoded `<section class="category">` blocks (everything except Home) get removed — they're replaced by categories rendered from `categoryTree` at load time.
-- [ ] **Rendering:** a new `renderCategoryTree()` (script.js), parallel to how `buildTileElement` builds tiles today, walks `categoryTree` in parent→child, `order`-sorted sequence and builds each `.category` section (header, collapse button, content wrapper, own tile-grid) into `<main id="categories">` after Home, before the existing category-wiring logic runs.
-- [ ] **What does *not* need to change:** `categoryToggles`, `openPath`/`renderOpenPath`, `categoryAncestorChain`, and the collapse-button wiring all already operate generically on `.category:not(.category--home) > .category-header` via a live `document.querySelectorAll` pass — they don't care whether those elements came from static HTML or were just inserted by `renderCategoryTree()`, as long as rendering happens first. Tile storage/rendering (`loadCategoryTiles`, `categoryGrids`) is also untouched — it already keys off `data-category-id`, which will still exist, just assigned dynamically now instead of hand-typed.
-- [ ] **Explicitly out of scope for this entry** (each is its own Build Planner item, still not promoted): create/rename/delete UI for categories, the color-picker UI itself (this entry only adds the `stripeColor` field to the schema), category move/reparent UI, and anything from the multi-select-for-categories or search items.
-
-### Weather widget: auto-update every 15 minutes while the page stays open (including location)
-
-- [ ] **Requested:** the weather widget should store the time it was last updated, check every minute whether 15+ minutes have passed, and if so, update — re-fetching location too.
-- [ ] **Root-caused against the actual code — partially already exists, one real piece missing:**
-  - `loadLiveWeather` (script.js) already stores an update timestamp (`fetchedAt`) alongside the fetched data in `WEATHER_CACHE_KEY`'s localStorage cache, and already has a 15-minute staleness threshold (`WEATHER_STALE_MS = 15 * 60 * 1000`) that it checks against `fetchedAt` to decide whether to serve the cache or fetch fresh — including re-fetching location via `getCoords()` whenever it does fetch fresh (not just on first load). So the storage and staleness-comparison logic requested already exist correctly.
-  - **What's actually missing:** nothing currently re-invokes that staleness check on any kind of timer. `loadLiveWeather`/`refreshLiveWeather` is only ever called (a) once at page load (`refreshLiveWeather(false)`), and (b) once when the user edits the WeatherAPI key in Settings (`refreshLiveWeather(true)`). There is no periodic re-check while the page stays open — so today, a tab left open past 15 minutes keeps showing increasingly stale weather indefinitely, only correcting itself on the next manual reload.
-  - The clock already has a working per-minute self-scheduling tick (`scheduleNextClockTick`, aligned to real minute boundaries via `setTimeout`) that calls `updateClock()` and reschedules itself — the natural, already-proven pattern to reuse for a once-a-minute weather-staleness check, rather than introducing a second, separate timing mechanism.
-- [ ] **Proposed fix:** add a call to `refreshLiveWeather(false)` into the per-minute tick (either inside `scheduleNextClockTick`'s callback directly, or a small sibling function scheduled the same way) — `loadLiveWeather` already no-ops cheaply (serves cache, no network call) when the cache isn't stale yet, so this is safe to call every minute without adding real overhead; it only actually fetches (location + weather) once 15+ minutes have genuinely passed.
-
-### Move Entry: dragging a tile up, auto-scroll can't reach far enough to drop it on Home
-
-- [ ] **Reported:** while moving a tile, dragging up toward the top of the page to drop it on the Home category stops working once News (the category directly under Home) comes into view — can't scroll any further up from there.
-- [ ] **Investigated directly, not guessed — the auto-scroll mechanism itself works correctly when actually triggered:** reproduced a drag with the pointer held in the top edge zone (`AUTO_SCROLL_EDGE_PX = 70`px from the top, script.js) and confirmed via Playwright that `window.scrollBy`'s upward auto-scroll (`autoScrollTick`) does reach `scrollY = 0` and Home's tile-grid does become fully visible and reachable right below the pinned header — no clamping bug, no thrown error, no stuck state found in the code path itself.
-- [ ] **Best-supported explanation — a reach problem, not a logic bug:** the trigger zone is only the top 70 screen pixels. On an actual phone, that band sits at or behind the status bar/notch — a real thumb dragging a tile one-handed generally can't push into it, especially not while also holding the phone. Once the visible list has scrolled enough that News's header sits near the top of the *comfortably reachable* area, there's nowhere higher left to drag into that would actually cross into the 70px trigger band, so auto-scroll never engages for the remaining distance — matching "stops at News" exactly, without anything in the code actually being broken. (Home itself isn't the blocker either way: it's the very first section in the page, so reaching `scrollY = 0` by any means reveals it in full — confirmed directly, `homeTop` lands well within a normal phone viewport once there.)
-- [ ] **Proposed fix — enlarge the trigger zone so a real thumb can reach it:** raise `AUTO_SCROLL_EDGE_PX` (script.js) from `70` to something like `120`, giving real headroom past a typical status bar/notch, and consider raising `AUTO_SCROLL_MAX_PX_PER_FRAME` (currently `14`) a bit too, since a larger zone means more distance may need covering once it does trigger. Both are simple constant changes, no structural rework — low-risk either way even if the ergonomic read above isn't the full story.
-- [ ] **Caveat:** diagnosed without a real touch device in hand — the "reach" explanation is the strongest one that survived direct testing of the code itself (which ruled out an actual scroll-logic bug), but worth a real-device check after the constants change to confirm it's actually enough headroom.
-
-### Weather widget: placeholder location before load should be McMurdo Station, Antarctica
-
-- [ ] **Requested:** before the real location/weather finishes loading, the widget should start out showing McMurdo Station, Antarctica instead of whatever it currently shows.
-- [ ] **Root-caused: the current pre-load placeholder is "Los Ranchos de Albuquerque, NM," set in two places that need to change together:**
-  - `weatherState.locationName` (script.js) defaults to `'Los Ranchos de Albuquerque, NM'` alongside the rest of the placeholder weather figures (temp, condition, etc.) — this is what `renderWeatherTemps`/the location line render until `applyLiveWeatherData` overwrites it with the real fetched location.
-  - index.html's `#weather-location` markup also hardcodes the same text directly, so the very first paint (before script.js even runs) shows it too — both need to change together or they'd drift out of sync.
-- [ ] **Not the same thing as `FALLBACK_COORDS`:** there's a separate constant (`FALLBACK_COORDS = { lat: 35.1497, lon: -106.6764 }`, also Albuquerque-based) used by `getCoords()` only if real geolocation is unavailable, declined, or times out — that's what real weather data ends up being fetched *for* in a no-geolocation case, not the pre-load placeholder text this request is about. Left alone unless asked — changing it would mean an actual geolocation failure shows fake Antarctic weather as if it were real, which seems like a different, riskier thing than what was asked (a placeholder shown only until the real fetch resolves).
-- [x] **Confirmed with the user:** also reroll the placeholder weather figures to match, not just the location name.
-- [ ] **Fix:** change `weatherState.locationName`'s default (script.js) and the static text inside `#weather-location` (index.html) to `'McMurdo Station, Antarctica'`. Reroll the rest of the placeholder object to something Antarctic and internally consistent, e.g. condition code `1117` ("Blizzard," already in `WX_CONDITIONS` — matches McMurdo's real, famous "Condition One" storms) with `tempF: -20, hiF: -10, loF: -30, feelsF: -35, windMph: 35, humidity: 60, dewPointF: -25, uv: 0, visibilityMi: 1`. `moonPhase` stays as-is — unrelated to location.
-
-### Weather widget: FALLBACK_COORDS should default to Orlando, FL
-
-- [ ] **Requested:** `FALLBACK_COORDS` should default to Orlando, FL.
-- [ ] **Confirmed this is a different constant from the McMurdo placeholder above, not a duplicate ask:** `FALLBACK_COORDS` (script.js, currently `{ lat: 35.1497, lon: -106.6764 }` — Albuquerque) is what `getCoords()` hands to the *real* WeatherAPI fetch when actual geolocation is unavailable, declined, or times out — it's real coordinates fed to a real API call, not placeholder display text, so no separate location-name string needs changing alongside it: the API returns Orlando's real name/region itself once fetched with Orlando's coordinates.
-- [ ] **Fix:** change `FALLBACK_COORDS` to Orlando, FL's coordinates: `{ lat: 28.5383, lon: -81.3792 }`. Update the comment above it (currently references "the original placeholder text (Los Ranchos de Albuquerque, NM)," which will no longer be accurate once the McMurdo Station item above ships) to describe the new default instead.
-
-### Multi-select move: rename to Cut/Paste, color-code the action bar buttons
-
-- [ ] **Requested:** after selecting tiles, the "Move Selected"/"Move Here" button should get a light green background, and "Cancel" should get a light red background. Also rename "Move Selected" → "Cut" and "Move Here" → "Paste"; "Cancel" stays "Cancel."
-- [ ] **Root-caused against the actual markup — one button, not two:** there's only a single button element (`#select-action-move`, index.html/script.js), whose text is swapped between `'Move Selected (N)'` and `'Move Here (N)'` by `updateSelectActionBar()` (script.js) depending on `pickingDestination` (false = still selecting tiles; true = a destination category is being chosen). Renaming both means changing both branches of that same function to `'Cut (N)'` / `'Paste (N)'` — kept the "(N)" selected-count suffix on both, matching the existing pattern, since only the wording was requested to change.
-- [ ] **Colors — no existing green/red tokens to reuse:** `:root`/`:root[data-theme="dark"]` (styles.css) currently only define neutral tokens (`--bg`, `--surface`, `--fg`, `--border`, `--home-header-bg`/`fg` for the move button's current blue). Proposed new tokens, light/dark pairs like the existing ones:
-  - `--action-go-bg: #c8f2c0` / `--action-go-fg: #14531f` (light green bg, dark green text) for `.select-action-move` in both its states, replacing its current `--home-header-bg`/`fg` (blue) usage — dark-theme override something like `--action-go-bg: #1f3d24` / `--action-go-fg: #a3e8a3` (muted dark-mode green, keeping decent contrast against the dark surface).
-  - `--action-stop-bg: #f7c9c9` / `--action-stop-fg: #6b1414` (light red bg, dark red text) for `.select-action-cancel` (currently plain `.select-action-bar button` styling with no color override) — dark-theme override something like `--action-stop-bg: #3d1f1f` / `--action-stop-fg: #e8a3a3`.
-  - Exact shades above are a starting proposal, not confirmed — easy to adjust once seen rendered.
-- [ ] **Scope check:** the tile menu's own "Select" entry point (`#tile-menu-select`, unrelated button that starts select mode in the first place) and the per-tile checkmark/outline styling (`.tile-selected`) aren't mentioned in the request and are left alone — this is specifically about the bottom action bar's two buttons once in select mode.
+_Empty — nothing currently queued. Log new bug reports and feature requests here; only build them on explicit "Go ahead and build" instruction._
 
 ## Build Planner
 
@@ -1078,7 +1051,7 @@ _The user supplied a full written spec for a Solid-Explorer-style file-manager U
 
 This is a big, multi-part foundation, not a single buildable unit — promote pieces to the Build Queue individually once each is ready, rather than as one giant build. Broken down by what the document asked for, cross-referenced against what already exists:
 
-- [x] **1. Category data model — promoted to the Build Queue** (see "Category data model: persisted, ordered category tree" above). Every item below still depends on it landing first.
+- [x] **1. Category data model — built (Build Log 47).** Categories are now persisted data (`categoryTree` in localStorage) rendered into DOM at load, instead of hand-authored HTML. Every item below is now unblocked to actually start on top of it.
 - [ ] **2. Long-press multi-select, extended to categories, with range-select and select-all/invert/clear.** Tile long-press-to-select already exists (`enterSelectMode`/`toggleTileSelected`/`selectMode`, script.js) but is tap-to-toggle only, one grid at a time — no range-select ("subsequent long-presses select ranges"), no Select All/Invert/Clear. Extending selection to categories (not just tiles) means the same mechanics need to work on `.category-header` elements too, including selecting a category that itself contains subcategories/tiles (the whole subtree moves as a unit).
 - [ ] **3. Create: "+" for both Tile and Category, at "current location."** Tile creation already exists (`openAddTile`, the `.tile-add` `+` button per grid). Category creation is new (depends on item 1) — needs a UI entry point (FAB or button, per the doc) offering both, and "current location" needs a precise definition once single-open-path navigation is in the mix: the deepest entry in `openPath`, defaulting to Home when nothing is open. Name validation + conflict detection (no two sibling categories sharing a name) is new — nothing like it exists today.
 - [ ] **4. Color picker for primary (top-level) categories.** `--stripe-color` exists today only as a hand-typed inline style per category in index.html — no picker UI anywhere. Needs: a preset palette + custom color UI, storing the chosen color in the new category data model (item 1), and applying it the same way `--stripe-color` already works. Scoped to primary/top-level categories per the doc — subcategories' color treatment (inherit vs. their own lighter variant) is left open, not decided.
