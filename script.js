@@ -1,5 +1,30 @@
 (function () {
   const root = document.documentElement;
+
+  // Site name — not the Home category (the .category-name "Home" inside .category--home, a
+  // separate element entirely), but the page's own name: the browser tab title and the visible
+  // <h1 class="site-title"> in .site-header. Falls back to "Home" (the original hardcoded value)
+  // whenever unset/empty, so a fresh device with no stored value renders exactly as it always has.
+  const SITE_NAME_STORAGE = 'siteName';
+  const SITE_NAME_DEFAULT = 'Home';
+  const siteNameInput = document.getElementById('site-name-input');
+  const siteTitleEl = document.querySelector('.site-title');
+
+  function applySiteName(name) {
+    const value = name || SITE_NAME_DEFAULT;
+    document.title = value;
+    siteTitleEl.textContent = value;
+  }
+
+  siteNameInput.value = localStorage.getItem(SITE_NAME_STORAGE) || '';
+  applySiteName(siteNameInput.value.trim());
+  siteNameInput.addEventListener('change', () => {
+    const name = siteNameInput.value.trim();
+    if (name) localStorage.setItem(SITE_NAME_STORAGE, name);
+    else localStorage.removeItem(SITE_NAME_STORAGE);
+    applySiteName(name);
+  });
+
   const themeToggle = document.getElementById('theme-toggle');
   const settingsOverlay = document.getElementById('settings-overlay');
   const settingsClose = document.getElementById('settings-close');
@@ -176,27 +201,20 @@
   }
 
   function renderOpenPath() {
-    // While a Move Entry drag is live, also pin open the chain of ancestors leading to wherever
-    // the dragged tile currently sits (dragInfo.currentGrid) — on top of, not instead of, the
-    // normal openPath. Otherwise ordinary hover-navigation elsewhere (e.g. backing out of a
-    // subcategory the tile was dragged through) can collapse the tile's own category out from
-    // under it, leaving it invisible until the pointer re-enters a visible grid. Deliberately
-    // shows two paths open at once during a drag — an intentional exception, not a bug.
-    const pinnedGrid = dragInfo ? dragInfo.currentGrid : null;
-    const pinnedCategoryId = pinnedGrid ? pinnedGrid.closest('.category').dataset.categoryId : null;
-    const pinnedChain = pinnedCategoryId ? categoryAncestorChain(pinnedCategoryId) : [];
+    // The Build 46 "pinned chain" exception (keeping a dragged tile's category forced open even
+    // while hovering elsewhere) is gone — Move Entry drag no longer navigates to other categories
+    // at all (same-category reorder only, see dragInfo/finishTileDrag), so there's nothing left
+    // for it to protect against. Plain openPath rendering only.
     categoryToggles.forEach((entry, id) => {
-      const onPath = openPath.includes(id) || pinnedChain.includes(id);
+      const onPath = openPath.includes(id);
       entry.contentEl.hidden = !onPath;
       entry.mainBtn.setAttribute('aria-expanded', String(onPath));
       // Own direct links are the default child shown when a category-with-subcategories opens —
       // visible only while this category is the deepest (leaf) selection, hidden as soon as one
       // of its subcategories becomes the active child instead, or the leaf's collapse button has
-      // hidden them via the double-duty behavior below — except while the dragged tile is sitting
-      // directly in this category's own grid, which forces it visible regardless.
-      const pinnedOwnGrid = pinnedGrid && entry.ownGridEl === pinnedGrid;
+      // hidden them via the double-duty behavior below.
       if (entry.ownGridEl) {
-        entry.ownGridEl.hidden = !(pinnedOwnGrid || (onPath && isPathLeaf(id) && !leafLinksCollapsed));
+        entry.ownGridEl.hidden = !(onPath && isPathLeaf(id) && !leafLinksCollapsed);
       }
       // Every category on the current path gets its own collapse button now that the chevron
       // (redundant with tapping the header to open) is gone — not just the deepest leaf.
@@ -252,6 +270,20 @@
       document.documentElement.style.setProperty('--pinned-header-height', height + 'px');
     });
     pinnedHeaderObserver.observe(pinnedHeaderEl);
+  }
+
+  // Home's own header is now position: fixed (removed from flow — see .category-header--home's
+  // CSS comment for why), so .category--home .tile-grid needs to reserve exactly its height via
+  // padding-top, kept live the same way as --pinned-header-height above. Reads .offsetHeight
+  // (border-box, includes the header's own 10px/14px padding) rather than the ResizeObserver
+  // entry's contentRect (content-box only, would under-report by the vertical padding and leave
+  // a gap the tile-grid doesn't actually need to cover).
+  const homeHeaderEl = document.querySelector('.category-header--home');
+  if (homeHeaderEl && 'ResizeObserver' in window) {
+    const homeHeaderObserver = new ResizeObserver(() => {
+      document.documentElement.style.setProperty('--home-header-height', homeHeaderEl.offsetHeight + 'px');
+    });
+    homeHeaderObserver.observe(homeHeaderEl);
   }
 
   // --- Category data model: categories (everything except Home, which stays static/special-cased)
@@ -317,15 +349,6 @@
       .map((id) => [id, categoryTree[id]]);
   }
 
-  function buildTileAddButton() {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'tile tile-add';
-    btn.setAttribute('aria-label', 'Add tile');
-    btn.textContent = '+';
-    return btn;
-  }
-
   function buildCategorySection(id, node) {
     const section = document.createElement('section');
     section.className = 'category';
@@ -360,7 +383,6 @@
       const ownGrid = document.createElement('div');
       ownGrid.className = 'tile-grid';
       ownGrid.hidden = true;
-      ownGrid.appendChild(buildTileAddButton());
       contentEl.appendChild(ownGrid);
       children.forEach(([childId, childNode]) => contentEl.appendChild(buildCategorySection(childId, childNode)));
       section.appendChild(contentEl);
@@ -368,7 +390,6 @@
       const grid = document.createElement('div');
       grid.className = 'tile-grid';
       grid.hidden = true;
-      grid.appendChild(buildTileAddButton());
       section.appendChild(grid);
     }
     return section;
@@ -713,7 +734,7 @@
     const url = parsedUrl.href;
     const id = newTileId();
     const tile = buildTileElement(id, name, url);
-    addTileTargetGrid.insertBefore(tile, addTileTargetGrid.querySelector('.tile-add'));
+    addTileTargetGrid.appendChild(tile);
     updateTileNameWrapClass(tile);
     const tiles = loadCategoryTiles(addTileTargetCategoryId);
     tiles.push({ id, name, url, createdAt: Date.now(), lastUsedAt: null, useCount: 0 });
@@ -732,15 +753,11 @@
     grids.forEach((grid) => {
       const categoryId = grid.closest('.category').dataset.categoryId;
       categoryGrids.set(categoryId, grid);
-      const addBtn = grid.querySelector('.tile-add');
       loadCategoryTiles(categoryId).forEach((t) => {
         const tile = buildTileElement(t.id, t.name, t.url);
-        grid.insertBefore(tile, addBtn);
+        grid.appendChild(tile);
         updateTileNameWrapClass(tile);
       });
-      if (addBtn) {
-        addBtn.addEventListener('click', () => openAddTile(grid, categoryId));
-      }
     });
   }
 
@@ -1024,10 +1041,9 @@
   // category, shown with the resting drop-shadow on all its tiles), or null.
   // dragInfo: state for the tile actively being dragged, or null when idle (move mode can be
   // active with no active drag — e.g. right after entry, before the first pointerdown).
-  //   dragInfo.grid — the TRUE original source grid, fixed for the whole drag (needed for
-  //     off-viewport-cancel snap-back, regardless of how many grids the tile passed through).
-  //   dragInfo.currentGrid — whichever grid the tile is LIVE-reparented into right now; this is
-  //     what same-category reorder and cross-category reflow both operate on.
+  //   dragInfo.grid — the source grid, fixed for the whole drag. Drag/drop is same-category
+  //     reorder only now (cross-category moves go through Select/Cut+Paste instead), so there's
+  //     only ever one grid in play — no more live-reparenting into a different grid mid-drag.
   let moveMode = null;
   let moveModeTimeoutId = null;
   // dragInfo itself is declared earlier, alongside selectMode, so renderOpenPath's drag-pinning
@@ -1050,7 +1066,7 @@
 
   function onDocumentClickDuringMoveMode(e) {
     if (!moveMode || justFinishedDrag) return;
-    const tile = e.target.closest && e.target.closest('.tile:not(.tile-add)');
+    const tile = e.target.closest && e.target.closest('.tile');
     if (tile && tile.parentElement === moveMode.grid) return;
     exitMoveMode();
   }
@@ -1081,64 +1097,6 @@
     moveMode = null;
   }
 
-  // A hover must "settle" briefly before it actually opens/collapses anything — opening a
-  // category via header-hover collapses whatever else was open (the same global single-open-path
-  // rule normal browsing uses), and if the thing collapsing was tall while the thing opening is
-  // short, a fast sweep could jump the hover target somewhere far away in a single step, skipping
-  // real categories in between (including the one being dragged toward). Gating the actual
-  // openCategoryPath call behind a short timer — cancelled if the pointer moves off before it
-  // fires — means that churn never starts in the first place for a sweep that's just passing
-  // through. This also means sweeping down through a freshly-opened category's own subcategory
-  // list won't cascade-open each one in turn; each still needs its own brief hover to open.
-  const HOVER_SETTLE_MS = 220;
-
-  function handleHeaderHover(headerEl) {
-    if (dragInfo.lastHeaderEl === headerEl) return;
-    if (dragInfo.lastHeaderEl) dragInfo.lastHeaderEl.classList.remove('move-drop-target');
-    if (dragInfo.hoverSettleTimer) {
-      clearTimeout(dragInfo.hoverSettleTimer);
-      dragInfo.hoverSettleTimer = null;
-    }
-    dragInfo.lastHeaderEl = null;
-    dragInfo.crossTargetId = null;
-    const section = headerEl.closest('.category');
-    if (!section) return;
-    const id = section.dataset.categoryId;
-    // The highlight shows immediately (instant feedback this is the current hover target) and
-    // crossTargetId (read at drop time) tracks it immediately too — only the actual navigation
-    // (openCategoryPath, which is what causes the collapse/expand churn) waits for the settle
-    // timer. Re-hovering the drag's own original source header (e.g. dragging away then back) is
-    // handled the same as any other header — it reopens via the same global rule once settled.
-    // finishTileDrag separately guards against treating crossTargetId === sourceCategoryId as a
-    // real cross-category append, so this is safe either way.
-    headerEl.classList.add('move-drop-target');
-    dragInfo.lastHeaderEl = headerEl;
-    dragInfo.crossTargetId = id;
-    dragInfo.hoverSettleTimer = setTimeout(() => {
-      dragInfo.hoverSettleTimer = null;
-      openCategoryPath(id);
-      // The settle delay only stops a *fast sweep* from ever triggering an open — once a hover
-      // genuinely does settle and open something, the same collapse/expand height-asymmetry jump
-      // from the original bug can still throw an unrelated header under the pointer's current,
-      // unmoved position (confirmed directly: without this line, a slow, deliberate drag still
-      // skipped straight from one subcategory to a much-further category). Re-running position
-      // detection against the last known pointer coordinates immediately after — the same
-      // justification autoScrollTick already uses for scroll-driven shifts — catches whatever the
-      // open itself just moved, so the very next real category actually gets detected.
-      if (dragInfo) processDragPosition(dragInfo.lastClientX, dragInfo.lastClientY);
-    }, HOVER_SETTLE_MS);
-  }
-
-  function clearHeaderHover() {
-    if (dragInfo.lastHeaderEl) dragInfo.lastHeaderEl.classList.remove('move-drop-target');
-    if (dragInfo.hoverSettleTimer) {
-      clearTimeout(dragInfo.hoverSettleTimer);
-      dragInfo.hoverSettleTimer = null;
-    }
-    dragInfo.lastHeaderEl = null;
-    dragInfo.crossTargetId = null;
-  }
-
   function startTileDrag(tileEl, e) {
     if (dragInfo) return;
     e.preventDefault();
@@ -1147,13 +1105,9 @@
     dragInfo = {
       tileEl,
       grid,
-      currentGrid: grid,
       pointerId: e.pointerId,
       grabDX: e.clientX - rect.left,
       grabDY: e.clientY - rect.top,
-      crossTargetId: null,
-      lastHeaderEl: null,
-      hoverSettleTimer: null,
       originalNextSibling: tileEl.nextSibling,
       lastClientX: e.clientX,
       lastClientY: e.clientY,
@@ -1178,9 +1132,6 @@
       document.removeEventListener('pointermove', onTileDragMove);
       document.removeEventListener('pointerup', onTileDragUp);
       document.removeEventListener('pointercancel', onTileDragUp);
-      // A pending hover-settle timer captures `id`/the header via closure, not dragInfo itself —
-      // without this it would still fire openCategoryPath after the drag has already ended.
-      if (dragInfo && dragInfo.hoverSettleTimer) clearTimeout(dragInfo.hoverSettleTimer);
     };
   }
 
@@ -1196,7 +1147,7 @@
 
   function findNearestTile(grid, excludeEl, x, y) {
     const tiles = Array.from(grid.children).filter(
-      (c) => c.classList.contains('tile') && !c.classList.contains('tile-add') && c !== excludeEl
+      (c) => c.classList.contains('tile') && c !== excludeEl
     );
     let nearest = null;
     let nearestDist = Infinity;
@@ -1213,25 +1164,12 @@
     return nearest;
   }
 
-  // Live-reparents the dragged tile into `grid` if it isn't already there, dropping it at an
-  // initial nearest-tile position so it doesn't sit at a stale spot before the next reflow pass.
-  function enterGrid(grid) {
-    if (!dragInfo || dragInfo.currentGrid === grid) return;
-    dragInfo.currentGrid = grid;
-    const nearest = findNearestTile(grid, dragInfo.tileEl, dragInfo.lastClientX, dragInfo.lastClientY);
-    if (nearest) nearest.before(dragInfo.tileEl);
-    else grid.insertBefore(dragInfo.tileEl, grid.querySelector('.tile-add'));
-    // Re-pin the open-path chain to the tile's new live location so it can't be hidden by
-    // navigation elsewhere while the drag continues.
-    renderOpenPath();
-  }
-
-  // Reorders dragInfo.currentGrid around the dragged tile based on cursor position. Nearest-tile-
-  // center (rather than exact hit-test under the cursor) so a fast or coalesced drag still
-  // resolves to the correct slot even if intermediate pointermove events over specific sibling
-  // tiles never actually get dispatched.
+  // Reorders dragInfo.grid around the dragged tile based on cursor position. Nearest-tile-center
+  // (rather than exact hit-test under the cursor) so a fast or coalesced drag still resolves to
+  // the correct slot even if intermediate pointermove events over specific sibling tiles never
+  // actually get dispatched.
   function reflowWithinCurrentGrid(x, y) {
-    const grid = dragInfo.currentGrid;
+    const grid = dragInfo.grid;
     const nearest = findNearestTile(grid, dragInfo.tileEl, x, y);
     if (!nearest) return;
     dragInfo.tileEl.style.transform = 'none';
@@ -1249,7 +1187,7 @@
     // proximity, which would flip the order back and forth on every single move event.
     if (distToNearestSq < distToOwnSq) {
       const siblings = Array.from(grid.children).filter(
-        (c) => c.classList.contains('tile') && !c.classList.contains('tile-add')
+        (c) => c.classList.contains('tile')
       );
       const draggedIndex = siblings.indexOf(dragInfo.tileEl);
       const targetIndex = siblings.indexOf(nearest);
@@ -1270,20 +1208,10 @@
 
   function processDragPosition(clientX, clientY) {
     if (!dragInfo) return;
-    const under = document.elementFromPoint(clientX, clientY);
-    const headerUnder = under && under.closest && under.closest('.category-header');
-
-    if (headerUnder) {
-      handleHeaderHover(headerUnder);
-    } else {
-      clearHeaderHover();
-      // Prefer whichever visible grid is directly under the pointer (picking up a newly-revealed
-      // destination immediately); otherwise keep reflowing within wherever the tile currently is.
-      const gridUnder = under && under.closest && under.closest('.tile-grid:not([hidden])');
-      enterGrid(gridUnder || dragInfo.currentGrid);
-      reflowWithinCurrentGrid(clientX, clientY);
-    }
-
+    // No more header-hover/cross-category detection — drag is same-category reorder only, so
+    // this always just reflows within the drag's own source grid regardless of what's under the
+    // pointer (cross-category moves go through Select/Cut+Paste instead).
+    reflowWithinCurrentGrid(clientX, clientY);
     followPointer(clientX, clientY);
   }
 
@@ -1357,66 +1285,23 @@
   function finishTileDrag() {
     if (!dragInfo) return;
     const info = dragInfo;
-    const crossTargetId = info.crossTargetId;
     info.cleanup();
     stopAutoScroll();
     info.tileEl.style.transform = '';
     info.tileEl.style.zIndex = '';
     info.tileEl.style.pointerEvents = '';
     info.tileEl.classList.remove('move-dragging', 'move-grabbed');
-    if (info.lastHeaderEl) info.lastHeaderEl.classList.remove('move-drop-target');
 
+    // Same-category reorder only — cross-category moves go through Select/Cut+Paste instead, so
+    // this is always just persisting the live DOM order back to storage.
     const sourceCategoryId = info.grid.closest('.category').dataset.categoryId;
-    const tileId = info.tileEl.dataset.tileId;
-    const liveCategoryId = info.currentGrid.closest('.category').dataset.categoryId;
-
-    if (crossTargetId && crossTargetId !== sourceCategoryId) {
-      // A different category's header is (or was, as of the last processed move) highlighted —
-      // trust that as the destination and append to the end of its list. Hovering a header and
-      // hovering a grid are mutually exclusive at any instant, so a header still highlighted
-      // right up to release is the more recent, more relevant signal — even if the tile was
-      // transiently live-reflowed into some other grid it merely passed through earlier in the
-      // drag (e.g. a sibling subcategory revealed in passing by cascading hover-expand on the
-      // way to the true target).
-      const destGrid = categoryGrids.get(crossTargetId);
-      if (destGrid) {
-        const sourceTiles = loadCategoryTiles(sourceCategoryId);
-        const idx = sourceTiles.findIndex((t) => t.id === tileId);
-        if (idx !== -1) {
-          const [moved] = sourceTiles.splice(idx, 1);
-          saveCategoryTiles(sourceCategoryId, sourceTiles);
-          const destTiles = loadCategoryTiles(crossTargetId);
-          destTiles.push(moved);
-          saveCategoryTiles(crossTargetId, destTiles);
-          destGrid.insertBefore(info.tileEl, destGrid.querySelector('.tile-add'));
-        }
-      }
-    } else if (liveCategoryId !== sourceCategoryId) {
-      // Real cross-category move: the tile is already live-reflowed into currentGrid at the
-      // exact position it should land — persist source removal and destination insertion there.
-      const sourceTiles = loadCategoryTiles(sourceCategoryId);
-      const idx = sourceTiles.findIndex((t) => t.id === tileId);
-      const movedData = idx !== -1 ? sourceTiles.splice(idx, 1)[0] : null;
-      if (idx !== -1) saveCategoryTiles(sourceCategoryId, sourceTiles);
-      if (movedData) {
-        const destTiles = loadCategoryTiles(liveCategoryId);
-        const byId = new Map(destTiles.map((t) => [t.id, t]));
-        byId.set(tileId, movedData);
-        const orderedIds = Array.from(info.currentGrid.children)
-          .filter((c) => c.classList.contains('tile') && !c.classList.contains('tile-add'))
-          .map((c) => c.dataset.tileId);
-        const reordered = orderedIds.map((id) => byId.get(id)).filter(Boolean);
-        saveCategoryTiles(liveCategoryId, reordered);
-      }
-    } else {
-      const orderedIds = Array.from(info.currentGrid.children)
-        .filter((c) => c.classList.contains('tile') && !c.classList.contains('tile-add'))
-        .map((c) => c.dataset.tileId);
-      const tiles = loadCategoryTiles(sourceCategoryId);
-      const byId = new Map(tiles.map((t) => [t.id, t]));
-      const reordered = orderedIds.map((id) => byId.get(id)).filter(Boolean);
-      saveCategoryTiles(sourceCategoryId, reordered);
-    }
+    const orderedIds = Array.from(info.grid.children)
+      .filter((c) => c.classList.contains('tile'))
+      .map((c) => c.dataset.tileId);
+    const tiles = loadCategoryTiles(sourceCategoryId);
+    const byId = new Map(tiles.map((t) => [t.id, t]));
+    const reordered = orderedIds.map((id) => byId.get(id)).filter(Boolean);
+    saveCategoryTiles(sourceCategoryId, reordered);
 
     dragInfo = null;
     renderOpenPath();
@@ -1433,7 +1318,6 @@
     info.tileEl.style.zIndex = '';
     info.tileEl.style.pointerEvents = '';
     info.tileEl.classList.remove('move-dragging', 'move-grabbed');
-    if (info.lastHeaderEl) info.lastHeaderEl.classList.remove('move-drop-target');
     info.grid.insertBefore(info.tileEl, info.originalNextSibling);
     dragInfo = null;
     renderOpenPath();
@@ -1482,15 +1366,16 @@
       selectActionMoveBtn.textContent = 'Cut (' + n + ')';
       selectActionMoveBtn.disabled = n === 0;
     } else {
-      const destId = openPath.length > 0 ? openPath[openPath.length - 1] : null;
-      if (destId) {
-        const nameEl = document.querySelector('.category[data-category-id="' + CSS.escape(destId) + '"] > .category-header .category-name');
-        selectActionStatus.textContent = 'Destination: ' + (nameEl ? nameEl.textContent : destId);
-      } else {
-        selectActionStatus.textContent = 'Choose a destination category above, then tap Paste';
-      }
+      // Same convention as currentLocationId() (used by Create) — "nothing open" now resolves to
+      // Home rather than leaving Paste disabled with no destination. Home isn't part of openPath
+      // (it's special-cased, always visible, no "open" state), so without this fallback Select
+      // could never target Home at all — the only way to reach it used to be cross-category drag,
+      // which no longer exists now that drag is same-category reorder only.
+      const destId = currentLocationId();
+      const nameEl = document.querySelector('.category[data-category-id="' + CSS.escape(destId) + '"] > .category-header .category-name');
+      selectActionStatus.textContent = 'Destination: ' + (nameEl ? nameEl.textContent : destId);
       selectActionMoveBtn.textContent = 'Paste (' + n + ')';
-      selectActionMoveBtn.disabled = !destId;
+      selectActionMoveBtn.disabled = false;
     }
   }
 
@@ -1518,8 +1403,8 @@
   }
 
   function confirmMoveSelected() {
-    if (!selectMode || openPath.length === 0) return;
-    const destId = openPath[openPath.length - 1];
+    if (!selectMode) return;
+    const destId = currentLocationId();
     const sourceId = selectMode.categoryId;
     if (destId !== sourceId) {
       const sourceTiles = loadCategoryTiles(sourceId);
@@ -1531,7 +1416,7 @@
       const destGrid = categoryGrids.get(destId);
       moving.forEach((t) => {
         const el = selectMode.grid.querySelector('[data-tile-id="' + t.id + '"]');
-        if (el && destGrid) destGrid.insertBefore(el, destGrid.querySelector('.tile-add'));
+        if (el && destGrid) destGrid.appendChild(el);
       });
     }
     exitSelectMode();

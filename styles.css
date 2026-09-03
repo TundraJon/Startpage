@@ -259,15 +259,37 @@ main {
   color: var(--home-header-fg);
   border-top: none;
   padding: 10px 14px;
-  /* Anchored just below .pinned-header (also sticky, at top: 0) rather than the rest of Home's
+  /* Anchored just below .pinned-header (also fixed, at top: 0) rather than the rest of Home's
      tiles, which keep scrolling away normally. --pinned-header-height is kept in sync by a
      ResizeObserver (script.js) since the pinned header's real height varies (alert ticker,
      hourly-forecast content, window resize) — a hardcoded pixel offset would drift out of sync
      with any of those. z-index sits below .pinned-header's (100) so that one stays on top when
-     both are visible, but above ordinary scrolling content beneath it. */
-  position: sticky;
+     both are visible, but above ordinary scrolling content beneath it.
+     position: fixed, not sticky — sticky only stays stuck within its own containing block
+     (.category--home), and that section is exactly the header's own height plus Home's short
+     tile-grid tall, so the header gets pushed off the moment that box's bottom scrolls past the
+     sticky offset (i.e. the instant the next category, News, touches it). Fixed has no such
+     containing-block edge case: it's anchored to the viewport, full stop. Left/width/max-width
+     mirror main's own centered 900px column (main { max-width:900px; margin:0 auto }) so the
+     header lines up with the content below it instead of stretching edge-to-edge on wide
+     screens — on phone widths (this is mobile-first) that column is the full viewport anyway,
+     so this is a no-op there. Removed from flow, so .category--home .tile-grid below reserves
+     the matching space via padding-top: var(--home-header-height). */
+  position: fixed;
   top: var(--pinned-header-height, 0px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 900px;
+  box-sizing: border-box;
   z-index: 90;
+}
+
+.category--home .tile-grid {
+  /* Reserves the space .category-header--home used to occupy in normal flow before it became
+     position: fixed (see that rule's comment) — kept live by the same ResizeObserver pattern
+     as --pinned-header-height (script.js), not a hardcoded value. */
+  padding-top: var(--home-header-height, 0px);
 }
 
 .category--home .category-header--home .category-name {
@@ -301,6 +323,27 @@ main {
 .home-header-action-btn:focus-visible {
   opacity: 1;
   background: rgba(255, 255, 255, 0.15);
+}
+
+/* #create-btn only — collapse-all-btn (the header's other .home-header-action-btn) keeps the
+   plain transparent icon-button look above, untouched. ID selector wins over the shared class
+   rules (including its :hover) with no !important and regardless of source order, so this reads
+   as a small green tile-like chip instead: same border-radius as a real .tile, the Cut/Paste
+   action bar's existing green tokens (Build 47) rather than a third green being introduced. */
+#create-btn {
+  font-size: 1.6rem;
+  line-height: 1;
+  padding: 2px 12px;
+  border-radius: 8px;
+  background: var(--action-go-bg);
+  color: var(--action-go-fg);
+  opacity: 1;
+}
+
+#create-btn:hover,
+#create-btn:focus-visible {
+  opacity: 0.85;
+  background: var(--action-go-bg);
 }
 
 .home-widgets {
@@ -387,21 +430,6 @@ main {
   line-height: 0.595rem;
 }
 
-.tile-add {
-  border-style: dashed;
-  background: transparent;
-  color: var(--fg-muted);
-  font-family: inherit;
-  font-size: 1.5rem;
-  opacity: 0.5;
-  cursor: pointer;
-}
-
-.tile-add:hover,
-.tile-add:focus-visible {
-  opacity: 0.85;
-}
-
 .tile-fallback span {
   font-size: 0.75rem;
   -webkit-line-clamp: 3;
@@ -409,7 +437,7 @@ main {
 
 /* --- Phase 2 Editing System, Part 2: Move Entry (drag-and-drop) --- */
 
-.tile-grid.move-mode .tile:not(.tile-add) {
+.tile-grid.move-mode .tile {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
   touch-action: none;
 }
@@ -422,11 +450,6 @@ main {
 
 .tile.move-dragging {
   transition: none;
-}
-
-.category-header.move-drop-target {
-  outline: 2px dashed var(--stripe-color, #3B82C4);
-  outline-offset: -2px;
 }
 
 .widget {
