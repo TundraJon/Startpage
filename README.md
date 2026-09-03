@@ -1066,6 +1066,12 @@ _Six queued items, all built and verified together in one pass, per "Go ahead an
 - [ ] **What stays exactly as-is:** same-grid reorder (`reflowWithinCurrentGrid`, nearest-tile-center detection) and its live visual feedback; auto-scroll (still useful for a long single category); the tile-menu's "Move" entry point; Select's tap-to-toggle, Cut/Paste labels and colors (Build 47), and the stuck-selection fix (Build 43) — none of this changes.
 - [ ] **Now-moot, not being undone:** Build 47's `AUTO_SCROLL_EDGE_PX` 70→120 change was specifically about reaching Home *while dragging* — that scenario no longer exists once cross-category drag is removed. Left as-is (it's harmless for same-category scrolling too), just noting it no longer serves the purpose it was built for. The still-queued Home-header `position: fixed` fix above is unaffected — it's still needed for the header's own visibility/`+`-button reasons, just not for drag-drop anymore.
 
+### Settings: rename the site title ("Home" in the top header row)
+
+- [ ] **Requested:** an ability in Settings to rename the very top row — the page/site title, currently hardcoded as "Home" — to whatever the user wants. Explicitly **not** the Home category (the `<h2 class="category-name">Home</h2>` inside `.category--home`) — this is about `<h1 class="site-title">Home</h1>` in `.site-header` (index.html), the site's own name.
+- [ ] **Root-caused:** the site title is pure static markup today — `<title>Home</title>` (browser tab) and `<h1 class="site-title">Home</h1>` (visible header) are both hand-typed literals in index.html, and `script.js` has zero references to either (`site-title`/`document.title` — no matches). There's no existing wiring to extend; this is new, not a bug.
+- [ ] **Proposed fix, following the existing WeatherAPI-key pattern (`script.js`, `weatherApiKeyInput`) exactly:** add a text input under a new "Site Name" (or similar) `options-section` in `#settings-overlay` (index.html), alongside the existing Theme/Weather sections. Store it in `localStorage` under a new key (e.g. `siteName`), read it back on load, and on a `change` listener write both `document.title` and `.site-title`'s `textContent` — falling back to "Home" when unset/empty, so a fresh device with no stored value renders exactly as it does today.
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
