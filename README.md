@@ -1028,7 +1028,32 @@ _Six queued items, all built and verified together in one pass, per "Go ahead an
 
 ## Build Queue
 
-_Empty — nothing currently queued. Log new bug reports and feature requests here; only build them on explicit "Go ahead and build" instruction._
+### Home header: fix the sticky-position bug, use position: fixed instead
+
+- [ ] **Reported:** Home's header stays sticky only until the News category touches it, then it scrolls away. It should never scroll, full stop.
+- [ ] **Root-caused — a real CSS gotcha in Build 48's own approach, not a follow-up tweak of it:** `.category-header--home` is `position: sticky` *inside* `<section class="category category--home">`, and a sticky element can only stay stuck as long as it's within its own containing block's bounds — once the *bottom* of that section (the header plus Home's own short tile-grid) scrolls up to the sticky offset, the header gets pushed off by whatever comes next (News's section), because there's no more room left inside its own parent to stick within. This matches "stops once News touches it" exactly — it's not a threshold or a timing issue, it's sticky positioning doing exactly what it's specified to do against a parent that's too short.
+- [ ] **Fix — `position: fixed`, not a sticky tweak:** `fixed` is the correct tool for "never scrolls, ever" — it's anchored to the viewport with no containing-block edge case at all, unlike `sticky`. Concretely:
+  - `.category-header--home`: `position: fixed; top: var(--pinned-header-height, 0px); left: 0; right: 0;` (fixed elements are removed from flow, so `left`/`right: 0` are needed to span full width the way it does today) — `z-index: 90` unchanged.
+  - Since it's now removed from flow, whatever follows needs to reserve space for it, or it'll sit underneath, covered. Add a *second* `ResizeObserver` (script.js, alongside the existing `.pinned-header` one from Build 48) that measures `.category-header--home` itself and writes `--home-header-height`; apply `padding-top: var(--home-header-height, 0px)` to `#categories` (or Home's own tile-grid specifically) to push everything below down by exactly that much.
+  - No DOM restructuring needed (the header stays inside `.category--home` in the markup) — this is a positioning-strategy change, not a move-it-out-of-its-parent change.
+
+### Remove the per-category "+" tile — the global "+ Tile" flow supersedes it
+
+- [ ] **Requested:** remove the empty "+" tile from the end of every category's tile grid — no longer needed now that Home's header has a global "+ Tile" entry point (Build 48).
+- [ ] **Root-caused: `.tile-add` isn't purely decorative — it's also used as an insertion-point anchor throughout Move Entry and tile-adding code, not just a clickable button.** A plain visual removal (hiding it with CSS) would be wrong — the underlying reference node is actually load-bearing. Every current use, from a full script.js grep:
+  - Created once per grid in `buildTileAddButton()`/`buildCategorySection()`, plus hand-authored once in Home's own markup (index.html).
+  - Used as the "insert before this" anchor in three places: `addTileSubmit`'s handler, cross-category drop in `finishTileDrag`, and `confirmMoveSelected`'s batch-move append.
+  - Its own click listener (in `wireTileGrids()`) opens the add-tile overlay for that grid — the per-grid version of what the global "+ Tile" flow now already does.
+  - Explicitly filtered out (`!c.classList.contains('tile-add')`) in several places that need "just the real tiles": `findNearestTile`, the siblings arrays in `reflowWithinCurrentGrid` and `finishTileDrag`'s two order-computing filters, and the closest-tile click check for the tile menu.
+- [ ] **Fix:** remove the `.tile-add` element entirely (from `buildCategorySection`/`buildTileAddButton` and Home's hardcoded markup) rather than hiding it, and refactor its three `insertBefore(x, grid.querySelector('.tile-add'))` call sites to plain `grid.appendChild(x)` — actually simpler code, since there's no longer a reference node to look up. `wireTileGrids()` loses its per-grid add-button click wiring (nothing left to wire). The `:not(.tile-add)` filters become unconditionally true once no such element exists anywhere — harmless to leave, but worth deleting for clarity while already touching those lines.
+
+### Home header "+": 2x size, in a green "tile"
+
+- [ ] **Requested:** make the "+" on Home's header twice its current size, and give it a green tile-like background instead of its current plain icon-button look.
+- [ ] **Root-caused:** `#create-btn` currently shares `.home-header-action-btn` with `#collapse-all-btn` — same transparent background, `font-size: 0.8rem`, `padding: 6px`. Needs to become visually distinct without changing collapse-all's own styling.
+- [ ] **Proposed fix:** a new class scoped to `#create-btn` only (collapse-all-btn keeps `.home-header-action-btn` as-is): `font-size: 1.6rem` (2x), plus a real background/border-radius so it reads as a small tile-like chip rather than a flat icon — reusing the light-green tokens already added in Build 47 (`--action-go-bg`/`--action-go-fg`) for consistency rather than introducing a third green. Exact padding/corner-radius to be tuned visually during the build so it reads as a clean square "tile," not just a bigger version of the current flat button.
+
+## Build Planner
 
 ## Build Planner
 
