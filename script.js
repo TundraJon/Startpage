@@ -181,7 +181,12 @@
   let dragInfo = null;
   const selectActionBar = document.getElementById('select-action-bar');
   const selectActionStatus = document.getElementById('select-action-status');
-  const selectActionMoveBtn = document.getElementById('select-action-move');
+  const selectActionSelectAllBtn = document.getElementById('select-action-selectall');
+  const selectActionCutBtn = document.getElementById('select-action-cut');
+  const selectActionRenameBtn = document.getElementById('select-action-rename');
+  const selectActionPasteBtn = document.getElementById('select-action-paste');
+  const selectActionDeleteBtn = document.getElementById('select-action-delete');
+  const selectActionClearBtn = document.getElementById('select-action-clear');
 
   // Ancestor chain (root -> id) for a category, walked via the live DOM rather than stored state,
   // so it's always correct regardless of what was previously open.
@@ -361,6 +366,11 @@
     mainBtn.type = 'button';
     mainBtn.className = 'category-header-main';
     mainBtn.setAttribute('aria-expanded', 'false');
+    const checkSpan = document.createElement('span');
+    checkSpan.className = 'category-select-check';
+    checkSpan.textContent = '✓';
+    checkSpan.hidden = true;
+    mainBtn.appendChild(checkSpan);
     const nameSpan = document.createElement('span');
     nameSpan.className = 'category-name';
     nameSpan.textContent = node.name;
@@ -436,7 +446,18 @@
 
       categoryToggles.set(id, { section, contentEl, ownGridEl, mainBtn, collapseBtn });
 
-      mainBtn.addEventListener('click', () => openCategoryPath(id));
+      // Long-press either enters category-select mode (first press) or, if already in it, range-
+      // selects from the original anchor to this category (subsequent press) — mirrors tiles'
+      // handleTileLongPress exactly, just against the visible-category-header order instead of a
+      // grid. No drag-arming here — categories don't have a Move-Entry-style drag, only tiles do.
+      attachLongPress(mainBtn, () => handleCategoryLongPress(id), () => moveMode !== null);
+      mainBtn.addEventListener('click', () => {
+        if (selectMode && selectMode.kind === 'category') {
+          toggleCategorySelected(id);
+          return;
+        }
+        openCategoryPath(id);
+      });
       collapseBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         collapseFromCategory(id);
@@ -658,7 +679,12 @@
     a.appendChild(span);
 
     a.addEventListener('contextmenu', (e) => e.preventDefault());
-    attachLongPress(a, () => openTileMenu(a), () => (moveMode && moveMode.grid === a.parentElement) || (selectMode && selectMode.grid === a.parentElement));
+    // Long-press either enters select mode (first press) or, if this tile's grid is already in
+    // tile-select mode, extends the selection as a range from the original anchor (subsequent
+    // press) — see handleTileLongPress. Suppressed only while this grid is already in Move
+    // Entry's own move-mode (dragging takes priority; a long-press mid-drag-session shouldn't
+    // also try to open selection).
+    attachLongPress(a, (e) => handleTileLongPress(a, e), () => moveMode && moveMode.grid === a.parentElement);
 
     // While this tile's grid is in move mode, a plain tap must not navigate away — pointerdown
     // (below, wired once move mode is entered) already handles grabbing/dragging it. While its
@@ -669,7 +695,7 @@
         e.stopPropagation();
         return;
       }
-      if (selectMode && selectMode.grid === a.parentElement) {
+      if (selectMode && selectMode.kind === 'tile' && selectMode.grid === a.parentElement) {
         e.preventDefault();
         e.stopPropagation();
         toggleTileSelected(a);
@@ -822,18 +848,41 @@
 
   const addCategoryOverlay = document.getElementById('add-category-overlay');
   const addCategoryClose = document.getElementById('add-category-close');
+  const addCategoryTitleEl = document.getElementById('add-category-title');
   const addCategoryNameInput = document.getElementById('add-category-name');
   const addCategoryError = document.getElementById('add-category-error');
   const addCategorySubmit = document.getElementById('add-category-submit');
+  // null while creating a new category; set to an existing category's id while editing one
+  // (opened from the select-action-bar's 🔧 Edit button) — same dialog either way, per the
+  // decision that Edit reuses the create-category overlay rather than being a separate one.
+  let addCategoryTargetId = null;
 
   function openAddCategory() {
+    addCategoryTargetId = null;
+    addCategoryTitleEl.textContent = 'Add Category';
+    addCategorySubmit.textContent = 'Add Category';
     addCategoryNameInput.value = '';
+    addCategoryError.hidden = true;
+    addCategoryOverlay.hidden = false;
+    addCategoryNameInput.focus();
+  }
+  // Called from the select-action-bar's Edit button (further down) — targets whichever single
+  // category is currently selected. Color editing isn't wired up here: the dialog is name-only
+  // until the category color picker itself exists (Build Planner item 4).
+  function openEditCategory(id) {
+    const node = categoryTree[id];
+    if (!node) return;
+    addCategoryTargetId = id;
+    addCategoryTitleEl.textContent = 'Edit Category';
+    addCategorySubmit.textContent = 'Save';
+    addCategoryNameInput.value = node.name;
     addCategoryError.hidden = true;
     addCategoryOverlay.hidden = false;
     addCategoryNameInput.focus();
   }
   function closeAddCategory() {
     addCategoryOverlay.hidden = true;
+    addCategoryTargetId = null;
   }
   function showAddCategoryError(text) {
     addCategoryError.textContent = text;
@@ -853,6 +902,22 @@
     const name = addCategoryNameInput.value.trim();
     if (!name) {
       showAddCategoryError('Name required.');
+      return;
+    }
+    if (addCategoryTargetId) {
+      const targetId = addCategoryTargetId;
+      const node = categoryTree[targetId];
+      const isDuplicate = Object.values(categoryTree).some(
+        (n) => n !== node && n.parentId === node.parentId && n.name.trim().toLowerCase() === name.toLowerCase()
+      );
+      if (isDuplicate) {
+        showAddCategoryError('A category named "' + name + '" already exists here.');
+        return;
+      }
+      node.name = name;
+      saveCategoryTree(categoryTree);
+      rebuildCategoriesAndTiles();
+      closeAddCategory();
       return;
     }
     const currentId = currentLocationId();
@@ -875,28 +940,10 @@
     closeAddCategory();
   });
 
-  // --- Phase 2 Part 1: tile long-press action menu (Remove Entry / Move Entry / Rename Entry) ---
-  const tileMenuOverlay = document.getElementById('tile-menu-overlay');
-  const tileMenuClose = document.getElementById('tile-menu-close');
-  const tileMenuTitle = document.getElementById('tile-menu-title');
-  const tileMenuRemoveBtn = document.getElementById('tile-menu-remove');
-  const tileMenuRenameBtn = document.getElementById('tile-menu-rename');
-  let tileMenuTargetEl = null;
-
-  function closeTileMenu() {
-    tileMenuOverlay.hidden = true;
-    tileMenuTargetEl = null;
-  }
-  function openTileMenu(tileEl) {
-    tileMenuTargetEl = tileEl;
-    tileMenuTitle.textContent = tileEl.querySelector('span').textContent;
-    tileMenuOverlay.hidden = false;
-  }
-  tileMenuClose.addEventListener('click', closeTileMenu);
-  tileMenuOverlay.addEventListener('click', (e) => {
-    if (e.target === tileMenuOverlay) closeTileMenu();
-  });
-
+  // --- Phase 2 Part 1: tile Rename/Delete — the tile-menu popup that used to trigger these is
+  // retired (long-press now goes straight into select mode and its bottom bar, see below); the
+  // underlying rename/delete dialogs and logic stay exactly as built, just triggered from the new
+  // bottom-bar buttons instead. ---
   const tileConfirmOverlay = document.getElementById('tile-confirm-overlay');
   const tileConfirmClose = document.getElementById('tile-confirm-close');
   const tileConfirmText = document.getElementById('tile-confirm-text');
@@ -924,29 +971,6 @@
     if (cb) cb();
   });
 
-  function removeTile(tileEl) {
-    const categoryId = tileEl.closest('.category').dataset.categoryId;
-    const tileId = tileEl.dataset.tileId;
-    const tiles = loadCategoryTiles(categoryId).filter((t) => t.id !== tileId);
-    saveCategoryTiles(categoryId, tiles);
-    tileEl.remove();
-  }
-
-  tileMenuRemoveBtn.addEventListener('click', () => {
-    const tileEl = tileMenuTargetEl;
-    closeTileMenu();
-    const name = tileEl.querySelector('span').textContent;
-    openTileConfirm('Are you sure you want to remove ' + name + '?', () => {
-      // Intentional, permanent easter egg — a 10% chance of a second "really sure?" prompt.
-      // Never document or hint at this in user-facing help text.
-      if (Math.random() < 0.10) {
-        openTileConfirm('Are you REALLY sure? 😳', () => removeTile(tileEl));
-      } else {
-        removeTile(tileEl);
-      }
-    });
-  });
-
   const tileRenameOverlay = document.getElementById('tile-rename-overlay');
   const tileRenameClose = document.getElementById('tile-rename-close');
   const tileRenameInput = document.getElementById('tile-rename-input');
@@ -962,14 +986,14 @@
     if (e.target === tileRenameOverlay) closeTileRename();
   });
 
-  tileMenuRenameBtn.addEventListener('click', () => {
-    const tileEl = tileMenuTargetEl;
-    closeTileMenu();
+  // Called from the select-action-bar's Rename button (script.js further down) instead of the
+  // now-retired tile-menu popup — same dialog, just a new trigger.
+  function openTileRenameFor(tileEl) {
     tileRenameTargetEl = tileEl;
     tileRenameInput.value = tileEl.querySelector('span').textContent;
     tileRenameOverlay.hidden = false;
     tileRenameInput.focus();
-  });
+  }
 
   tileRenameSave.addEventListener('click', () => {
     const tileEl = tileRenameTargetEl;
@@ -1006,13 +1030,26 @@
 
     el.addEventListener('pointerdown', (e) => {
       if (shouldSuppress && shouldSuppress()) return;
+      // Suppresses the browser's own native drag-initiation (relevant for tiles, real <a> links)
+      // and text-selection/focus-on-mousedown — without this, a press-and-drag that arms Move
+      // Entry (armDragFromLongPress) could get hijacked by native link-dragging the instant the
+      // pointer crosses the threshold, silently swallowing every further pointer event for that
+      // gesture (confirmed directly: only the one threshold-crossing pointermove ever arrived,
+      // no pointerup at all). Harmless here regardless of element type — preventDefault on
+      // pointerdown doesn't cancel the eventual click's own default action (e.g. navigation),
+      // only these specific native gestures.
+      e.preventDefault();
       startX = e.clientX;
       startY = e.clientY;
       cancelPress();
       pressTimer = setTimeout(() => {
         pressTimer = null;
         suppressNextClick = true;
-        callback();
+        // The originating pointerdown event is passed through — callers that need to keep
+        // tracking the same continuous touch past the long-press itself (tiles arming a
+        // long-press-then-drag into Move Entry, see armDragFromLongPress) need its pointerId/
+        // coordinates. Callers that don't care just ignore the argument, same as before.
+        callback(e);
       }, LONG_PRESS_MS);
     });
 
@@ -1030,7 +1067,14 @@
     el.addEventListener('click', (e) => {
       if (suppressNextClick) {
         suppressNextClick = false;
-        e.stopPropagation();
+        // stopImmediatePropagation, not just stopPropagation — the tile's own click listener is
+        // registered on this same element in this same (capture) phase, so a plain
+        // stopPropagation doesn't stop it from also firing right after this one. That was
+        // harmless with the old tile-menu-popup callback (its own click handler's fallback path
+        // was a no-op the instant after a long-press), but it's a real bug now that a fresh
+        // long-press enters select mode directly — the tile's click handler seeing select mode
+        // already active would immediately toggle the just-made selection right back off.
+        e.stopImmediatePropagation();
         e.preventDefault();
       }
     }, true);
@@ -1324,25 +1368,15 @@
     markDragJustFinished();
   }
 
-  const tileMenuMoveBtn = document.getElementById('tile-menu-move');
-  tileMenuMoveBtn.addEventListener('click', () => {
-    const tileEl = tileMenuTargetEl;
-    closeTileMenu();
-    if (!tileEl) return;
-    enterMoveMode(tileEl);
-  });
-
-  // --- Multi-select batch move — additive to single-tile Move Entry above, which is untouched.
-  // Long-press a tile -> tile menu -> Select enters select mode for that tile's grid; tapping
-  // other tiles in the same grid toggles their selection; "Cut" hands off to the normal
-  // single-open-path category navigation to pick a destination, then "Paste" appends the whole
-  // batch to the end of that category's list (no live reflow, matching Move Entry's own
-  // header-drop append-to-end behavior for a single tile) — this is a move, not a real clipboard
-  // copy: the same tile objects relocate, nothing is duplicated. ---
-  const selectActionCancelBtn = document.getElementById('select-action-cancel');
+  // --- Multi-select (tiles and categories) — long-press goes straight into select mode now (the
+  // tile-menu popup is retired); the bottom bar it shows covers Select All, Cut/Paste (move,
+  // between categories or, for tiles, now also within one via re-navigating to it), Rename/Edit,
+  // and Delete. Single-tile Move Entry (drag-to-reorder) is unaffected — see
+  // armDragFromLongPress: dragging the same touch that triggered the long-press, without lifting
+  // first, transitions straight into it instead of staying in select mode. ---
 
   function toggleTileSelected(tileEl) {
-    if (!selectMode) return;
+    if (!selectMode || selectMode.kind !== 'tile') return;
     const id = tileEl.dataset.tileId;
     if (selectMode.selectedIds.has(id)) {
       selectMode.selectedIds.delete(id);
@@ -1354,17 +1388,292 @@
     updateSelectActionBar();
   }
 
+  // Range-select: a long-press on a *second* tile while already in tile-select mode selects
+  // everything positionally between the original anchor (the first tile long-pressed, fixed for
+  // the whole select-mode session — not the most recently pressed one) and this new tile.
+  function rangeSelectTiles(newTileEl) {
+    if (!selectMode || selectMode.kind !== 'tile') return;
+    const grid = selectMode.grid;
+    const tiles = Array.from(grid.children).filter((c) => c.classList.contains('tile'));
+    const anchorEl = grid.querySelector('[data-tile-id="' + CSS.escape(selectMode.rangeAnchorId) + '"]');
+    const anchorIdx = anchorEl ? tiles.indexOf(anchorEl) : -1;
+    const newIdx = tiles.indexOf(newTileEl);
+    if (anchorIdx === -1 || newIdx === -1) {
+      toggleTileSelected(newTileEl);
+      return;
+    }
+    const lo = Math.min(anchorIdx, newIdx);
+    const hi = Math.max(anchorIdx, newIdx);
+    for (let i = lo; i <= hi; i++) {
+      const t = tiles[i];
+      if (!selectMode.selectedIds.has(t.dataset.tileId)) {
+        selectMode.selectedIds.add(t.dataset.tileId);
+        t.classList.add('tile-selected');
+      }
+    }
+    updateSelectActionBar();
+  }
+
+  function handleTileLongPress(tileEl, e) {
+    if (selectMode && selectMode.kind === 'tile' && selectMode.grid === tileEl.parentElement) {
+      rangeSelectTiles(tileEl);
+    } else {
+      enterSelectMode(tileEl);
+    }
+    armDragFromLongPress(tileEl, e);
+  }
+
+  // Keeps watching the SAME continuous touch that triggered the long-press (filtered by
+  // pointerId) — if it moves past a small threshold before lifting, that's read as "actually
+  // wanted to drag this, not just select it": exits select mode and hands off straight into
+  // Move Entry's existing same-category drag-reorder, continuous with the one gesture. If it
+  // lifts first without moving, nothing further happens and the tile just stays selected.
+  function armDragFromLongPress(tileEl, e) {
+    const pointerId = e.pointerId;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const DRAG_ARM_PX = 20; // matches attachLongPress's own MOVE_CANCEL_PX, for consistency
+    function onMove(ev) {
+      if (ev.pointerId !== pointerId) return;
+      if (Math.abs(ev.clientX - startX) > DRAG_ARM_PX || Math.abs(ev.clientY - startY) > DRAG_ARM_PX) {
+        cleanup();
+        enterMoveMode(tileEl);
+        startTileDrag(tileEl, ev);
+      }
+    }
+    function onUp(ev) {
+      if (ev.pointerId !== pointerId) return;
+      cleanup();
+    }
+    function cleanup() {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
+    }
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
+  }
+
+  // --- Category selection: selecting a category selects its whole subtree (subcategories + their
+  // tiles) by default; deselecting works the same way in reverse. selectMode.selectedIds holds
+  // the explicitly-pressed roots (may include redundant entries already covered by an ancestor —
+  // harmless, see prunedSelectedCategoryRoots); the visible checkmarks reflect the full expanded
+  // set via refreshCategorySelectionVisuals. ---
+
+  function categorySubtreeIds(rootId) {
+    const out = [rootId];
+    categoryChildren(rootId).forEach(([childId]) => out.push(...categorySubtreeIds(childId)));
+    return out;
+  }
+
+  // "Topmost" selected categories only — prunes any selected id that has an ancestor also
+  // selected, since that id's selection is already implied by the ancestor's subtree. This is
+  // what Edit/Cut/Delete actually operate on, and what Edit's exactly-one-selected check counts.
+  function prunedSelectedCategoryRoots() {
+    if (!selectMode || selectMode.kind !== 'category') return [];
+    return Array.from(selectMode.selectedIds).filter((id) => {
+      const ancestors = categoryAncestorChain(id).slice(0, -1);
+      return !ancestors.some((a) => selectMode.selectedIds.has(a));
+    });
+  }
+
+  function refreshCategorySelectionVisuals() {
+    const effective = new Set();
+    if (selectMode && selectMode.kind === 'category') {
+      selectMode.selectedIds.forEach((rootId) => categorySubtreeIds(rootId).forEach((id) => effective.add(id)));
+    }
+    categoryToggles.forEach((entry, id) => {
+      const selected = effective.has(id);
+      const check = entry.mainBtn.querySelector('.category-select-check');
+      if (check) check.hidden = !selected;
+    });
+  }
+
+  function toggleCategorySelected(id) {
+    if (!selectMode || selectMode.kind !== 'category') return;
+    if (selectMode.selectedIds.has(id)) selectMode.selectedIds.delete(id);
+    else selectMode.selectedIds.add(id);
+    refreshCategorySelectionVisuals();
+    updateSelectActionBar();
+  }
+
+  // Currently-visible category headers, top-to-bottom in real render order — a collapsed
+  // subcategory's header is hidden along with the rest of its parent's content, so this
+  // naturally excludes anything not actually reachable/tappable right now.
+  function visibleCategoryHeaderIds() {
+    return Array.from(categoryToggles.entries())
+      .filter(([, entry]) => entry.mainBtn.offsetParent !== null)
+      .map(([id]) => id);
+  }
+
+  function rangeSelectCategories(targetId) {
+    if (!selectMode || selectMode.kind !== 'category') return;
+    const order = visibleCategoryHeaderIds();
+    const anchorIdx = order.indexOf(selectMode.rangeAnchorId);
+    const targetIdx = order.indexOf(targetId);
+    if (anchorIdx === -1 || targetIdx === -1) {
+      toggleCategorySelected(targetId);
+      return;
+    }
+    const lo = Math.min(anchorIdx, targetIdx);
+    const hi = Math.max(anchorIdx, targetIdx);
+    for (let i = lo; i <= hi; i++) selectMode.selectedIds.add(order[i]);
+    refreshCategorySelectionVisuals();
+    updateSelectActionBar();
+  }
+
+  function handleCategoryLongPress(id) {
+    if (selectMode && selectMode.kind === 'category') {
+      rangeSelectCategories(id);
+    } else {
+      enterCategorySelectMode(id);
+    }
+  }
+
+  function enterSelectMode(tileEl) {
+    if (moveMode) exitMoveMode();
+    if (selectMode) exitSelectMode();
+    const grid = tileEl.parentElement;
+    selectMode = {
+      kind: 'tile',
+      grid,
+      categoryId: grid.closest('.category').dataset.categoryId,
+      selectedIds: new Set(),
+      rangeAnchorId: tileEl.dataset.tileId,
+    };
+    pickingDestination = false;
+    grid.classList.add('select-mode');
+    toggleTileSelected(tileEl);
+  }
+
+  function enterCategorySelectMode(id) {
+    if (moveMode) exitMoveMode();
+    if (selectMode) exitSelectMode();
+    selectMode = { kind: 'category', selectedIds: new Set(), rangeAnchorId: id };
+    pickingDestination = false;
+    toggleCategorySelected(id);
+  }
+
+  function exitSelectMode() {
+    if (selectMode) {
+      if (selectMode.kind === 'tile') {
+        selectMode.grid.classList.remove('select-mode');
+        // Query the whole document, not just selectMode.grid — confirmMoveSelected already
+        // reparents moved tiles into the destination grid before calling this, so scoping the
+        // cleanup to the (now smaller) source grid missed them and left the moved tiles stuck
+        // showing the selected outline/checkmark in their new category.
+        document.querySelectorAll('.tile-selected').forEach((t) => t.classList.remove('tile-selected'));
+      } else if (selectMode.kind === 'category') {
+        categoryToggles.forEach((entry) => {
+          const check = entry.mainBtn.querySelector('.category-select-check');
+          if (check) check.hidden = true;
+        });
+      }
+    }
+    selectMode = null;
+    pickingDestination = false;
+    updateSelectActionBar();
+  }
+
+  function moveCategorySubtree(rootId, newParentId) {
+    const parentIdForOrder = newParentId === 'home' ? null : newParentId;
+    // Refuse a move into itself or into one of its own descendants — either would orphan the
+    // subtree into an unreachable cycle.
+    if (parentIdForOrder === rootId || categorySubtreeIds(rootId).includes(parentIdForOrder)) return;
+    const node = categoryTree[rootId];
+    if (!node) return;
+    const siblingOrders = Object.values(categoryTree)
+      .filter((n) => n.parentId === parentIdForOrder)
+      .map((n) => n.order);
+    node.parentId = parentIdForOrder;
+    node.order = siblingOrders.length > 0 ? Math.max(...siblingOrders) + 1 : 0;
+  }
+
+  function confirmMoveSelected() {
+    if (!selectMode) return;
+    const destId = currentLocationId();
+    if (selectMode.kind === 'tile') {
+      const sourceId = selectMode.categoryId;
+      if (destId !== sourceId) {
+        const sourceTiles = loadCategoryTiles(sourceId);
+        const moving = sourceTiles.filter((t) => selectMode.selectedIds.has(t.id));
+        const remaining = sourceTiles.filter((t) => !selectMode.selectedIds.has(t.id));
+        saveCategoryTiles(sourceId, remaining);
+        const destTiles = loadCategoryTiles(destId).concat(moving);
+        saveCategoryTiles(destId, destTiles);
+        const destGrid = categoryGrids.get(destId);
+        moving.forEach((t) => {
+          const el = selectMode.grid.querySelector('[data-tile-id="' + t.id + '"]');
+          if (el && destGrid) destGrid.appendChild(el);
+        });
+      }
+    } else {
+      prunedSelectedCategoryRoots().forEach((rootId) => moveCategorySubtree(rootId, destId));
+      saveCategoryTree(categoryTree);
+      // Reset the open path rather than leave it referencing whatever was just moved — a moved
+      // category may no longer be nested where openPath still says it is (e.g. moving the very
+      // category the user is currently inside of, which selecting-then-cutting makes possible for
+      // the first time). Back to Home is the one state guaranteed to still be valid afterward.
+      openPath = [];
+      rebuildCategoriesAndTiles();
+    }
+    exitSelectMode();
+  }
+
+  function deleteSelected() {
+    if (!selectMode) return;
+    if (selectMode.kind === 'tile') {
+      const grid = selectMode.grid;
+      const categoryId = selectMode.categoryId;
+      const remaining = loadCategoryTiles(categoryId).filter((t) => !selectMode.selectedIds.has(t.id));
+      saveCategoryTiles(categoryId, remaining);
+      selectMode.selectedIds.forEach((tileId) => {
+        const el = grid.querySelector('[data-tile-id="' + CSS.escape(tileId) + '"]');
+        if (el) el.remove();
+      });
+    } else {
+      prunedSelectedCategoryRoots().forEach((rootId) => {
+        categorySubtreeIds(rootId).forEach((id) => {
+          delete categoryTree[id];
+          localStorage.removeItem(TILE_STORAGE_PREFIX + id);
+        });
+      });
+      saveCategoryTree(categoryTree);
+      // Same reasoning as confirmMoveSelected's category branch — the deleted category (or one of
+      // its ancestors on the current path) may no longer exist; Home is the one guaranteed-valid
+      // state to fall back to.
+      openPath = [];
+      rebuildCategoriesAndTiles();
+    }
+    exitSelectMode();
+  }
+
+  function selectedCount() {
+    if (!selectMode) return 0;
+    return selectMode.kind === 'category' ? prunedSelectedCategoryRoots().length : selectMode.selectedIds.size;
+  }
+
   function updateSelectActionBar() {
     if (!selectMode) {
       selectActionBar.hidden = true;
       return;
     }
     selectActionBar.hidden = false;
-    const n = selectMode.selectedIds.size;
+    const isCategory = selectMode.kind === 'category';
+    const n = selectedCount();
+
+    selectActionSelectAllBtn.hidden = isCategory; // Select All is tiles-only, per the decision
+    selectActionSelectAllBtn.disabled = pickingDestination;
+    selectActionRenameBtn.textContent = isCategory ? '🔧' : '✏️';
+    selectActionRenameBtn.setAttribute('aria-label', isCategory ? 'Edit category' : 'Rename');
+    selectActionRenameBtn.disabled = n !== 1 || pickingDestination;
+    selectActionCutBtn.disabled = n === 0 || pickingDestination;
+    selectActionDeleteBtn.disabled = n === 0 || pickingDestination;
+
     if (!pickingDestination) {
       selectActionStatus.textContent = n + ' selected';
-      selectActionMoveBtn.textContent = 'Cut (' + n + ')';
-      selectActionMoveBtn.disabled = n === 0;
+      selectActionPasteBtn.disabled = true;
     } else {
       // Same convention as currentLocationId() (used by Create) — "nothing open" now resolves to
       // Home rather than leaving Paste disabled with no destination. Home isn't part of openPath
@@ -1374,71 +1683,62 @@
       const destId = currentLocationId();
       const nameEl = document.querySelector('.category[data-category-id="' + CSS.escape(destId) + '"] > .category-header .category-name');
       selectActionStatus.textContent = 'Destination: ' + (nameEl ? nameEl.textContent : destId);
-      selectActionMoveBtn.textContent = 'Paste (' + n + ')';
-      selectActionMoveBtn.disabled = false;
+      selectActionPasteBtn.disabled = false;
     }
   }
 
-  function enterSelectMode(tileEl) {
-    if (moveMode) exitMoveMode();
-    const grid = tileEl.parentElement;
-    selectMode = { grid, categoryId: grid.closest('.category').dataset.categoryId, selectedIds: new Set() };
-    pickingDestination = false;
-    grid.classList.add('select-mode');
-    toggleTileSelected(tileEl);
-  }
+  selectActionClearBtn.addEventListener('click', () => exitSelectMode());
 
-  function exitSelectMode() {
-    if (selectMode) {
-      selectMode.grid.classList.remove('select-mode');
-      // Query the whole document, not just selectMode.grid — confirmMoveSelected already
-      // reparents moved tiles into the destination grid before calling this, so scoping the
-      // cleanup to the (now smaller) source grid missed them and left the moved tiles stuck
-      // showing the selected outline/checkmark in their new category.
-      document.querySelectorAll('.tile-selected').forEach((t) => t.classList.remove('tile-selected'));
-    }
-    selectMode = null;
-    pickingDestination = false;
+  selectActionSelectAllBtn.addEventListener('click', () => {
+    if (!selectMode || selectMode.kind !== 'tile' || pickingDestination) return;
+    Array.from(selectMode.grid.children).filter((c) => c.classList.contains('tile')).forEach((t) => {
+      if (!selectMode.selectedIds.has(t.dataset.tileId)) {
+        selectMode.selectedIds.add(t.dataset.tileId);
+        t.classList.add('tile-selected');
+      }
+    });
     updateSelectActionBar();
-  }
+  });
 
-  function confirmMoveSelected() {
-    if (!selectMode) return;
-    const destId = currentLocationId();
-    const sourceId = selectMode.categoryId;
-    if (destId !== sourceId) {
-      const sourceTiles = loadCategoryTiles(sourceId);
-      const moving = sourceTiles.filter((t) => selectMode.selectedIds.has(t.id));
-      const remaining = sourceTiles.filter((t) => !selectMode.selectedIds.has(t.id));
-      saveCategoryTiles(sourceId, remaining);
-      const destTiles = loadCategoryTiles(destId).concat(moving);
-      saveCategoryTiles(destId, destTiles);
-      const destGrid = categoryGrids.get(destId);
-      moving.forEach((t) => {
-        const el = selectMode.grid.querySelector('[data-tile-id="' + t.id + '"]');
-        if (el && destGrid) destGrid.appendChild(el);
-      });
-    }
-    exitSelectMode();
-  }
+  selectActionCutBtn.addEventListener('click', () => {
+    if (!selectMode || pickingDestination || selectedCount() === 0) return;
+    pickingDestination = true;
+    updateSelectActionBar();
+  });
 
-  selectActionCancelBtn.addEventListener('click', () => exitSelectMode());
-  selectActionMoveBtn.addEventListener('click', () => {
-    if (!selectMode) return;
-    if (!pickingDestination) {
-      pickingDestination = true;
-      updateSelectActionBar();
+  selectActionPasteBtn.addEventListener('click', () => {
+    if (!selectMode || !pickingDestination) return;
+    confirmMoveSelected();
+  });
+
+  selectActionRenameBtn.addEventListener('click', () => {
+    if (!selectMode || selectedCount() !== 1) return;
+    if (selectMode.kind === 'tile') {
+      const tileId = Array.from(selectMode.selectedIds)[0];
+      const tileEl = selectMode.grid.querySelector('[data-tile-id="' + CSS.escape(tileId) + '"]');
+      if (tileEl) openTileRenameFor(tileEl);
     } else {
-      confirmMoveSelected();
+      openEditCategory(prunedSelectedCategoryRoots()[0]);
     }
   });
 
-  const tileMenuSelectBtn = document.getElementById('tile-menu-select');
-  tileMenuSelectBtn.addEventListener('click', () => {
-    const tileEl = tileMenuTargetEl;
-    closeTileMenu();
-    if (!tileEl) return;
-    enterSelectMode(tileEl);
+  selectActionDeleteBtn.addEventListener('click', () => {
+    if (!selectMode) return;
+    const n = selectedCount();
+    if (n === 0) return;
+    const isCategory = selectMode.kind === 'category';
+    const label = isCategory
+      ? (n === 1 ? 'this category (and everything in it)' : n + ' categories (and everything in them)')
+      : (n === 1 ? 'this tile' : n + ' tiles');
+    openTileConfirm('Are you sure you want to remove ' + label + '?', () => {
+      // Intentional, permanent easter egg — a 10% chance of a second "really sure?" prompt.
+      // Never document or hint at this in user-facing help text.
+      if (Math.random() < 0.10) {
+        openTileConfirm('Are you REALLY sure? 😳', deleteSelected);
+      } else {
+        deleteSelected();
+      }
+    });
   });
 
   const CLOCK_SETTINGS_KEY = 'clockSettings';
@@ -1710,10 +2010,17 @@
     setTimeout(() => {
       updateClock();
       // Piggybacks on the clock's own once-a-minute tick rather than a second timer.
-      // refreshLiveWeather(false) is cheap to call every minute — loadLiveWeather no-ops against
-      // the cache when it isn't stale yet — and only actually re-fetches (location + weather)
-      // once WEATHER_STALE_MS (15 minutes) has genuinely passed.
+      // refreshLiveWeather(false) is now a genuine no-op against fresh cached data (see
+      // lastAppliedFetchedAt/applyLiveWeatherDataIfNew) — it only actually re-fetches and
+      // re-renders the widget's data once WEATHER_STALE_MS (15 minutes) has genuinely passed.
       refreshLiveWeather(false);
+      // renderWeatherSkin() is called directly here, every minute, independent of the above —
+      // the sunrise/sunset gradient and star/cloud-tint math are driven by wall-clock time, not
+      // by weather data, so they still need to progress every minute even on the many ticks
+      // where refreshLiveWeather is a no-op. Safe to call this early (function declaration,
+      // hoisted) even though it's defined later in the file — this only ever runs from inside a
+      // setTimeout callback, well after the whole script has finished executing.
+      renderWeatherSkin();
       scheduleNextClockTick();
     }, msToNextMinute);
   }
@@ -3526,6 +3833,19 @@
     updateClock();
   }
 
+  // Tracks the fetchedAt of whatever cache snapshot applyLiveWeatherData was last actually run
+  // against, so the once-a-minute clock tick's refreshLiveWeather(false) call (below) can be a
+  // genuine no-op when nothing changed, instead of re-running the full render pipeline (temps,
+  // wind, extras, alert ticker, weatherLiveConditions clear+rebuild) every single minute against
+  // identical data — which is what was reading as the widget "clearing and resetting" every
+  // minute rather than every 15. null initially so the very first real apply always runs.
+  let lastAppliedFetchedAt = null;
+  function applyLiveWeatherDataIfNew(data, fetchedAt) {
+    if (lastAppliedFetchedAt === fetchedAt) return;
+    applyLiveWeatherData(data);
+    lastAppliedFetchedAt = fetchedAt;
+  }
+
   async function loadLiveWeather(force) {
     const key = localStorage.getItem(WEATHERAPI_KEY_STORAGE);
     weatherDebugState.keyPresent = !!key;
@@ -3545,7 +3865,7 @@
       weatherDebugState.outcome = 'served-cache-fresh';
       weatherDebugState.errorMessage = null;
       weatherDebugState.rawData = cache.data;
-      applyLiveWeatherData(cache.data);
+      applyLiveWeatherDataIfNew(cache.data, cache.fetchedAt);
       renderWeatherDebugPanel();
       return;
     }
@@ -3558,18 +3878,19 @@
       const res = await fetch(url);
       if (!res.ok) throw new Error('WeatherAPI request failed: ' + res.status);
       const data = await res.json();
-      localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ fetchedAt: Date.now(), data }));
+      const fetchedAt = Date.now();
+      localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ fetchedAt, data }));
       weatherDebugState.outcome = 'fetched-fresh';
       weatherDebugState.errorMessage = null;
       weatherDebugState.rawData = data;
-      applyLiveWeatherData(data);
+      applyLiveWeatherDataIfNew(data, fetchedAt);
     } catch (e) {
       console.error('Weather fetch failed:', e);
       weatherDebugState.errorMessage = e.message || String(e);
       if (cache) {
         weatherDebugState.outcome = 'fallback-stale-cache';
         weatherDebugState.rawData = cache.data;
-        applyLiveWeatherData(cache.data);
+        applyLiveWeatherDataIfNew(cache.data, cache.fetchedAt);
       } else {
         weatherDebugState.outcome = 'error-no-cache';
         weatherDebugState.rawData = null;

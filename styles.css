@@ -216,6 +216,17 @@ main {
   text-align: left;
 }
 
+/* Selection checkmark — sits left of .category-name (DOM order, appended before it) since a
+   category is a full-width header row, not a square tile, so .tile-selected's corner-badge
+   treatment doesn't fit. Colored with the category's own top/stripe color, i.e. the same
+   --stripe-color already driving its header's border-top ("the color of the category top"). */
+.category-select-check {
+  margin-right: 6px;
+  flex-shrink: 0;
+  font-weight: bold;
+  color: var(--stripe-color, var(--home-header-bg));
+}
+
 .category-name {
   font-weight: 600;
   font-size: 1rem;
@@ -1220,12 +1231,12 @@ main {
   height: 64px;
 }
 
-/* --- Tile menu: tile-style action buttons (Rename, Move, Select, Delete) --- */
+/* --- Tile-style action buttons: originally the tile-menu popup's own styling (Rename/Move/
+   Select/Delete), but the popup itself is retired — these classes are still live, shared with
+   the "+" Create menu's "+ Tile"/"+ Category" buttons (index.html, #create-menu-overlay). --- */
 
 .tile-menu-actions {
   display: grid;
-  /* Sized for 5 columns, matching .tile-grid's own repeat(5, 1fr), even though only 4 actions
-     exist today — leaves room for a 5th action later with no layout rework. */
   grid-template-columns: repeat(5, 1fr);
   gap: 8px;
   margin-top: 16px;
@@ -1270,6 +1281,11 @@ main {
   position: relative;
   outline: 3px solid var(--stripe-color, var(--home-header-bg));
   outline-offset: -3px;
+  /* Scale/lift feedback, per the spec — reuses .tile.move-grabbed's own scale+shadow treatment
+     below, minus its rotate: selection lifts, it doesn't tilt. */
+  transform: scale(1.05);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45), 0 0 0 2px var(--stripe-color, #3B82C4);
+  z-index: 5;
 }
 
 .tile.tile-selected::after {
@@ -1315,30 +1331,44 @@ main {
   min-width: 0;
 }
 
-.select-action-bar button {
+.select-action-icons {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Icon-only square buttons — Select All, Cut, Rename/Edit, Paste, Delete, Clear, in that order
+   (the order chosen for the safety goal: Delete sits at the far end next to Clear, not sandwiched
+   between the frequently-tapped Cut/Paste). */
+.select-action-icon-btn {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 8px 14px;
-  font-size: 0.85rem;
+  padding: 0;
+  font-size: 1.1rem;
+  line-height: 1;
   cursor: pointer;
   background: var(--surface);
   color: var(--fg);
 }
 
-/* Both qualified with .select-action-bar to out-specificity ".select-action-bar button" above
-   (a class + type selector otherwise beats a lone class selector regardless of source order). */
-.select-action-bar .select-action-move {
+.select-action-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.select-action-icon-btn.select-action-cut,
+.select-action-icon-btn.select-action-paste {
   background: var(--action-go-bg);
   color: var(--action-go-fg);
   border-color: var(--action-go-bg);
 }
 
-.select-action-move:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.select-action-bar .select-action-cancel {
+.select-action-icon-btn.select-action-delete {
   background: var(--action-stop-bg);
   color: var(--action-stop-fg);
   border-color: var(--action-stop-bg);

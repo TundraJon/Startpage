@@ -491,7 +491,7 @@
 <div class="help-overlay" id="add-category-overlay" hidden>
   <div class="help-panel options-panel">
     <button class="help-close" id="add-category-close" aria-label="Close add category">&times;</button>
-    <h2>Add Category</h2>
+    <h2 id="add-category-title">Add Category</h2>
     <section class="options-section">
       <div class="option-row"><span>Name</span><input type="text" id="add-category-name" autocomplete="off" placeholder="Category name" style="width: 55%; min-width: 0;"></div>
     </section>
@@ -500,23 +500,16 @@
   </div>
 </div>
 
-<div class="help-overlay" id="tile-menu-overlay" hidden>
-  <div class="help-panel options-panel">
-    <button class="help-close" id="tile-menu-close" aria-label="Close tile menu">&times;</button>
-    <h2 id="tile-menu-title">Tile</h2>
-    <div class="tile-menu-actions">
-      <button type="button" class="tile-menu-action" id="tile-menu-rename"><span class="tile-menu-icon">✏️</span><span class="tile-menu-action-label">Rename</span></button>
-      <button type="button" class="tile-menu-action" id="tile-menu-move"><span class="tile-menu-icon">🖐️</span><span class="tile-menu-action-label">Move</span></button>
-      <button type="button" class="tile-menu-action" id="tile-menu-select"><span class="tile-menu-icon">☑️</span><span class="tile-menu-action-label">Select</span></button>
-      <button type="button" class="tile-menu-action" id="tile-menu-remove"><span class="tile-menu-icon">🗑️</span><span class="tile-menu-action-label">Delete</span></button>
-    </div>
-  </div>
-</div>
-
 <div class="select-action-bar" id="select-action-bar" hidden>
   <span class="select-action-status" id="select-action-status">0 selected</span>
-  <button type="button" class="select-action-cancel" id="select-action-cancel">Cancel</button>
-  <button type="button" class="select-action-move" id="select-action-move" disabled>Cut (0)</button>
+  <div class="select-action-icons">
+    <button type="button" class="select-action-icon-btn" id="select-action-selectall" aria-label="Select all">🅰️</button>
+    <button type="button" class="select-action-icon-btn select-action-cut" id="select-action-cut" aria-label="Cut" disabled>✂️</button>
+    <button type="button" class="select-action-icon-btn" id="select-action-rename" aria-label="Rename" disabled>✏️</button>
+    <button type="button" class="select-action-icon-btn select-action-paste" id="select-action-paste" aria-label="Paste" disabled>📋</button>
+    <button type="button" class="select-action-icon-btn select-action-delete" id="select-action-delete" aria-label="Delete" disabled>🗑️</button>
+    <button type="button" class="select-action-icon-btn" id="select-action-clear" aria-label="Clear selection">🆑</button>
+  </div>
 </div>
 
 <div class="help-overlay" id="tile-confirm-overlay" hidden>
