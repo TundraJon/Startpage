@@ -1114,7 +1114,16 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
-_Nothing queued right now — promote items from the Build Planner below when ready to start._
+### Move Entry: two corrections to Build 51's drop/tap behavior
+
+- [ ] **Reported:** two things about Build 51's Move Entry are still wrong.
+  1. **Upon dropping a dragged tile, it should end up UN-checked** (deselected) — not stay checked, which is what it does today. ("Upon release the tile gets in-checked" in an earlier message meant *un*-checked, not *re*-checked as Build 51 assumed.)
+  2. **A plain tap on a tile right after a drag should still toggle its selection** — not just re-grab it for another drag. The user may want to tap it to rename/delete/etc. via the bar, not necessarily drag it again.
+- [ ] **Root-caused (2):** the tile click handler's existing `moveMode` branch (script.js, `buildTileElement`) unconditionally swallows the click — `preventDefault`/`stopPropagation`/`return` — for any tile in a grid that's currently in `moveMode`, regardless of whether the interaction was a genuine drag or just a plain tap. That branch predates Build 50/51 and was written for the old design where dragging and selecting were mutually exclusive; now that they coexist, it incorrectly blocks the tap-to-toggle path that select mode's own click branch (right below it) would otherwise handle correctly.
+- [ ] **Root-caused (1):** `toggleTileSelected` is never called as part of the drag lifecycle at all — `startTileDrag`/`finishTileDrag`/`cancelTileDrag` only touch `dragInfo`/`move-grabbed`/`move-dragging`, never `selectMode.selectedIds` or the `tile-selected` class. So a tile that was checked before a drag simply stays checked after, since nothing ever un-checks it.
+- [ ] **Not yet decided — needs settling before this is built:**
+  - For (1): should un-checking-on-drop apply only to the tile that was actually dragged, or does dropping any tile un-check the *entire* current selection? (The wording only described the one dragged tile.)
+  - For (2): if a plain tap should toggle selection even when `moveMode` is active, what distinguishes "the user tapped to toggle" from "the user tapped to grab it for a follow-up drag" (today's `moveMode`-active pointerdown starts tracking a drag immediately, unconditionally)? Likely needs the same movement-threshold gating `armTileDragFromSelectMode` already uses elsewhere, rather than moveMode's current immediate-trigger — worth confirming that's the intended fix rather than guessing.
 
 ## Build Planner
 
