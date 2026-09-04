@@ -179,11 +179,10 @@
   let selectMode = null;
   let pickingDestination = false;
   let dragInfo = null;
-  // Select mode's own 5-second-inactivity auto-close, mirroring the shape of Move Entry's
-  // existing moveModeTimeoutId below (declared/defined further down, alongside the rest of that
-  // state) — reset on every meaningful interaction, including live drag activity now that
-  // dragging is a capability layered on top of select mode rather than a separate state that
-  // replaces it. See resetSelectModeTimeout, defined further down once exitSelectMode exists.
+  // Organize Mode's own inactivity auto-close timer id — reset on every meaningful interaction,
+  // including live drag activity, since dragging is a capability layered on top of select mode
+  // rather than a separate state. See resetSelectModeTimeout, defined further down once
+  // exitSelectMode exists.
   let selectModeTimeoutId = null;
   const selectActionBar = document.getElementById('select-action-bar');
   const selectActionStatus = document.getElementById('select-action-status');
@@ -456,7 +455,7 @@
       // selects from the original anchor to this category (subsequent press) — mirrors tiles'
       // handleTileLongPress exactly, just against the visible-category-header order instead of a
       // grid. No drag-arming here — categories don't have a Move-Entry-style drag, only tiles do.
-      attachLongPress(mainBtn, () => handleCategoryLongPress(id), () => moveMode !== null);
+      attachLongPress(mainBtn, () => handleCategoryLongPress(id), () => dragInfo !== null);
       mainBtn.addEventListener('click', () => {
         if (selectMode && selectMode.kind === 'category') {
           toggleCategorySelected(id);
@@ -685,18 +684,20 @@
     a.appendChild(span);
 
     a.addEventListener('contextmenu', (e) => e.preventDefault());
-    // Long-press either enters select mode (first press) or, if this tile's grid is already in
-    // tile-select mode, extends the selection as a range from the original anchor (subsequent
-    // press) — see handleTileLongPress. Suppressed only while this grid is already in Move
-    // Entry's own move-mode (dragging takes priority; a long-press mid-drag-session shouldn't
-    // also try to open selection).
-    attachLongPress(a, () => handleTileLongPress(a), () => moveMode && moveMode.grid === a.parentElement);
+    // Long-press either enters Organize Mode (first press) or, if this tile's grid is already in
+    // it, extends the selection as a range from the original anchor (subsequent press) — see
+    // handleTileLongPress. Suppressed only while this specific tile is actively being dragged
+    // right now (dragging takes priority; a long-press mid-drag shouldn't also try to range-select).
+    attachLongPress(a, () => handleTileLongPress(a), () => dragInfo && dragInfo.grid === a.parentElement);
 
-    // While this tile's grid is in move mode, a plain tap must not navigate away — pointerdown
-    // (below, wired once move mode is entered) already handles grabbing/dragging it. While its
-    // grid is in select mode, a tap toggles this tile's selected state instead of navigating.
+    // While this tile's grid is in Organize Mode, a tap toggles this tile's selected state
+    // instead of navigating (dragging is handled separately, by pointerdown below). The one
+    // exception is the click that's the tail end of a gesture that just finished a drag — that's
+    // not a genuine new tap, so it's swallowed rather than un-checking the tile it was just
+    // dropped as. A real, separate tap right after still toggles selection normally, since the
+    // user may want to rename/delete/etc. it via the bar rather than drag it again.
     a.addEventListener('click', (e) => {
-      if (moveMode && moveMode.grid === a.parentElement) {
+      if (justFinishedDrag) {
         e.preventDefault();
         e.stopPropagation();
         return;
@@ -713,12 +714,13 @@
     }, true);
 
     a.addEventListener('pointerdown', (e) => {
-      if (moveMode && moveMode.grid === a.parentElement) {
-        startTileDrag(a, e);
-      } else if (selectMode && selectMode.kind === 'tile' && selectMode.grid === a.parentElement) {
+      if (selectMode && selectMode.kind === 'tile' && selectMode.grid === a.parentElement) {
+        // Drag/drop only ever moves one tile at a time, so it's disabled entirely whenever 2+
+        // tiles are selected — a plain tap still falls through untouched and toggles selection.
+        if (selectMode.selectedIds.size > 1) return;
         // Same reasoning as attachLongPress's own pointerdown handler: without an early
         // preventDefault here, Chromium's native link-dragging (tiles are real <a href>
-        // elements) can hijack this second, separate touch-and-drag the instant it crosses
+        // elements) can hijack this touch-and-drag the instant it crosses
         // armTileDragFromSelectMode's threshold, silently swallowing the rest of the gesture.
         e.preventDefault();
         armTileDragFromSelectMode(a, e);
@@ -812,7 +814,6 @@
   // cases. Scoped to :not(.category--home) throughout so Home's own header/grid (never destroyed)
   // isn't re-wired a second time, which would duplicate its already-rendered tiles.
   function rebuildCategoriesAndTiles() {
-    exitMoveMode();
     exitSelectMode();
     document.querySelectorAll('#categories > .category:not(.category--home)').forEach((el) => el.remove());
     renderCategoryTree();
@@ -1094,73 +1095,25 @@
     }, true);
   }
 
-  // --- Phase 2 Editing System, Part 2: Move Entry (drag-and-drop) ---
-  // moveMode: { grid } — the single .tile-grid currently in move mode (the anchor/source
-  // category, shown with the resting drop-shadow on all its tiles), or null.
-  // dragInfo: state for the tile actively being dragged, or null when idle (move mode can be
-  // active with no active drag — e.g. right after entry, before the first pointerdown).
+  // --- Phase 2 Editing System, Part 2: Organize Mode's drag-and-drop capability ---
+  // Dragging is a capability layered on top of tile-kind selectMode (see armTileDragFromSelectMode
+  // below), not a separate state — the grid's own .select-mode class (added at enterSelectMode)
+  // already covers the resting drop-shadow/touch-action styling for the whole session. dragInfo
+  // is state for the tile actively being dragged, or null when idle (select mode can be active
+  // with no active drag — e.g. right after entry, before the first pointerdown that arms one).
   //   dragInfo.grid — the source grid, fixed for the whole drag. Drag/drop is same-category
-  //     reorder only now (cross-category moves go through Select/Cut+Paste instead), so there's
-  //     only ever one grid in play — no more live-reparenting into a different grid mid-drag.
-  let moveMode = null;
-  let moveModeTimeoutId = null;
+  //     reorder only (cross-category moves go through Select/Cut+Paste instead), so there's only
+  //     ever one grid in play — no live-reparenting into a different grid mid-drag.
   // dragInfo itself is declared earlier, alongside selectMode, so renderOpenPath's drag-pinning
   // logic can read it — see the comment there.
   let justFinishedDrag = false;
 
-  function resetMoveModeTimeout() {
-    if (!moveMode) return;
-    clearTimeout(moveModeTimeoutId);
-    moveModeTimeoutId = setTimeout(exitMoveMode, 5000);
-    // Drag activity counts as select-mode activity too, now that Move Entry is a capability
-    // layered on top of select mode rather than a separate state that replaces it — this keeps
-    // the bar's own 5-second timer (resetSelectModeTimeout, defined further down) from expiring
-    // out from under an in-progress drag.
-    resetSelectModeTimeout();
-  }
-
   function setGrabbedTile(tileEl) {
-    if (!moveMode) return;
-    moveMode.grid.querySelectorAll('.tile.move-grabbed').forEach((t) => {
+    if (!selectMode || selectMode.kind !== 'tile') return;
+    selectMode.grid.querySelectorAll('.tile.move-grabbed').forEach((t) => {
       if (t !== tileEl) t.classList.remove('move-grabbed');
     });
     tileEl.classList.add('move-grabbed');
-  }
-
-  function onDocumentClickDuringMoveMode(e) {
-    if (!moveMode || justFinishedDrag) return;
-    const tile = e.target.closest && e.target.closest('.tile');
-    if (tile && tile.parentElement === moveMode.grid) return;
-    exitMoveMode();
-  }
-
-  function enterMoveMode(tileEl) {
-    // No longer exits select mode — the two coexist now. The bar and checkmarks stay visible for
-    // as long as select mode itself is open; a drag is just an additional capability layered on
-    // top of it, not a replacement state (per the user: "the bar stays visible the entire time
-    // select mode is active"). exitSelectMode (below) is what tears this down too, when it fires.
-    const grid = tileEl.parentElement;
-    if (moveMode && moveMode.grid !== grid) exitMoveMode();
-    if (!moveMode) {
-      moveMode = { grid };
-      grid.classList.add('move-mode');
-      // Deferred so the click that opened Move Entry (still bubbling to document right now)
-      // doesn't immediately trip the tap-away exit check above.
-      setTimeout(() => document.addEventListener('click', onDocumentClickDuringMoveMode), 0);
-    }
-    setGrabbedTile(tileEl);
-    resetMoveModeTimeout();
-  }
-
-  function exitMoveMode() {
-    if (!moveMode) return;
-    if (dragInfo) cancelTileDrag();
-    clearTimeout(moveModeTimeoutId);
-    moveModeTimeoutId = null;
-    moveMode.grid.classList.remove('move-mode');
-    moveMode.grid.querySelectorAll('.tile.move-grabbed').forEach((t) => t.classList.remove('move-grabbed'));
-    document.removeEventListener('click', onDocumentClickDuringMoveMode);
-    moveMode = null;
   }
 
   function startTileDrag(tileEl, e) {
@@ -1185,7 +1138,7 @@
     tileEl.classList.add('move-dragging');
     tileEl.style.zIndex = '50';
     tileEl.style.pointerEvents = 'none';
-    resetMoveModeTimeout();
+    resetSelectModeTimeout();
 
     // Listening on document (filtered by pointerId) rather than using setPointerCapture on the
     // tile itself: same-category reorder reparents the tile mid-drag (.after()/.before()), and
@@ -1313,7 +1266,7 @@
       return;
     }
     window.scrollBy(0, dragInfo.autoScrollDir * AUTO_SCROLL_MAX_PX_PER_FRAME * dragInfo.autoScrollSpeed);
-    resetMoveModeTimeout();
+    resetSelectModeTimeout();
     // The page moved under a stationary pointer — re-run reflow/hover-detection against the
     // last known pointer position, since no new pointermove event fires from scrolling alone.
     processDragPosition(dragInfo.lastClientX, dragInfo.lastClientY);
@@ -1330,7 +1283,7 @@
 
   function handleTileDragMove(e) {
     if (!dragInfo) return;
-    resetMoveModeTimeout();
+    resetSelectModeTimeout();
     dragInfo.lastClientX = e.clientX;
     dragInfo.lastClientY = e.clientY;
 
@@ -1369,10 +1322,17 @@
     const reordered = orderedIds.map((id) => byId.get(id)).filter(Boolean);
     saveCategoryTiles(sourceCategoryId, reordered);
 
+    // Dropping un-checks the dragged tile — drag/drop only ever moves one tile at a time, so
+    // dropping can only ever apply to that single tile. A cancelled drag (cancelTileDrag) isn't a
+    // real drop, so it leaves selection untouched.
+    if (selectMode && selectMode.kind === 'tile' && selectMode.selectedIds.has(info.tileEl.dataset.tileId)) {
+      toggleTileSelected(info.tileEl);
+    }
+
     dragInfo = null;
     renderOpenPath();
     markDragJustFinished();
-    resetMoveModeTimeout();
+    resetSelectModeTimeout();
   }
 
   function cancelTileDrag() {
@@ -1448,12 +1408,13 @@
     }
   }
 
-  // While tile-select mode is open, a plain touch-and-drag on ANY tile in that same grid — a
-  // fresh touch, not continuous with whatever long-press opened select mode — starts Move Entry,
-  // without ever hiding the bar or exiting select mode: the two coexist for as long as select
-  // mode itself stays open (per the user). Gated on movement past a threshold first so an
-  // ordinary tap still falls through to the tile's own click handler and toggles its selection
-  // normally, exactly as before.
+  // While tile Organize Mode is open, a plain touch-and-drag on ANY tile in that same grid — a
+  // fresh touch, not continuous with whatever long-press opened it — drags/reorders it, without
+  // ever hiding the bar or exiting select mode: the two coexist for as long as select mode itself
+  // stays open. Gated on movement past a threshold first so an ordinary tap still falls through to
+  // the tile's own click handler and toggles its selection normally. Only ever wired (see
+  // buildTileElement's pointerdown handler) while at most one tile is selected — drag/drop only
+  // ever moves one tile at a time, so it's disabled entirely once 2+ are selected.
   function armTileDragFromSelectMode(tileEl, e) {
     const pointerId = e.pointerId;
     const startX = e.clientX;
@@ -1463,7 +1424,6 @@
       if (ev.pointerId !== pointerId) return;
       if (Math.abs(ev.clientX - startX) > DRAG_ARM_PX || Math.abs(ev.clientY - startY) > DRAG_ARM_PX) {
         cleanup();
-        enterMoveMode(tileEl);
         startTileDrag(tileEl, ev);
       }
     }
@@ -1558,7 +1518,6 @@
   }
 
   function enterSelectMode(tileEl) {
-    if (moveMode) exitMoveMode();
     if (selectMode) exitSelectMode();
     const grid = tileEl.parentElement;
     selectMode = {
@@ -1574,33 +1533,30 @@
   }
 
   function enterCategorySelectMode(id) {
-    if (moveMode) exitMoveMode();
     if (selectMode) exitSelectMode();
     selectMode = { kind: 'category', selectedIds: new Set(), rangeAnchorId: id };
     pickingDestination = false;
     toggleCategorySelected(id);
   }
 
-  // Resets select mode's own 5-second-inactivity auto-close (per the user: this, not a separate
-  // "move mode" timer, is what governs the whole session now — drag activity included, via
-  // resetMoveModeTimeout calling this too). No-ops if select mode isn't actually open.
+  // Organize Mode's own inactivity auto-close — only while idle with nothing selected. The
+  // instant something is selected, it's actively being used and waits indefinitely for the user
+  // to act (Cut/Paste, Rename/Edit, Delete, or a drag) rather than closing out from under them; a
+  // fresh long-press restarts the same rule from wherever selection ends up. No-ops if select
+  // mode isn't actually open.
   function resetSelectModeTimeout() {
     if (!selectMode) return;
     clearTimeout(selectModeTimeoutId);
-    selectModeTimeoutId = setTimeout(exitSelectMode, 5000);
+    selectModeTimeoutId = selectedCount() === 0 ? setTimeout(exitSelectMode, 5000) : null;
   }
 
   function exitSelectMode() {
-    // Captured before nulling selectMode below — exitMoveMode's own cleanup (cancelling an
-    // in-progress drag) can indirectly call updateSelectActionBar/resetSelectModeTimeout, which
-    // would otherwise re-arm the very timer this function is in the middle of tearing down if it
-    // read selectMode still non-null at that point.
     const wasSelectMode = selectMode;
     selectMode = null;
     pickingDestination = false;
     clearTimeout(selectModeTimeoutId);
     selectModeTimeoutId = null;
-    if (moveMode) exitMoveMode();
+    if (dragInfo) cancelTileDrag();
     if (wasSelectMode) {
       if (wasSelectMode.kind === 'tile') {
         wasSelectMode.grid.classList.remove('select-mode');
@@ -3382,16 +3338,20 @@
     let cloudTint = null;
     if (weatherSettings.liveSkin) {
       cloudTint = computeCloudTint(getEffectiveSkyTime(), getEffectiveConditionSkins());
-      // Fixed layer order: gradient -> stars -> cloud overlay -> precipitation (rain/snow/hail/
-      // fog/bolt) -> floating clouds -> lightning flash. Stars sit behind the cloud overlay so
-      // cloud opacity occludes them for free; everything else correctly stays in front of it.
-      weatherSkin.appendChild(starsCanvas);
+      // Layer order (stars -> cloud overlay -> precipitation (rain/snow/hail/fog/bolt) ->
+      // floating clouds -> lightning flash) is now established by each layer's own z-index in
+      // CSS, not DOM order — so an already-connected layer is left alone here instead of being
+      // re-appended just to keep it visually on top. Re-appending an existing node turned out to
+      // reset its running CSS animation's effective position (confirmed via the clouds below,
+      // which visibly snapped every time this function ran) — canvases have no CSS animation to
+      // disturb, but they're left alone too now on the same principle, for consistency.
+      if (!starsCanvas.parentNode) weatherSkin.appendChild(starsCanvas);
       const overlay = document.createElement('div');
       overlay.className = 'weather-skin-overlay';
       overlay.style.background = rgbToHex(cloudTint.rgb);
       overlay.style.opacity = String(cloudOverlayOpacity(cloudPct, cloudTint.daytime));
       weatherSkin.appendChild(overlay);
-      weatherSkin.appendChild(precipCanvas);
+      if (!precipCanvas.parentNode) weatherSkin.appendChild(precipCanvas);
 
       // Every call here used to wipe and recreate every cloud from scratch, each one instantly
       // scattered mid-drift via a negative animation-delay. That's the right move only for the
@@ -3408,10 +3368,9 @@
           cloud.style.animationDelay = (-Math.random() * parseFloat(cloud.style.animationDuration)) + 's';
         }
       } else {
-        // Re-append (move, not recreate) the preserved clouds so they stay correctly layered
-        // above the overlay/precip canvas just re-appended above — moving an existing node via
-        // appendChild doesn't restart or otherwise disturb its running CSS animation.
-        existingClouds.forEach((cloud) => weatherSkin.appendChild(cloud));
+        // Preserved clouds are left exactly where they are in the DOM — z-index (not DOM order)
+        // keeps them stacked above the overlay/precip layers now, so there's no longer any need
+        // to move them at all just to stay visually on top.
         if (existingClouds.length > cloudCount) {
           for (let i = existingClouds.length - 1; i >= cloudCount; i--) existingClouds[i].remove();
         } else if (existingClouds.length < cloudCount) {
@@ -3427,7 +3386,7 @@
         }
       }
 
-      weatherSkin.appendChild(flashDiv);
+      if (!flashDiv.parentNode) weatherSkin.appendChild(flashDiv);
       updateCloudTestingReadout(cloudTint, cloudOverlayOpacity(cloudPct, cloudTint.daytime));
     } else {
       starsCanvas.remove();

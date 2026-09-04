@@ -446,9 +446,12 @@ main {
   -webkit-line-clamp: 3;
 }
 
-/* --- Phase 2 Editing System, Part 2: Move Entry (drag-and-drop) --- */
+/* --- Phase 2 Editing System, Part 2: Organize Mode (select + drag-and-drop, merged) ---
+   touch-action: none applies for the whole select-mode session, not just once a drag has
+   actually started — a real touchscreen can otherwise claim the gesture as a native scroll
+   during the threshold-watching phase before a drag is detected as such. */
 
-.tile-grid.move-mode .tile {
+.tile-grid.select-mode .tile {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
   touch-action: none;
 }
@@ -749,12 +752,18 @@ main {
   pointer-events: none;
 }
 
+/* Explicit z-index layering, not DOM append order — stars < cloud tint overlay < precipitation
+   < floating clouds < lightning flash. This lets renderWeatherSkin() leave untouched layers
+   (especially the CSS-animated clouds) alone in the DOM on every call instead of re-appending
+   them just to keep them visually on top; re-appending an already-connected element turned out
+   to disturb its running animation-delay-based position. */
 .weather-skin-stars {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
+  z-index: 1;
 }
 
 .weather-skin-overlay {
@@ -762,6 +771,7 @@ main {
   inset: 0;
   background: #4b5563;
   pointer-events: none;
+  z-index: 2;
 }
 
 .weather-skin-precip {
@@ -770,14 +780,7 @@ main {
   width: 100%;
   height: 100%;
   pointer-events: none;
-}
-
-.weather-skin-flash {
-  position: absolute;
-  inset: 0;
-  background: #eaf2ff;
-  opacity: 0;
-  pointer-events: none;
+  z-index: 3;
 }
 
 .wx-skin-cloud {
@@ -789,6 +792,16 @@ main {
   animation-iteration-count: infinite;
   pointer-events: none;
   opacity: 0.9;
+  z-index: 4;
+}
+
+.weather-skin-flash {
+  position: absolute;
+  inset: 0;
+  background: #eaf2ff;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 5;
 }
 
 @keyframes wx-cloud-drift {
