@@ -179,6 +179,12 @@
   let selectMode = null;
   let pickingDestination = false;
   let dragInfo = null;
+  // Select mode's own 5-second-inactivity auto-close, mirroring the shape of Move Entry's
+  // existing moveModeTimeoutId below (declared/defined further down, alongside the rest of that
+  // state) — reset on every meaningful interaction, including live drag activity now that
+  // dragging is a capability layered on top of select mode rather than a separate state that
+  // replaces it. See resetSelectModeTimeout, defined further down once exitSelectMode exists.
+  let selectModeTimeoutId = null;
   const selectActionBar = document.getElementById('select-action-bar');
   const selectActionStatus = document.getElementById('select-action-status');
   const selectActionSelectAllBtn = document.getElementById('select-action-selectall');
@@ -684,7 +690,7 @@
     // press) — see handleTileLongPress. Suppressed only while this grid is already in Move
     // Entry's own move-mode (dragging takes priority; a long-press mid-drag-session shouldn't
     // also try to open selection).
-    attachLongPress(a, (e) => handleTileLongPress(a, e), () => moveMode && moveMode.grid === a.parentElement);
+    attachLongPress(a, () => handleTileLongPress(a), () => moveMode && moveMode.grid === a.parentElement);
 
     // While this tile's grid is in move mode, a plain tap must not navigate away — pointerdown
     // (below, wired once move mode is entered) already handles grabbing/dragging it. While its
@@ -709,6 +715,13 @@
     a.addEventListener('pointerdown', (e) => {
       if (moveMode && moveMode.grid === a.parentElement) {
         startTileDrag(a, e);
+      } else if (selectMode && selectMode.kind === 'tile' && selectMode.grid === a.parentElement) {
+        // Same reasoning as attachLongPress's own pointerdown handler: without an early
+        // preventDefault here, Chromium's native link-dragging (tiles are real <a href>
+        // elements) can hijack this second, separate touch-and-drag the instant it crosses
+        // armTileDragFromSelectMode's threshold, silently swallowing the rest of the gesture.
+        e.preventDefault();
+        armTileDragFromSelectMode(a, e);
       }
     });
 
@@ -1031,13 +1044,15 @@
     el.addEventListener('pointerdown', (e) => {
       if (shouldSuppress && shouldSuppress()) return;
       // Suppresses the browser's own native drag-initiation (relevant for tiles, real <a> links)
-      // and text-selection/focus-on-mousedown — without this, a press-and-drag that arms Move
-      // Entry (armDragFromLongPress) could get hijacked by native link-dragging the instant the
-      // pointer crosses the threshold, silently swallowing every further pointer event for that
-      // gesture (confirmed directly: only the one threshold-crossing pointermove ever arrived,
-      // no pointerup at all). Harmless here regardless of element type — preventDefault on
-      // pointerdown doesn't cancel the eventual click's own default action (e.g. navigation),
-      // only these specific native gestures.
+      // and text-selection/focus-on-mousedown — without this, a would-be long-press that instead
+      // turns into quick movement (or the separate touch-and-drag that arms Move Entry, see
+      // armTileDragFromSelectMode, which has this same preventDefault on its own pointerdown too)
+      // could get hijacked by native link-dragging the instant the pointer crosses a threshold,
+      // silently swallowing every further pointer event for that gesture (confirmed directly:
+      // only the one threshold-crossing pointermove ever arrived, no pointerup at all). Harmless
+      // here regardless of element type — preventDefault on pointerdown doesn't cancel the
+      // eventual click's own default action (e.g. navigation), only these specific native
+      // gestures.
       e.preventDefault();
       startX = e.clientX;
       startY = e.clientY;
@@ -1045,10 +1060,9 @@
       pressTimer = setTimeout(() => {
         pressTimer = null;
         suppressNextClick = true;
-        // The originating pointerdown event is passed through — callers that need to keep
-        // tracking the same continuous touch past the long-press itself (tiles arming a
-        // long-press-then-drag into Move Entry, see armDragFromLongPress) need its pointerId/
-        // coordinates. Callers that don't care just ignore the argument, same as before.
+        // The originating pointerdown event is passed through in case a caller needs it (e.g.
+        // its coordinates); most callers, including tiles' own handleTileLongPress, just ignore
+        // the argument.
         callback(e);
       }, LONG_PRESS_MS);
     });
@@ -1098,6 +1112,11 @@
     if (!moveMode) return;
     clearTimeout(moveModeTimeoutId);
     moveModeTimeoutId = setTimeout(exitMoveMode, 5000);
+    // Drag activity counts as select-mode activity too, now that Move Entry is a capability
+    // layered on top of select mode rather than a separate state that replaces it — this keeps
+    // the bar's own 5-second timer (resetSelectModeTimeout, defined further down) from expiring
+    // out from under an in-progress drag.
+    resetSelectModeTimeout();
   }
 
   function setGrabbedTile(tileEl) {
@@ -1116,7 +1135,10 @@
   }
 
   function enterMoveMode(tileEl) {
-    if (selectMode) exitSelectMode();
+    // No longer exits select mode — the two coexist now. The bar and checkmarks stay visible for
+    // as long as select mode itself is open; a drag is just an additional capability layered on
+    // top of it, not a replacement state (per the user: "the bar stays visible the entire time
+    // select mode is active"). exitSelectMode (below) is what tears this down too, when it fires.
     const grid = tileEl.parentElement;
     if (moveMode && moveMode.grid !== grid) exitMoveMode();
     if (!moveMode) {
@@ -1414,21 +1436,25 @@
     updateSelectActionBar();
   }
 
-  function handleTileLongPress(tileEl, e) {
+  // Two separate touches, per the user: this long-press only ever selects (or range-selects) —
+  // it never arms a drag itself. A drag starts from its own fresh touch instead, see
+  // armTileDragFromSelectMode below (wired from buildTileElement's pointerdown handler), and
+  // doesn't require a long-press at all once select mode is already open.
+  function handleTileLongPress(tileEl) {
     if (selectMode && selectMode.kind === 'tile' && selectMode.grid === tileEl.parentElement) {
       rangeSelectTiles(tileEl);
     } else {
       enterSelectMode(tileEl);
     }
-    armDragFromLongPress(tileEl, e);
   }
 
-  // Keeps watching the SAME continuous touch that triggered the long-press (filtered by
-  // pointerId) — if it moves past a small threshold before lifting, that's read as "actually
-  // wanted to drag this, not just select it": exits select mode and hands off straight into
-  // Move Entry's existing same-category drag-reorder, continuous with the one gesture. If it
-  // lifts first without moving, nothing further happens and the tile just stays selected.
-  function armDragFromLongPress(tileEl, e) {
+  // While tile-select mode is open, a plain touch-and-drag on ANY tile in that same grid — a
+  // fresh touch, not continuous with whatever long-press opened select mode — starts Move Entry,
+  // without ever hiding the bar or exiting select mode: the two coexist for as long as select
+  // mode itself stays open (per the user). Gated on movement past a threshold first so an
+  // ordinary tap still falls through to the tile's own click handler and toggles its selection
+  // normally, exactly as before.
+  function armTileDragFromSelectMode(tileEl, e) {
     const pointerId = e.pointerId;
     const startX = e.clientX;
     const startY = e.clientY;
@@ -1555,24 +1581,41 @@
     toggleCategorySelected(id);
   }
 
+  // Resets select mode's own 5-second-inactivity auto-close (per the user: this, not a separate
+  // "move mode" timer, is what governs the whole session now — drag activity included, via
+  // resetMoveModeTimeout calling this too). No-ops if select mode isn't actually open.
+  function resetSelectModeTimeout() {
+    if (!selectMode) return;
+    clearTimeout(selectModeTimeoutId);
+    selectModeTimeoutId = setTimeout(exitSelectMode, 5000);
+  }
+
   function exitSelectMode() {
-    if (selectMode) {
-      if (selectMode.kind === 'tile') {
-        selectMode.grid.classList.remove('select-mode');
-        // Query the whole document, not just selectMode.grid — confirmMoveSelected already
+    // Captured before nulling selectMode below — exitMoveMode's own cleanup (cancelling an
+    // in-progress drag) can indirectly call updateSelectActionBar/resetSelectModeTimeout, which
+    // would otherwise re-arm the very timer this function is in the middle of tearing down if it
+    // read selectMode still non-null at that point.
+    const wasSelectMode = selectMode;
+    selectMode = null;
+    pickingDestination = false;
+    clearTimeout(selectModeTimeoutId);
+    selectModeTimeoutId = null;
+    if (moveMode) exitMoveMode();
+    if (wasSelectMode) {
+      if (wasSelectMode.kind === 'tile') {
+        wasSelectMode.grid.classList.remove('select-mode');
+        // Query the whole document, not just wasSelectMode.grid — confirmMoveSelected already
         // reparents moved tiles into the destination grid before calling this, so scoping the
         // cleanup to the (now smaller) source grid missed them and left the moved tiles stuck
         // showing the selected outline/checkmark in their new category.
         document.querySelectorAll('.tile-selected').forEach((t) => t.classList.remove('tile-selected'));
-      } else if (selectMode.kind === 'category') {
+      } else if (wasSelectMode.kind === 'category') {
         categoryToggles.forEach((entry) => {
           const check = entry.mainBtn.querySelector('.category-select-check');
           if (check) check.hidden = true;
         });
       }
     }
-    selectMode = null;
-    pickingDestination = false;
     updateSelectActionBar();
   }
 
@@ -1659,6 +1702,11 @@
       selectActionBar.hidden = true;
       return;
     }
+    // Virtually every meaningful select-mode interaction (toggling, range-select, Select All,
+    // Cut, navigating while picking a destination) already ends by calling this — resetting the
+    // 5-second-inactivity timer here covers all of them at once, on top of the explicit resets
+    // during live drag activity (resetMoveModeTimeout).
+    resetSelectModeTimeout();
     selectActionBar.hidden = false;
     const isCategory = selectMode.kind === 'category';
     const n = selectedCount();
