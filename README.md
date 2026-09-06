@@ -1149,6 +1149,12 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
+### Popup positioning (Build 54): anchor flush to the very top, not just below the search bar
+
+- [ ] **Reported:** Build 54's top-anchored popups (`padding-top: calc(var(--pinned-header-height, 0px) + 16px)` on `.help-overlay`) are still too low. Wanted instead: pin popups flush to the very top of the screen, ignoring the pinned header (theme toggle/title/search bar) entirely — since the dimmed backdrop already makes everything behind the popup unusable anyway, there's no reason to reserve space above it for a header nobody can interact with. This frees up more vertical room before the popup content runs into the on-screen keyboard.
+- [ ] **The target-visible-below-popup behavior (already built, Build 54) stays** — for a popup with a specific existing target (rename tile, edit category, single-item delete confirm), that item should still end up just below the popup's bottom edge. `scrollTargetBelowPopup` already measures the panel's live `getBoundingClientRect().bottom` at scroll time, so moving the popup higher doesn't need a separate code change there — it should just adapt automatically to wherever the panel's new bottom edge ends up.
+- [ ] **Proposed fix:** change `.help-overlay`'s `padding-top` from `calc(var(--pinned-header-height, 0px) + 16px)` to a small flat value (e.g. matching the existing 20px side/bottom padding) instead of anything tied to `--pinned-header-height`.
+
 ### "▲ Collapse all categories" should also scroll back to the top of the page
 
 - [ ] **Reported:** wants "Collapse all" (Home header's ▲ button) to also scroll the page back to the very top afterward, so Home's first tile is visible — not just collapse everything and leave the scroll position wherever it was.
