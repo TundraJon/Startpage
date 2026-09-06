@@ -1148,6 +1148,14 @@ Comparing the Phase 2 Part 3 spec doc against the current category-actions imple
 - [ ] **Create New Category is a floating "+" button in the Home header** — spec wants this deferred to the not-yet-built whole-structure reorg tree tool (Part 4) instead. Right now the floating button is the only way to create a category at all, so this is a real placement conflict, not an oversight — worth revisiting once Part 4 exists.
 - [ ] **Add Subcategory Here isn't a per-category long-press action** — the same global "+" button creates a child of whichever category is currently navigated into, which works but isn't the spec's trigger (long-press on the specific target category).
 
+### Category Sort (Build 53): make it a cancellable preview instead of an instant, permanent apply
+
+- [ ] **Reported:** Build 53's three Sort buttons (Alphabetical / Most Used / Last Used) currently apply and save immediately on click, with no way back except manually re-dragging tiles into their old order. Wanted instead: clicking a sort mode shows a **preview** of that order (tiles visibly reordered, nothing saved to storage yet), plus an explicit **Cancel** to revert to the order the category was in before Sort was opened.
+- [ ] **Open questions to resolve before building (not decided yet):**
+  1. What commits the preview — a separate Confirm/Apply button, or does it save automatically once the Edit Category dialog is otherwise closed (× / outside-tap / Save)?
+  2. Can the user switch between the three sort modes while previewing (each new click re-previews from the *original* pre-sort order, not stacking on top of the last preview), or does picking a second mode need its own Cancel first?
+  3. Does Cancel exit back to the exact order captured when the dialog opened, even if the user tried more than one sort mode first?
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
