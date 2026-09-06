@@ -866,6 +866,10 @@
   const addCategoryNameInput = document.getElementById('add-category-name');
   const addCategoryError = document.getElementById('add-category-error');
   const addCategorySubmit = document.getElementById('add-category-submit');
+  const editCategorySortSection = document.getElementById('edit-category-sort-section');
+  const sortCategoryAlphaBtn = document.getElementById('sort-category-alpha');
+  const sortCategoryMostUsedBtn = document.getElementById('sort-category-most-used');
+  const sortCategoryLastUsedBtn = document.getElementById('sort-category-last-used');
   // null while creating a new category; set to an existing category's id while editing one
   // (opened from the select-action-bar's 🔧 Edit button) — same dialog either way, per the
   // decision that Edit reuses the create-category overlay rather than being a separate one.
@@ -877,6 +881,7 @@
     addCategorySubmit.textContent = 'Add Category';
     addCategoryNameInput.value = '';
     addCategoryError.hidden = true;
+    editCategorySortSection.hidden = true; // a brand-new category has no tiles yet to sort
     addCategoryOverlay.hidden = false;
     addCategoryNameInput.focus();
   }
@@ -891,9 +896,33 @@
     addCategorySubmit.textContent = 'Save';
     addCategoryNameInput.value = node.name;
     addCategoryError.hidden = true;
+    editCategorySortSection.hidden = false;
     addCategoryOverlay.hidden = false;
     addCategoryNameInput.focus();
   }
+
+  // Sorts categoryId's own direct tiles only — never cascades into nested subcategories, each
+  // level sorts independently if the user wants more than one sorted. Non-destructive (reorder
+  // only, nothing removed) so it applies immediately with no confirmation, and the dialog stays
+  // open in case the user wants to try a different order.
+  function sortCategoryTiles(categoryId, comparator) {
+    const tiles = loadCategoryTiles(categoryId).slice().sort(comparator);
+    saveCategoryTiles(categoryId, tiles);
+    rebuildCategoriesAndTiles();
+  }
+  sortCategoryAlphaBtn.addEventListener('click', () => {
+    if (!addCategoryTargetId) return;
+    sortCategoryTiles(addCategoryTargetId, (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  });
+  sortCategoryMostUsedBtn.addEventListener('click', () => {
+    if (!addCategoryTargetId) return;
+    sortCategoryTiles(addCategoryTargetId, (a, b) => (b.useCount || 0) - (a.useCount || 0));
+  });
+  sortCategoryLastUsedBtn.addEventListener('click', () => {
+    if (!addCategoryTargetId) return;
+    // Never-used tiles (lastUsedAt still null) sort to the end, behind anything with a real timestamp.
+    sortCategoryTiles(addCategoryTargetId, (a, b) => (b.lastUsedAt || 0) - (a.lastUsedAt || 0));
+  });
   function closeAddCategory() {
     addCategoryOverlay.hidden = true;
     addCategoryTargetId = null;

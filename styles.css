@@ -1127,6 +1127,30 @@ main {
   font-size: 0.95rem;
 }
 
+/* Edit Category dialog's Sort Tiles row — three immediate-action buttons (not a form field),
+   each sorting that category's own direct tiles only. Non-destructive/instant per spec, so no
+   confirmation and the dialog stays open for trying another order. */
+.category-sort-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.category-sort-btn {
+  flex: 1;
+  padding: 8px 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.category-sort-btn:hover,
+.category-sort-btn:focus-visible {
+  border-color: var(--fg-muted);
+}
+
 .option-row:last-child {
   border-bottom: none;
 }
