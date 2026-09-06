@@ -860,6 +860,23 @@
     if (grid) openAddTile(grid, destId);
   });
 
+  // Popups now anchor near the top of the page (styles.css's .help-overlay) instead of vertical
+  // centering, so an on-screen keyboard never covers them. For a popup acting on one specific
+  // existing thing (a tile, a category header), this scrolls the underlying page — not the popup
+  // itself, which is position: fixed and unaffected by page scroll — so that thing ends up
+  // visible immediately below the popup, the same way the popup's own position is now fixed
+  // relative to the search bar. No-ops when there's no single target to show (targetEl omitted,
+  // e.g. Add Tile/Add Category/Settings/Help, or a multi-select delete confirm).
+  function scrollTargetBelowPopup(panelEl, targetEl) {
+    if (!targetEl) return;
+    requestAnimationFrame(() => {
+      const panelBottom = panelEl.getBoundingClientRect().bottom;
+      const targetTop = targetEl.getBoundingClientRect().top;
+      const gap = 12;
+      window.scrollBy({ top: targetTop - panelBottom - gap, behavior: 'auto' });
+    });
+  }
+
   const addCategoryOverlay = document.getElementById('add-category-overlay');
   const addCategoryClose = document.getElementById('add-category-close');
   const addCategoryTitleEl = document.getElementById('add-category-title');
@@ -875,8 +892,20 @@
   // decision that Edit reuses the create-category overlay rather than being a separate one.
   let addCategoryTargetId = null;
 
+  // Sort is a *preview*, not an instant apply: sortPreviewOriginalTiles snapshots the category's
+  // tile order at the moment the Edit dialog opens (this, not whatever order a prior preview left
+  // behind, is what Cancel restores to and what each new sort mode re-previews from — per the
+  // user's decisions). sortPreviewDirty tracks whether a preview has actually been applied, so
+  // Save only rewrites storage when there's something to commit, and closing without Save reverts
+  // the live DOM back to the original order rather than silently leaving a preview on screen with
+  // nothing saved.
+  let sortPreviewOriginalTiles = null;
+  let sortPreviewDirty = false;
+
   function openAddCategory() {
     addCategoryTargetId = null;
+    sortPreviewOriginalTiles = null;
+    sortPreviewDirty = false;
     addCategoryTitleEl.textContent = 'Add Category';
     addCategorySubmit.textContent = 'Add Category';
     addCategoryNameInput.value = '';
@@ -892,6 +921,8 @@
     const node = categoryTree[id];
     if (!node) return;
     addCategoryTargetId = id;
+    sortPreviewOriginalTiles = loadCategoryTiles(id).slice();
+    sortPreviewDirty = false;
     addCategoryTitleEl.textContent = 'Edit Category';
     addCategorySubmit.textContent = 'Save';
     addCategoryNameInput.value = node.name;
@@ -899,31 +930,75 @@
     editCategorySortSection.hidden = false;
     addCategoryOverlay.hidden = false;
     addCategoryNameInput.focus();
+    const entry = categoryToggles.get(id);
+    scrollTargetBelowPopup(addCategoryOverlay.querySelector('.help-panel'), entry && entry.mainBtn);
   }
 
-  // Sorts categoryId's own direct tiles only — never cascades into nested subcategories, each
-  // level sorts independently if the user wants more than one sorted. Non-destructive (reorder
-  // only, nothing removed) so it applies immediately with no confirmation, and the dialog stays
-  // open in case the user wants to try a different order.
-  function sortCategoryTiles(categoryId, comparator) {
-    const tiles = loadCategoryTiles(categoryId).slice().sort(comparator);
-    saveCategoryTiles(categoryId, tiles);
-    rebuildCategoriesAndTiles();
+  // Reorders categoryId's grid DOM (not storage) to the given order — used by both the sort
+  // preview and its eventual commit, which just persists whatever order the DOM ends up in.
+  function reorderGridDom(categoryId, tiles) {
+    const grid = categoryGrids.get(categoryId);
+    if (!grid) return;
+    tiles.forEach((t) => {
+      const el = grid.querySelector('[data-tile-id="' + CSS.escape(t.id) + '"]');
+      if (el) grid.appendChild(el);
+    });
+  }
+
+  // Previews categoryId's own direct tiles in the given order — never cascades into nested
+  // subcategories, each level sorts independently if the user wants more than one sorted. Always
+  // re-previews from the original pre-sort snapshot (not stacked on top of a prior preview), so
+  // switching between sort modes freely is safe. Nothing is saved until Save commits it.
+  function applySortPreview(categoryId, comparator) {
+    if (!sortPreviewOriginalTiles) return;
+    reorderGridDom(categoryId, sortPreviewOriginalTiles.slice().sort(comparator));
+    sortPreviewDirty = true;
   }
   sortCategoryAlphaBtn.addEventListener('click', () => {
     if (!addCategoryTargetId) return;
-    sortCategoryTiles(addCategoryTargetId, (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    applySortPreview(addCategoryTargetId, (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
   });
   sortCategoryMostUsedBtn.addEventListener('click', () => {
     if (!addCategoryTargetId) return;
-    sortCategoryTiles(addCategoryTargetId, (a, b) => (b.useCount || 0) - (a.useCount || 0));
+    applySortPreview(addCategoryTargetId, (a, b) => (b.useCount || 0) - (a.useCount || 0));
   });
   sortCategoryLastUsedBtn.addEventListener('click', () => {
     if (!addCategoryTargetId) return;
     // Never-used tiles (lastUsedAt still null) sort to the end, behind anything with a real timestamp.
-    sortCategoryTiles(addCategoryTargetId, (a, b) => (b.lastUsedAt || 0) - (a.lastUsedAt || 0));
+    applySortPreview(addCategoryTargetId, (a, b) => (b.lastUsedAt || 0) - (a.lastUsedAt || 0));
   });
+
+  // Persists whatever order the preview left the grid's DOM in — same read-DOM-order-back-to-
+  // storage pattern finishTileDrag already uses for Move Entry. A no-op when no preview was ever
+  // applied (sortPreviewDirty stays false, e.g. the user only renamed and never touched Sort).
+  function commitSortPreview(categoryId) {
+    if (sortPreviewDirty) {
+      const grid = categoryGrids.get(categoryId);
+      if (grid) {
+        const orderedIds = Array.from(grid.children).filter((c) => c.classList.contains('tile')).map((c) => c.dataset.tileId);
+        const tiles = loadCategoryTiles(categoryId);
+        const byId = new Map(tiles.map((t) => [t.id, t]));
+        saveCategoryTiles(categoryId, orderedIds.map((id) => byId.get(id)).filter(Boolean));
+      }
+    }
+    sortPreviewOriginalTiles = null;
+    sortPreviewDirty = false;
+  }
+
+  // Reverts the live grid DOM back to the order captured when the Edit dialog opened — called
+  // whenever the dialog closes WITHOUT going through commitSortPreview first (× close,
+  // outside-tap), so an un-saved preview never lingers on screen looking applied. A no-op once
+  // commitSortPreview has already cleared sortPreviewOriginalTiles (the normal Save path).
+  function revertSortPreview() {
+    if (sortPreviewOriginalTiles && sortPreviewDirty && addCategoryTargetId) {
+      reorderGridDom(addCategoryTargetId, sortPreviewOriginalTiles);
+    }
+    sortPreviewOriginalTiles = null;
+    sortPreviewDirty = false;
+  }
+
   function closeAddCategory() {
+    revertSortPreview();
     addCategoryOverlay.hidden = true;
     addCategoryTargetId = null;
   }
@@ -959,6 +1034,7 @@
       }
       node.name = name;
       saveCategoryTree(categoryTree);
+      commitSortPreview(targetId);
       rebuildCategoriesAndTiles();
       closeAddCategory();
       return;
@@ -990,14 +1066,36 @@
   const tileConfirmOverlay = document.getElementById('tile-confirm-overlay');
   const tileConfirmClose = document.getElementById('tile-confirm-close');
   const tileConfirmText = document.getElementById('tile-confirm-text');
+  const tileConfirmCounts = document.getElementById('tile-confirm-counts');
+  const tileConfirmTypeInput = document.getElementById('tile-confirm-type-input');
   const tileConfirmYes = document.getElementById('tile-confirm-yes');
   const tileConfirmNo = document.getElementById('tile-confirm-no');
   let tileConfirmOnYes = null;
+  let tileConfirmRequireTypedYes = false;
 
-  function openTileConfirm(text, onYes) {
+  // opts.counts: impact-summary text shown near the bottom of the dialog (e.g. Remove Category's
+  // tile/subcategory/combined total) — informational, shown independent of the friction tier
+  // below it. opts.requireTypedYes: gates Confirm behind typing "yes" (case-insensitive) instead
+  // of it being immediately clickable — used for Remove Category once there's at least one tile
+  // anywhere in the subtree; omitted (falsy) elsewhere, which is every other use of this dialog
+  // today (plain tile delete, the delete easter egg, an empty-subtree category delete).
+  function openTileConfirm(text, onYes, opts) {
+    opts = opts || {};
     tileConfirmText.textContent = text;
     tileConfirmOnYes = onYes;
+    if (opts.counts) {
+      tileConfirmCounts.textContent = opts.counts;
+      tileConfirmCounts.hidden = false;
+    } else {
+      tileConfirmCounts.hidden = true;
+    }
+    tileConfirmRequireTypedYes = !!opts.requireTypedYes;
+    tileConfirmTypeInput.value = '';
+    tileConfirmTypeInput.hidden = !tileConfirmRequireTypedYes;
+    tileConfirmYes.disabled = tileConfirmRequireTypedYes;
     tileConfirmOverlay.hidden = false;
+    if (tileConfirmRequireTypedYes) tileConfirmTypeInput.focus();
+    scrollTargetBelowPopup(tileConfirmOverlay.querySelector('.help-panel'), opts.targetEl);
   }
   function closeTileConfirm() {
     tileConfirmOverlay.hidden = true;
@@ -1007,6 +1105,10 @@
   tileConfirmNo.addEventListener('click', closeTileConfirm);
   tileConfirmOverlay.addEventListener('click', (e) => {
     if (e.target === tileConfirmOverlay) closeTileConfirm();
+  });
+  tileConfirmTypeInput.addEventListener('input', () => {
+    if (!tileConfirmRequireTypedYes) return;
+    tileConfirmYes.disabled = tileConfirmTypeInput.value.trim().toLowerCase() !== 'yes';
   });
   tileConfirmYes.addEventListener('click', () => {
     const cb = tileConfirmOnYes;
@@ -1036,6 +1138,7 @@
     tileRenameInput.value = tileEl.querySelector('span').textContent;
     tileRenameOverlay.hidden = false;
     tileRenameInput.focus();
+    scrollTargetBelowPopup(tileRenameOverlay.querySelector('.help-panel'), tileEl);
   }
 
   tileRenameSave.addEventListener('click', () => {
@@ -1759,18 +1862,53 @@
     if (!selectMode) return;
     const n = selectedCount();
     if (n === 0) return;
-    const isCategory = selectMode.kind === 'category';
-    const label = isCategory
-      ? (n === 1 ? 'this category (and everything in it)' : n + ' categories (and everything in them)')
-      : (n === 1 ? 'this tile' : n + ' tiles');
-    openTileConfirm('Are you sure you want to remove ' + label + '?', () => {
-      // Intentional, permanent easter egg — a 10% chance of a second "really sure?" prompt.
-      // Never document or hint at this in user-facing help text.
-      if (Math.random() < 0.10) {
-        openTileConfirm('Are you REALLY sure? 😳', deleteSelected);
-      } else {
-        deleteSelected();
-      }
+
+    if (selectMode.kind === 'tile') {
+      const label = n === 1 ? 'this tile' : n + ' tiles';
+      // Only a single-tile delete has one unambiguous element to show below the popup; a batch
+      // delete has no one specific target, so it just top-anchors like any other no-target popup.
+      const targetEl = n === 1
+        ? selectMode.grid.querySelector('[data-tile-id="' + CSS.escape(Array.from(selectMode.selectedIds)[0]) + '"]')
+        : null;
+      openTileConfirm('Are you sure you want to remove ' + label + '?', () => {
+        // Intentional, permanent easter egg — a 10% chance of a second "really sure?" prompt.
+        // Never document or hint at this in user-facing help text. Tile-delete only — categories
+        // get their own, non-random friction below, scaled to what's actually being deleted.
+        if (Math.random() < 0.10) {
+          openTileConfirm('Are you REALLY sure? 😳', deleteSelected, { targetEl });
+        } else {
+          deleteSelected();
+        }
+      }, { targetEl });
+      return;
+    }
+
+    // Category branch: impact is computed recursively across every selected (pruned) root, since
+    // deleting a category also deletes its full nested subtree.
+    const roots = prunedSelectedCategoryRoots();
+    let tileCount = 0;
+    let subcategoryCount = 0;
+    roots.forEach((rootId) => {
+      const subtreeIds = categorySubtreeIds(rootId);
+      subcategoryCount += subtreeIds.length - 1; // exclude the root itself
+      subtreeIds.forEach((id) => { tileCount += loadCategoryTiles(id).length; });
+    });
+    const combinedTotal = tileCount + subcategoryCount;
+    const label = n === 1 ? 'this category (and everything in it)' : n + ' categories (and everything in them)';
+    const counts = 'You are about to delete ' + tileCount + (tileCount === 1 ? ' item' : ' items')
+      + ' and ' + subcategoryCount + (subcategoryCount === 1 ? ' subcategory' : ' subcategories')
+      + ', for a combined total of ' + combinedTotal + (combinedTotal === 1 ? ' entry.' : ' entries.');
+    // Friction scales by whether there are any tiles anywhere in the subtree — zero tiles (even
+    // with subcategories nested underneath) stays a plain Yes/No; the impact count itself is
+    // shown independent of that, whenever there's anything nested at all. No random easter egg
+    // for categories, ever — that's tile-delete-only.
+    // Same single-target rule as tile delete: only show something below the popup when exactly
+    // one category is targeted, not for a multi-select batch.
+    const targetEntry = n === 1 ? categoryToggles.get(roots[0]) : null;
+    openTileConfirm('Are you sure you want to remove ' + label + '?', deleteSelected, {
+      counts: combinedTotal > 0 ? counts : null,
+      requireTypedYes: tileCount > 0,
+      targetEl: targetEntry && targetEntry.mainBtn,
     });
   });
 

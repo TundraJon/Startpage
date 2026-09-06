@@ -971,9 +971,14 @@ main {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   padding: 20px;
+  /* Anchored just below the pinned header (theme/title/icons + search bar) instead of vertically
+     centered — an on-screen keyboard covers the bottom of the viewport, which used to hide a
+     centered (or lower) popup entirely. --pinned-header-height is the same live-tracked variable
+     the sticky Home header already anchors itself to (script.js's ResizeObserver). */
+  padding-top: calc(var(--pinned-header-height, 0px) + 16px);
   /* Above .pinned-header (100) so popups never render with their top hidden behind the sticky
      header — was 10, which lost to the header once it became sticky+layered in Build 41. */
   z-index: 200;
@@ -1166,6 +1171,29 @@ main {
 
 .add-category-error[hidden] {
   display: none;
+}
+
+/* Remove Category's impact count (tile/subcategory/combined total) — neutral, not the error-red
+   treatment above, since showing it isn't itself a warning; it's informational and shown even in
+   the low-friction (no typed confirmation) tier whenever there's anything nested. */
+#tile-confirm-counts {
+  color: var(--fg-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  margin: 8px 0 0;
+}
+
+#tile-confirm-type-input {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--fg);
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  margin-top: 12px;
 }
 
 .option-row input[type="checkbox"],

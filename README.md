@@ -1135,40 +1135,21 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 - [x] **Three buttons — Alphabetical, Most Used, Last Used** — added to a new "Sort Tiles" section in the Add/Edit Category overlay (index.html), shown only in Edit mode (`editCategorySortSection.hidden` toggled in `openEditCategory`/`openAddCategory`) since a brand-new category has no tiles yet to sort. Alphabetical uses `localeCompare`; Most Used sorts by `useCount` descending; Last Used sorts by `lastUsedAt` descending, with never-used tiles (`lastUsedAt` still `null`) sorting to the end. The dialog stays open after sorting (unlike Rename, which closes) so the user can try a different order without reopening it.
 - [x] **Verified via Playwright:** sort section hidden when creating a new category, visible when editing an existing one; all three sort modes produce the correct order against a 4-tile fixture engineered to differ under each mode; the dialog remains open after each sort; zero page errors.
 
+## Build Log 54 (completed)
+
+### Category Sort made a cancellable preview, Remove Category friction/count, popups top-anchored with target visible below
+
+- [x] **Category Sort (Build 53) is now a preview, not an instant apply.** `sortPreviewOriginalTiles` snapshots the category's tile order the moment the Edit dialog opens; each of the three Sort buttons (`applySortPreview`, script.js) reorders the live grid DOM only — never storage — always re-previewing from that same original snapshot, so switching between sort modes freely never stacks. **Save** (`commitSortPreview`) persists whatever order the DOM ends up in, mirroring `finishTileDrag`'s own read-DOM-order-back-to-storage pattern; closing any other way (× / outside-tap, via `revertSortPreview`) reverts the live DOM back to the original snapshot so an unsaved preview never lingers looking applied.
+- [x] **Remove Category now shows its impact and scales its confirmation friction.** The shared `tile-confirm-overlay` (index.html) gained two new, conditionally-shown pieces: a counts line and a typed-confirmation input, both driven through a new `opts` param on `openTileConfirm(text, onYes, opts)`.
+  - **Impact count** (`opts.counts`) — computed recursively across every selected (pruned) category root via `categorySubtreeIds`: tile count + subcategory count + combined total, in the exact wording from the original spec doc. Shown whenever there's anything nested at all, independent of the friction tier below — even a category with 0 tiles anywhere but a subcategory nested under it still shows that subcategory count.
+  - **Friction** (`opts.requireTypedYes`) — scales on whether there's at least one tile anywhere in the subtree (recursive). Zero tiles anywhere (subcategories allowed) stays a plain Yes/No. One or more tiles anywhere requires typing **"yes"** (case-insensitive, via a live `input` listener toggling the Confirm button's `disabled` state) — deliberately not "DELETE"/all-caps, to avoid fighting mobile autocapitalize.
+  - **No easter egg for categories** — the category branch of `selectActionDeleteBtn`'s handler no longer shares the tile-delete 10%-chance "really sure?" prompt; that's tile-delete only now, unconditionally.
+- [x] **Popups anchor near the top instead of centering, and keep their one specific target visible immediately below.** `.help-overlay`'s flex alignment changed from `center` to `flex-start` with `padding-top: calc(var(--pinned-header-height, 0px) + 16px)` — the same live-tracked variable the sticky Home header already anchors to — so every popup now sits just below the search bar instead of getting hidden behind an open on-screen keyboard. A new `scrollTargetBelowPopup(panelEl, targetEl)` helper scrolls the underlying page (the popup itself is `position: fixed`, unaffected) so a popup's one specific existing target — the tile being renamed, the category being edited, the single item in a delete confirm — ends up right below the popup's bottom edge. No-ops (and the popup just top-anchors with nothing special below) when there's no single target: Add Tile, Add Category, Settings, Help, or a multi-select delete confirm. Wired into `openTileRenameFor`, `openEditCategory`, and both branches of the delete-confirm call site.
+- [x] **Verified via Playwright:** Sort preview/switch/cancel/save all behave exactly as decided (DOM-only preview, storage untouched until Save, full revert on cancel); Remove Category's three fixtures (fully empty, zero-tiles-with-a-subcategory, tiles-somewhere-in-subtree) each produced the correct counts text and friction tier, including the wrong-word-stays-disabled / case-insensitive-"YES"-enables-it check, and confirmed no second "really sure?" prompt ever appears for a category delete; popup positioning confirmed both for a no-target popup (anchored near the pinned-header height, not viewport-centered) and a target popup (using a short 600px viewport with several categories expanded to guarantee real scroll room — a target already at the very top or bottom edge of all scrollable content is a known, physically-inherent limit of a scroll-based approach, not a defect). Full regression re-run of single-tile delete, Select All + batch delete, Cut+Paste, and plain category rename all still pass unchanged. Zero page errors throughout.
+
 ## Build Queue
 
-### Phase 2 Part 3 spec conflicts — flagged, not yet decided
-
-Comparing the Phase 2 Part 3 spec doc against the current category-actions implementation surfaced these conflicts (per the doc's own precedence rule: flag, don't silently resolve). Resolved since:
-- Sort — decided and built (Build 53).
-- Remove Category's impact calculation, confirmation friction, and the leaked easter egg — fully decided, see "Remove Category: impact count + scaled confirmation friction, no easter egg" below. Not built yet.
-- Merge Into... — declined. Long-press a tile, Select All, Cut+Paste into the target category, then a separate Cut+Paste for the subcategories, covers it well enough as a two-step manual process. No dedicated action needed.
-- Create New Category placement (floating "+" in the Home header) — declined. Current behavior is exactly what's wanted; the spec's "should live in the reorg tree tool" note doesn't apply.
-- Add Subcategory Here (via the same global "+" while navigated into a category) — declined. Fine as-is, no dedicated per-category long-press action needed.
-
-All resolved for now — Reassign Stripe Color moved to the Build Planner (below), held until the broader Personalization work starts.
-
-### Category Sort (Build 53): make it a cancellable preview instead of an instant, permanent apply
-
-- [ ] **Reported:** Build 53's three Sort buttons (Alphabetical / Most Used / Last Used) currently apply and save immediately on click, with no way back except manually re-dragging tiles into their old order. Wanted instead: clicking a sort mode shows a **preview** of that order (tiles visibly reordered, nothing saved to storage yet), plus an explicit **Cancel** to revert to the order the category was in before Sort was opened.
-- [x] **(1) decided:** the dialog's existing **Save** button commits the preview (no separate Confirm/Apply button needed).
-- [x] **(2) decided:** yes, the user can switch between sort modes while previewing — each click re-previews from the *original* pre-sort order (not stacked on top of the last preview).
-- [x] **(3) decided:** yes, Cancel always restores the exact order captured when the dialog opened, regardless of how many sort modes were tried first.
-
-### Remove Category: impact count + scaled confirmation friction, no easter egg
-
-- [ ] **Reported/decided — final design for this one:** Remove Category currently just reuses the plain Yes/No dialog tiles use, with no impact count at all. Wanted instead:
-  1. **Count always shown at the bottom of the confirmation window** whenever there's anything nested — tile count, subcategory count, and combined total — regardless of which friction tier below applies. Even a category with **zero tiles anywhere but one or more subcategories** still shows the subcategory count; it isn't gated by the same condition as (2).
-  2. **Friction scales by whether there are any tiles anywhere in the subtree** (recursive — a category with 0 direct tiles but a non-empty subcategory nested under it still counts as non-empty):
-     - **Zero tiles anywhere** (subcategories allowed): plain Yes/No, no typed confirmation.
-     - **One or more tiles anywhere in the subtree**: must type **"yes"** (case-insensitive — deliberately not "DELETE"/all-caps, to avoid fighting mobile autocapitalize) to enable Confirm.
-  3. **No 10%-chance "really sure?" easter egg for categories** — that's tile-delete-only (see "Phase 2 Part 3 spec conflicts" above); category delete currently leaks it via the shared confirm-dialog code path.
-
-### Popup positioning: anchor near the top instead of centering, keep the target item visible below
-
-- [ ] **Reported:** every popup (`.help-overlay` — add/edit tile, add/edit category, delete confirms, settings, help, etc.) currently centers itself both horizontally and vertically over a dimmed backdrop. With the on-screen keyboard open, a centered (or otherwise low) popup gets hidden behind it.
-- [ ] **Wanted:** anchor popups near the top of the page instead — just below the Google search bar, tall/positioned enough to cover the clock and weather widgets. Additionally, whatever specific item a popup is acting on (the tile being renamed, the category being edited, etc.) should be visible immediately below the popup, so the user can see the real thing while working on it — e.g. renaming a tile should show that tile directly under the rename popup; editing a category should show that category directly under the edit popup.
-- [x] **Decided:** "target item visible below" only applies to dialogs with an existing target (rename tile, edit category, delete confirm). Dialogs with no existing target (Add Tile, Add Category, Settings, Help) still anchor near the top covering the clock/weather, just with no target-item requirement — not left centered.
+_Nothing queued right now — add new bugs, corrections, or feature ideas here as they come up._
 
 ## Build Planner
 
