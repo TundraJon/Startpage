@@ -1151,10 +1151,19 @@ Comparing the Phase 2 Part 3 spec doc against the current category-actions imple
 ### Category Sort (Build 53): make it a cancellable preview instead of an instant, permanent apply
 
 - [ ] **Reported:** Build 53's three Sort buttons (Alphabetical / Most Used / Last Used) currently apply and save immediately on click, with no way back except manually re-dragging tiles into their old order. Wanted instead: clicking a sort mode shows a **preview** of that order (tiles visibly reordered, nothing saved to storage yet), plus an explicit **Cancel** to revert to the order the category was in before Sort was opened.
-- [ ] **Open questions to resolve before building (not decided yet):**
-  1. What commits the preview — a separate Confirm/Apply button, or does it save automatically once the Edit Category dialog is otherwise closed (× / outside-tap / Save)?
-  2. Can the user switch between the three sort modes while previewing (each new click re-previews from the *original* pre-sort order, not stacking on top of the last preview), or does picking a second mode need its own Cancel first?
-  3. Does Cancel exit back to the exact order captured when the dialog opened, even if the user tried more than one sort mode first?
+- [x] **(1) decided:** the dialog's existing **Save** button commits the preview (no separate Confirm/Apply button needed).
+- [x] **(2) decided:** yes, the user can switch between sort modes while previewing — each click re-previews from the *original* pre-sort order (not stacked on top of the last preview).
+- [x] **(3) decided:** yes, Cancel always restores the exact order captured when the dialog opened, regardless of how many sort modes were tried first.
+
+### Remove Category: impact count + type-DELETE friction, no easter egg
+
+- [ ] **Reported:** Remove Category was supposed to show the number of tiles and subcategories about to be deleted, with that count displayed at the **bottom of the confirmation window**. Currently it's just the plain Yes/No dialog tiles use, no count at all — see the "Phase 2 Part 3 spec conflicts" items above for the rest (type-DELETE-to-confirm friction, and the 10% easter egg leaking in from tile delete, which shouldn't apply to categories). User flagged there may be additional details beyond these that haven't been captured yet — revisit if more specifics surface.
+
+### Popup positioning: anchor near the top instead of centering, keep the target item visible below
+
+- [ ] **Reported:** every popup (`.help-overlay` — add/edit tile, add/edit category, delete confirms, settings, help, etc.) currently centers itself both horizontally and vertically over a dimmed backdrop. With the on-screen keyboard open, a centered (or otherwise low) popup gets hidden behind it.
+- [ ] **Wanted:** anchor popups near the top of the page instead — just below the Google search bar, tall/positioned enough to cover the clock and weather widgets. Additionally, whatever specific item a popup is acting on (the tile being renamed, the category being edited, etc.) should be visible immediately below the popup, so the user can see the real thing while working on it — e.g. renaming a tile should show that tile directly under the rename popup; editing a category should show that category directly under the edit popup.
+- [ ] **Open question:** does "target item visible below" apply only to dialogs with one specific existing target (rename tile, edit category, delete confirm), or to all popups? Add Tile / Add Category / Settings / Help have no existing target to show — unclear whether those should just anchor at the top (covering clock/weather) with nothing special below, or stay centered as they are now.
 
 ## Build Planner
 
