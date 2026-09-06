@@ -1139,13 +1139,16 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ### Phase 2 Part 3 spec conflicts — flagged, not yet decided
 
-Comparing the Phase 2 Part 3 spec doc against the current category-actions implementation surfaced these conflicts (per the doc's own precedence rule: flag, don't silently resolve). Sort was decided and built (Build 53, above); these are still open:
+Comparing the Phase 2 Part 3 spec doc against the current category-actions implementation surfaced these conflicts (per the doc's own precedence rule: flag, don't silently resolve). Resolved since:
+- Sort — decided and built (Build 53).
+- Remove Category's impact calculation, confirmation friction, and the leaked easter egg — fully decided, see "Remove Category: impact count + scaled confirmation friction, no easter egg" below. Not built yet.
+- Merge Into... — declined. Long-press a tile, Select All, Cut+Paste into the target category, then a separate Cut+Paste for the subcategories, covers it well enough as a two-step manual process. No dedicated action needed.
+- Create New Category placement (floating "+" in the Home header) — declined. Current behavior is exactly what's wanted; the spec's "should live in the reorg tree tool" note doesn't apply.
+- Add Subcategory Here (via the same global "+" while navigated into a category) — declined. Fine as-is, no dedicated per-category long-press action needed.
 
-- [x] **Remove Category's impact calculation, confirmation friction, and the leaked easter egg** — fully decided, see "Remove Category: impact count + scaled confirmation friction, no easter egg" below. Not built yet.
+Still open:
+
 - [ ] **Reassign Stripe Color has no UI yet** — the `stripeColor` field already exists on every category in the data model; there's just no picker to change it after creation (ties into the not-yet-built Personalization/Settings color palette).
-- [ ] **Merge Into... doesn't exist as its own action.** What exists (Cut+Paste for categories) reparents a category as a distinct nested child; Merge is conceptually different — dissolve the source, push only its tiles into an existing destination, keep the destination's identity, delete the source. No current path does that.
-- [ ] **Create New Category is a floating "+" button in the Home header** — spec wants this deferred to the not-yet-built whole-structure reorg tree tool (Part 4) instead. Right now the floating button is the only way to create a category at all, so this is a real placement conflict, not an oversight — worth revisiting once Part 4 exists.
-- [ ] **Add Subcategory Here isn't a per-category long-press action** — the same global "+" button creates a child of whichever category is currently navigated into, which works but isn't the spec's trigger (long-press on the specific target category).
 
 ### Category Sort (Build 53): make it a cancellable preview instead of an instant, permanent apply
 
