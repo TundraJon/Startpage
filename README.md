@@ -1146,9 +1146,7 @@ Comparing the Phase 2 Part 3 spec doc against the current category-actions imple
 - Create New Category placement (floating "+" in the Home header) — declined. Current behavior is exactly what's wanted; the spec's "should live in the reorg tree tool" note doesn't apply.
 - Add Subcategory Here (via the same global "+" while navigated into a category) — declined. Fine as-is, no dedicated per-category long-press action needed.
 
-Still open:
-
-- [ ] **Reassign Stripe Color has no UI yet** — the `stripeColor` field already exists on every category in the data model; there's just no picker to change it after creation (ties into the not-yet-built Personalization/Settings color palette).
+All resolved for now — Reassign Stripe Color moved to the Build Planner (below), held until the broader Personalization work starts.
 
 ### Category Sort (Build 53): make it a cancellable preview instead of an instant, permanent apply
 
@@ -1175,6 +1173,10 @@ Still open:
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
+
+### Reassign Stripe Color (category header)
+
+- [ ] Held on purpose, per the user — tie this to the broader Personalization/Settings work (color palette, etc.) rather than building it standalone now. The `stripeColor` field already exists on every category in the data model; there's just no picker to change it after creation. Promote to Build Queue once Personalization work starts.
 
 ### Add a favicon
 
