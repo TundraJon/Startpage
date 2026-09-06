@@ -1149,6 +1149,12 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
+### Category Cut+Paste is broken: destination-picking taps toggle selection instead of navigating
+
+- [ ] **Reported:** long-press a category header → check mark + bottom bar appears → tap Cut → destination shows as the same category just cut. Tapping any other category afterward just adds a check mark to it and leaves the Paste destination stuck on the original category — category Cut+Paste doesn't work at all right now.
+- [ ] **Root-caused:** the category header click handler (`wireCategoryHeaders`, script.js) is `if (selectMode && selectMode.kind === 'category') { toggleCategorySelected(id); return; } openCategoryPath(id);` — it checks `selectMode.kind` but never checks `pickingDestination` at all. So once Cut sets `pickingDestination = true`, every subsequent tap on a category header still routes into toggling that category's selection (checking/unchecking it in the *original* cut selection) instead of `openCategoryPath(id)` (navigating there to make it the new destination). Tile Cut+Paste doesn't hit this — a tile's destination is picked by tapping *category* headers, and this same handler falls through to `openCategoryPath(id)` unconditionally for tile-kind `selectMode`, which happens to be correct for tiles but is exactly the gap for categories.
+- [ ] **Proposed fix:** check `pickingDestination` before the category-toggle branch — while picking a destination, any category header tap should navigate (`openCategoryPath(id)`), regardless of `selectMode.kind`; only tap-to-toggle when not picking a destination.
+
 ### Cut+Paste: no way to select Home as the destination by tapping it
 
 - [ ] **Reported:** while picking a destination for a Cut (tile or category), there's no way to select Home by tapping it.
