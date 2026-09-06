@@ -1141,8 +1141,7 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 Comparing the Phase 2 Part 3 spec doc against the current category-actions implementation surfaced these conflicts (per the doc's own precedence rule: flag, don't silently resolve). Sort was decided and built (Build 53, above); these are still open:
 
-- [ ] **Remove Category has no impact calculation or "type DELETE" friction** — spec wants a count of direct tiles + nested subcategories + combined total shown before deletion, with a typed "DELETE" confirmation gating the Confirm button. Currently it's the same plain Yes/No `openTileConfirm` dialog tiles use.
-- [ ] **Category delete currently shares the tile-delete 10%-chance "really sure?" easter egg** — spec explicitly says that's tile-only and should not apply to category removal. This is a real conflict either way, not just a missing nice-to-have.
+- [x] **Remove Category's impact calculation, confirmation friction, and the leaked easter egg** — fully decided, see "Remove Category: impact count + scaled confirmation friction, no easter egg" below. Not built yet.
 - [ ] **Reassign Stripe Color has no UI yet** — the `stripeColor` field already exists on every category in the data model; there's just no picker to change it after creation (ties into the not-yet-built Personalization/Settings color palette).
 - [ ] **Merge Into... doesn't exist as its own action.** What exists (Cut+Paste for categories) reparents a category as a distinct nested child; Merge is conceptually different — dissolve the source, push only its tiles into an existing destination, keep the destination's identity, delete the source. No current path does that.
 - [ ] **Create New Category is a floating "+" button in the Home header** — spec wants this deferred to the not-yet-built whole-structure reorg tree tool (Part 4) instead. Right now the floating button is the only way to create a category at all, so this is a real placement conflict, not an oversight — worth revisiting once Part 4 exists.
@@ -1168,7 +1167,7 @@ Comparing the Phase 2 Part 3 spec doc against the current category-actions imple
 
 - [ ] **Reported:** every popup (`.help-overlay` — add/edit tile, add/edit category, delete confirms, settings, help, etc.) currently centers itself both horizontally and vertically over a dimmed backdrop. With the on-screen keyboard open, a centered (or otherwise low) popup gets hidden behind it.
 - [ ] **Wanted:** anchor popups near the top of the page instead — just below the Google search bar, tall/positioned enough to cover the clock and weather widgets. Additionally, whatever specific item a popup is acting on (the tile being renamed, the category being edited, etc.) should be visible immediately below the popup, so the user can see the real thing while working on it — e.g. renaming a tile should show that tile directly under the rename popup; editing a category should show that category directly under the edit popup.
-- [ ] **Open question:** does "target item visible below" apply only to dialogs with one specific existing target (rename tile, edit category, delete confirm), or to all popups? Add Tile / Add Category / Settings / Help have no existing target to show — unclear whether those should just anchor at the top (covering clock/weather) with nothing special below, or stay centered as they are now.
+- [x] **Decided:** "target item visible below" only applies to dialogs with an existing target (rename tile, edit category, delete confirm). Dialogs with no existing target (Add Tile, Add Category, Settings, Help) still anchor near the top covering the clock/weather, just with no target-item requirement — not left centered.
 
 ## Build Planner
 
