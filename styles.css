@@ -206,7 +206,11 @@ main {
   min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  /* flex-start, not space-between — a leftover from when this button also held a chevron icon on
+     the right (long gone). Its only two possible children now are the selection checkmark and the
+     name; space-between shoved them to opposite far edges the instant the checkmark became
+     visible, instead of sitting them side by side. */
+  justify-content: flex-start;
   background: transparent;
   border: none;
   padding: 6px 14px 10px;
@@ -305,6 +309,14 @@ main {
 
 .category--home .category-header--home .category-name {
   color: var(--home-header-fg);
+  /* Now tappable/long-pressable (select-Home-as-destination, and long-press for Home Settings) —
+     cursor + touch target sized to match, since it's a plain <h2> rather than a <button>. */
+  cursor: pointer;
+  padding: 6px 4px;
+  margin: -6px -4px;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .home-header-actions {
@@ -974,13 +986,13 @@ main {
   align-items: flex-start;
   justify-content: center;
   padding: 20px;
-  /* Anchored just below the pinned header (theme/title/icons + search bar) instead of vertically
-     centered — an on-screen keyboard covers the bottom of the viewport, which used to hide a
-     centered (or lower) popup entirely. --pinned-header-height is the same live-tracked variable
-     the sticky Home header already anchors itself to (script.js's ResizeObserver). */
-  padding-top: calc(var(--pinned-header-height, 0px) + 16px);
-  /* Above .pinned-header (100) so popups never render with their top hidden behind the sticky
-     header — was 10, which lost to the header once it became sticky+layered in Build 41. */
+  /* Anchored flush to the very top of the screen instead of vertically centered — an on-screen
+     keyboard covers the bottom of the viewport, which used to hide a centered (or lower) popup
+     entirely. Deliberately NOT reserving space for the pinned header (theme/title/icons + search
+     bar): the dimmed backdrop already makes everything behind the popup unusable, so there's no
+     reason to leave room above it for controls nobody can reach anyway — just the same flat 20px
+     as every other edge. */
+  /* Above .pinned-header (100) so popups render on top of it rather than behind it. */
   z-index: 200;
 }
 

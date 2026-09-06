@@ -267,6 +267,10 @@
     openPath = [];
     leafLinksCollapsed = false;
     renderOpenPath();
+    // Collapsing back to Home should also put Home's own first entry back in view — otherwise
+    // everything collapses correctly but the viewport just stays wherever it happened to be
+    // scrolled, no longer lined up with any real content.
+    window.scrollTo({ top: 0 });
   }
 
   // Home's category header is sticky, anchored just below .pinned-header rather than at a
@@ -457,6 +461,15 @@
       // grid. No drag-arming here — categories don't have a Move-Entry-style drag, only tiles do.
       attachLongPress(mainBtn, () => handleCategoryLongPress(id), () => dragInfo !== null);
       mainBtn.addEventListener('click', () => {
+        // pickingDestination takes priority over toggling selection — while picking where a Cut
+        // lands, every header tap means "make this the destination," regardless of selectMode.kind.
+        // Previously this fell straight into the category-toggle branch below whenever selectMode
+        // was category-kind, so tapping a destination during a category Cut just checked/unchecked
+        // it in the original cut selection instead of navigating there at all.
+        if (selectMode && pickingDestination) {
+          openCategoryPath(id);
+          return;
+        }
         if (selectMode && selectMode.kind === 'category') {
           toggleCategorySelected(id);
           return;
@@ -489,6 +502,20 @@
   renderOpenPath();
 
   document.getElementById('collapse-all-btn').addEventListener('click', () => collapseAllCategories());
+
+  // Home's header has no equivalent of other categories' clickable .category-header-main (just a
+  // plain <h2>, wired here instead of through wireCategoryHeaders since Home isn't a categoryTree
+  // entry at all). A tap only means something while picking a Cut/Paste destination — selecting
+  // Home as the destination the same way any other category header would (reusing
+  // collapseAllCategories, since "nothing open" is exactly what makes Home the current
+  // destination, per currentLocationId()); it's a no-op otherwise, since Home has nothing of its
+  // own to open/collapse (the ▲ button already handles collapsing everything else). A long-press
+  // opens Home's own settings dialog (Sort, for now — a future color picker per Personalization).
+  const homeNameEl = document.querySelector('.category--home .category-header--home .category-name');
+  homeNameEl.addEventListener('click', () => {
+    if (selectMode && pickingDestination) collapseAllCategories();
+  });
+  attachLongPress(homeNameEl, () => openHomeSettings(), () => dragInfo !== null);
 
   // --- Tile Grid: "+" add-tile mechanic, persisted tiles, and Phase 2 Part 1 tile actions ---
   const TILE_STORAGE_PREFIX = 'category-tiles-';
@@ -883,6 +910,7 @@
   const addCategoryNameInput = document.getElementById('add-category-name');
   const addCategoryError = document.getElementById('add-category-error');
   const addCategorySubmit = document.getElementById('add-category-submit');
+  const addCategoryNameSection = document.getElementById('add-category-name-section');
   const editCategorySortSection = document.getElementById('edit-category-sort-section');
   const sortCategoryAlphaBtn = document.getElementById('sort-category-alpha');
   const sortCategoryMostUsedBtn = document.getElementById('sort-category-most-used');
@@ -910,6 +938,7 @@
     addCategorySubmit.textContent = 'Add Category';
     addCategoryNameInput.value = '';
     addCategoryError.hidden = true;
+    addCategoryNameSection.hidden = false;
     editCategorySortSection.hidden = true; // a brand-new category has no tiles yet to sort
     addCategoryOverlay.hidden = false;
     addCategoryNameInput.focus();
@@ -927,11 +956,30 @@
     addCategorySubmit.textContent = 'Save';
     addCategoryNameInput.value = node.name;
     addCategoryError.hidden = true;
+    addCategoryNameSection.hidden = false;
     editCategorySortSection.hidden = false;
     addCategoryOverlay.hidden = false;
     addCategoryNameInput.focus();
     const entry = categoryToggles.get(id);
     scrollTargetBelowPopup(addCategoryOverlay.querySelector('.help-panel'), entry && entry.mainBtn);
+  }
+
+  // Home's own settings dialog — long-press on Home's header (wired above). Reuses this same
+  // overlay purely for its Sort section (Home isn't a categoryTree entry: no stripeColor, no
+  // rename via this dialog or anything else today), with the Name field hidden since there's
+  // nothing here for it to edit. A future color picker (Personalization, Home-only per the user)
+  // would live in this same dialog once it exists.
+  function openHomeSettings() {
+    addCategoryTargetId = 'home';
+    sortPreviewOriginalTiles = loadCategoryTiles('home').slice();
+    sortPreviewDirty = false;
+    addCategoryTitleEl.textContent = 'Home Settings';
+    addCategorySubmit.textContent = 'Save';
+    addCategoryError.hidden = true;
+    addCategoryNameSection.hidden = true;
+    editCategorySortSection.hidden = false;
+    addCategoryOverlay.hidden = false;
+    scrollTargetBelowPopup(addCategoryOverlay.querySelector('.help-panel'), homeNameEl);
   }
 
   // Reorders categoryId's grid DOM (not storage) to the given order — used by both the sort
@@ -1017,6 +1065,13 @@
   });
 
   addCategorySubmit.addEventListener('click', () => {
+    // Home Settings: no name to validate (the Name field is hidden entirely for it), nothing in
+    // categoryTree to update — just commit whatever Sort preview is active and close.
+    if (addCategoryTargetId === 'home') {
+      commitSortPreview('home');
+      closeAddCategory();
+      return;
+    }
     const name = addCategoryNameInput.value.trim();
     if (!name) {
       showAddCategoryError('Name required.');
