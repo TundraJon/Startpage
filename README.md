@@ -1149,7 +1149,11 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
-_Nothing queued right now — add new bugs, corrections, or feature ideas here as they come up._
+### Cut+Paste: no way to select Home as the destination by tapping it
+
+- [ ] **Reported:** while picking a destination for a Cut (tile or category), there's no way to select Home by tapping it.
+- [ ] **Root-caused:** `wireCategoryHeaders()` (script.js) is explicitly scoped to `:not(.category--home)` — every other category's header gets a click handler (navigate, and during destination-picking, "select this as the destination"), but Home's header (`.category-header--home`) never got one at all. The only existing path to "Home as destination" is the "▲ Collapse all categories" button, which happens to also clear `openPath` — and `currentLocationId()` falls back to `'home'` whenever `openPath` is empty — but that's a coincidental side effect of an unrelated-looking button, not a real "select Home" affordance a user would discover.
+- [ ] **Proposed fix:** wire a click handler onto Home's header mirroring what other category headers already do — during `pickingDestination`, tapping it sets `openPath = []` (making Home the current destination, same status-text update the Paste flow already handles for any other destination). Outside of destination-picking, since Home has no collapsible content of its own, tapping it could just do what "▲ Collapse all categories" already does today (collapse everything else) — or simply be a no-op outside select mode. Not decided yet — this is the shape of the fix, not a final call on the outside-select-mode behavior.
 
 ## Build Planner
 
