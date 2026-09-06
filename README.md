@@ -1155,9 +1155,14 @@ Comparing the Phase 2 Part 3 spec doc against the current category-actions imple
 - [x] **(2) decided:** yes, the user can switch between sort modes while previewing — each click re-previews from the *original* pre-sort order (not stacked on top of the last preview).
 - [x] **(3) decided:** yes, Cancel always restores the exact order captured when the dialog opened, regardless of how many sort modes were tried first.
 
-### Remove Category: impact count + type-DELETE friction, no easter egg
+### Remove Category: impact count + scaled confirmation friction, no easter egg
 
-- [ ] **Reported:** Remove Category was supposed to show the number of tiles and subcategories about to be deleted, with that count displayed at the **bottom of the confirmation window**. Currently it's just the plain Yes/No dialog tiles use, no count at all — see the "Phase 2 Part 3 spec conflicts" items above for the rest (type-DELETE-to-confirm friction, and the 10% easter egg leaking in from tile delete, which shouldn't apply to categories). User flagged there may be additional details beyond these that haven't been captured yet — revisit if more specifics surface.
+- [ ] **Reported/decided — final design for this one:** Remove Category currently just reuses the plain Yes/No dialog tiles use, with no impact count at all. Wanted instead:
+  1. **Count always shown at the bottom of the confirmation window** whenever there's anything nested — tile count, subcategory count, and combined total — regardless of which friction tier below applies. Even a category with **zero tiles anywhere but one or more subcategories** still shows the subcategory count; it isn't gated by the same condition as (2).
+  2. **Friction scales by whether there are any tiles anywhere in the subtree** (recursive — a category with 0 direct tiles but a non-empty subcategory nested under it still counts as non-empty):
+     - **Zero tiles anywhere** (subcategories allowed): plain Yes/No, no typed confirmation.
+     - **One or more tiles anywhere in the subtree**: must type **"yes"** (case-insensitive — deliberately not "DELETE"/all-caps, to avoid fighting mobile autocapitalize) to enable Confirm.
+  3. **No 10%-chance "really sure?" easter egg for categories** — that's tile-delete-only (see "Phase 2 Part 3 spec conflicts" above); category delete currently leaks it via the shared confirm-dialog code path.
 
 ### Popup positioning: anchor near the top instead of centering, keep the target item visible below
 
