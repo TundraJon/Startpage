@@ -1149,6 +1149,12 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
+### "▲ Collapse all categories" should also scroll back to the top of the page
+
+- [ ] **Reported:** wants "Collapse all" (Home header's ▲ button) to also scroll the page back to the very top afterward, so Home's first tile is visible — not just collapse everything and leave the scroll position wherever it was.
+- [ ] **Root-caused:** `collapseAllCategories()` (script.js) only clears `openPath` and calls `renderOpenPath()` — it never touches scroll position at all. If the page was scrolled down into a nested category when the button is tapped, everything collapses correctly but the viewport stays exactly where it was, no longer lined up with any real content.
+- [ ] **Proposed fix:** add a scroll-to-top call (e.g. `window.scrollTo({ top: 0 })`) inside `collapseAllCategories()`, alongside the existing `openPath = []` / `renderOpenPath()`.
+
 ### Category Cut+Paste is broken: destination-picking taps toggle selection instead of navigating
 
 - [ ] **Reported:** long-press a category header → check mark + bottom bar appears → tap Cut → destination shows as the same category just cut. Tapping any other category afterward just adds a check mark to it and leaves the Paste destination stuck on the original category — category Cut+Paste doesn't work at all right now.
