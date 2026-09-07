@@ -1169,6 +1169,12 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 - [ ] **Root-caused:** same handler, the `counts` string literally hardcodes `' item'`/`' items'` for `tileCount`.
 - [ ] **Scope note:** only the single-item (`n === 1`) case was asked to include a name — a multi-select delete (`n > 1`) wasn't described as needing every name listed, so that wording stays as `N tiles`/`N categories` unless told otherwise.
 
+### Home destination-select: widen the tap target to the whole title bar
+
+- [ ] **Reported:** selecting Home as a Cut/Paste destination should work by tapping anywhere on the title bar, not just the "Home" text itself — excluding the + and ▲ buttons.
+- [ ] **Root-caused:** Build 55 wired the click/long-press handlers onto `homeNameEl` — `.category--home .category-header--home .category-name` — just the `<h2>` text, not the full header row. It has some padding/negative-margin around the text for a slightly larger tap target, but that's still only around the name, not the whole bar.
+- [ ] **Proposed fix:** move the click/long-press listeners from `homeNameEl` to `.category-header--home` itself (the full row), while keeping `.home-header-actions` (the +/▲ buttons) working normally — either by checking `e.target.closest('.home-header-actions')` and bailing early in the header's handler, or by giving the two buttons' own click handlers `e.stopPropagation()` so they never reach the new header-level listener.
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
