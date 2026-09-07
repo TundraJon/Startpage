@@ -1176,7 +1176,11 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
-_Nothing queued right now — add new bugs, corrections, or feature ideas here as they come up._
+### Reorg Tree Tool: dragging should be restricted to the ☰ handle, not the whole row
+
+- [ ] **Reported:** the tool works well, but scrolling a long list is hard — every row is draggable everywhere, so there's rarely an empty spot to put a finger down and just scroll.
+- [ ] **Root-caused:** `.reorg-row` (styles.css) has `touch-action: none` on the whole row — needed so a touch-drag doesn't get hijacked as a native scroll — and the `pointerdown` listener that arms the drag (`buildReorgRow`, script.js) is also attached to the whole row, not just the `.reorg-row-handle` (☰) element. Together, every pixel of every row is a drag target, leaving nothing free for an ordinary scroll gesture.
+- [ ] **Proposed fix, per the user:** restrict dragging to the ☰ handle specifically — move the `pointerdown` listener from the row to just `.reorg-row-handle`, and move `touch-action: none` to that handle only, leaving the rest of the row (including the name text) at its default touch-action so it scrolls normally. Full drag control is preserved, just gated behind touching the handle first, same shape as how tile drag-and-drop is already gated behind Organize Mode rather than every tap.
 
 ## Build Planner
 
