@@ -1161,7 +1161,13 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
-_Nothing queued right now — add new bugs, corrections, or feature ideas here as they come up._
+### Delete confirmations: name the specific item, and say "tiles" not "items" in the impact count
+
+- [ ] **Reported (1):** deleting a single tile or single category should name it in the confirmation, e.g. "Are you sure you want to remove the Calendar tile?" instead of the current generic wording.
+- [ ] **Root-caused:** `selectActionDeleteBtn`'s click handler (script.js) builds `label` as `n === 1 ? 'this tile' : n + ' tiles'` for tiles, and `n === 1 ? 'this category (and everything in it)' : n + ' categories (and everything in them)'` for categories — neither branch ever looks up the actual name, single-item or not. The tile/category name is readily available at that point (the tile element's `<span>` text for a single selected tile; `categoryTree[rootId].name` for a single selected category), just never used.
+- [ ] **Reported (2):** the impact-count wording (Build 54/55) currently says "You are about to delete 4 items and 1 subcategory, for a combined total of 5 entries" — "items" should read "tiles" instead, matching what's actually being counted.
+- [ ] **Root-caused:** same handler, the `counts` string literally hardcodes `' item'`/`' items'` for `tileCount`.
+- [ ] **Scope note:** only the single-item (`n === 1`) case was asked to include a name — a multi-select delete (`n > 1`) wasn't described as needing every name listed, so that wording stays as `N tiles`/`N categories` unless told otherwise.
 
 ## Build Planner
 
