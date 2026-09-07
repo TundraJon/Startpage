@@ -504,18 +504,26 @@
   document.getElementById('collapse-all-btn').addEventListener('click', () => collapseAllCategories());
 
   // Home's header has no equivalent of other categories' clickable .category-header-main (just a
-  // plain <h2>, wired here instead of through wireCategoryHeaders since Home isn't a categoryTree
-  // entry at all). A tap only means something while picking a Cut/Paste destination — selecting
-  // Home as the destination the same way any other category header would (reusing
+  // plain <h2> plus the +/▲ action buttons, wired here instead of through wireCategoryHeaders
+  // since Home isn't a categoryTree entry at all). The whole title bar is the tap/long-press
+  // target — not just the name text — except the +/▲ buttons themselves, which need to keep
+  // working normally. A tap only means something while picking a Cut/Paste destination —
+  // selecting Home as the destination the same way any other category header would (reusing
   // collapseAllCategories, since "nothing open" is exactly what makes Home the current
   // destination, per currentLocationId()); it's a no-op otherwise, since Home has nothing of its
   // own to open/collapse (the ▲ button already handles collapsing everything else). A long-press
   // opens Home's own settings dialog (Sort, for now — a future color picker per Personalization).
   const homeNameEl = document.querySelector('.category--home .category-header--home .category-name');
-  homeNameEl.addEventListener('click', () => {
+  const homeHeaderActionsEl = document.querySelector('.category--home .home-header-actions');
+  homeHeaderEl.addEventListener('click', (e) => {
+    if (homeHeaderActionsEl.contains(e.target)) return;
     if (selectMode && pickingDestination) collapseAllCategories();
   });
-  attachLongPress(homeNameEl, () => openHomeSettings(), () => dragInfo !== null);
+  // Stops the +/▲ buttons' own presses from ever bubbling into the header-wide long-press
+  // listener below (attachLongPress's pointerdown lives on homeHeaderEl, the shared ancestor) —
+  // without this, holding either button down would also arm Home's long-press timer.
+  homeHeaderActionsEl.addEventListener('pointerdown', (e) => e.stopPropagation());
+  attachLongPress(homeHeaderEl, () => openHomeSettings(), () => dragInfo !== null);
 
   // --- Tile Grid: "+" add-tile mechanic, persisted tiles, and Phase 2 Part 1 tile actions ---
   const TILE_STORAGE_PREFIX = 'category-tiles-';
@@ -1776,6 +1784,293 @@
     node.order = siblingOrders.length > 0 ? Math.max(...siblingOrders) + 1 : 0;
   }
 
+  // --- Phase 2 Part 4: Whole-Structure Reorg Tree Tool ---
+  // A separate, full-screen view (not a .help-overlay modal) showing every category/subcategory
+  // site-wide as a flat, depth-indented, draggable list — tiles are never shown here, only
+  // structure. Nothing touches the real categoryTree until Save: reorgWorkingTree is a deep clone
+  // made when the tool opens, and every drag/reorder/re-nest/create operation during the session
+  // mutates only that clone. Cancel just discards it; Save replaces categoryTree's own contents
+  // with the clone's and persists/rebuilds from there.
+  const reorgView = document.getElementById('reorg-view');
+  const reorgListEl = document.getElementById('reorg-list');
+  const reorgCancelBtn = document.getElementById('reorg-cancel-btn');
+  const reorgSaveBtn = document.getElementById('reorg-save-btn');
+  let reorgWorkingTree = null;
+  let reorgDrag = null;
+
+  function reorgChildren(parentId) {
+    return Object.keys(reorgWorkingTree)
+      .filter((id) => reorgWorkingTree[id].parentId === parentId)
+      .sort((a, b) => reorgWorkingTree[a].order - reorgWorkingTree[b].order);
+  }
+
+  function reorgSubtreeIds(rootId) {
+    const out = [rootId];
+    reorgChildren(rootId).forEach((childId) => out.push(...reorgSubtreeIds(childId)));
+    return out;
+  }
+
+  // Depth-first flat order matching how the live accordion itself walks categoryChildren — this
+  // is both the render order and, via each row's live DOM position, the source of truth read back
+  // when a drag finishes.
+  function reorgFlattenTree() {
+    const out = [];
+    (function walk(parentId, depth) {
+      reorgChildren(parentId).forEach((id) => {
+        out.push({ id, depth });
+        walk(id, depth + 1);
+      });
+    })(null, 0);
+    return out;
+  }
+
+  function openReorgTool() {
+    closeSettings();
+    reorgWorkingTree = JSON.parse(JSON.stringify(categoryTree));
+    reorgView.hidden = false;
+    renderReorgList();
+  }
+
+  function closeReorgTool() {
+    reorgView.hidden = true;
+    reorgWorkingTree = null;
+  }
+
+  document.getElementById('open-reorg-btn').addEventListener('click', openReorgTool);
+  reorgCancelBtn.addEventListener('click', closeReorgTool);
+  reorgSaveBtn.addEventListener('click', () => {
+    Object.keys(categoryTree).forEach((k) => delete categoryTree[k]);
+    Object.assign(categoryTree, reorgWorkingTree);
+    saveCategoryTree(categoryTree);
+    closeReorgTool();
+    // Same reasoning as confirmMoveSelected/deleteSelected's category branches — a category on the
+    // current openPath may have moved or no longer exist in the shape it did; Home is the one
+    // state guaranteed to still be valid.
+    openPath = [];
+    rebuildCategoriesAndTiles();
+  });
+
+  function renderReorgList() {
+    reorgListEl.innerHTML = '';
+
+    // Home — synthetic (it isn't a categoryTree entry at all), always first, greyed out and
+    // non-interactive for every function this tool offers: it can't be moved, renamed, or nested
+    // under. Every real top-level category effectively sits as its child.
+    const homeRow = document.createElement('div');
+    homeRow.className = 'reorg-row reorg-row-home';
+    homeRow.style.setProperty('--depth', 0);
+    const homeHandle = document.createElement('span');
+    homeHandle.className = 'reorg-row-handle';
+    homeHandle.textContent = '🔒';
+    const homeName = document.createElement('span');
+    homeName.className = 'reorg-row-name';
+    homeName.textContent = 'Home';
+    homeRow.append(homeHandle, homeName);
+    reorgListEl.appendChild(homeRow);
+
+    reorgFlattenTree().forEach(({ id, depth }) => reorgListEl.appendChild(buildReorgRow(id, depth)));
+
+    const newBtn = document.createElement('button');
+    newBtn.type = 'button';
+    newBtn.className = 'reorg-row-new';
+    newBtn.textContent = '+ New Category';
+    newBtn.addEventListener('click', openReorgNewCategory);
+    reorgListEl.appendChild(newBtn);
+  }
+
+  function buildReorgRow(id, depth) {
+    const row = document.createElement('div');
+    row.className = 'reorg-row';
+    row.dataset.id = id;
+    row.style.setProperty('--depth', depth);
+    const handle = document.createElement('span');
+    handle.className = 'reorg-row-handle';
+    handle.textContent = '☰';
+    const name = document.createElement('span');
+    name.className = 'reorg-row-name';
+    name.textContent = reorgWorkingTree[id].name;
+    row.append(handle, name);
+    row.addEventListener('pointerdown', (e) => startReorgDrag(row, id, e));
+    return row;
+  }
+
+  const REORG_DRAG_ARM_PX = 12; // smaller than tiles' 20px -- these rows have no competing tap action
+  const REORG_INDENT_PX = 28; // horizontal px of drag per depth level, outdent/indent
+
+  function startReorgDrag(row, id, e) {
+    if (reorgDrag) return;
+    e.preventDefault();
+    const pointerId = e.pointerId;
+    const rect = row.getBoundingClientRect();
+    const drag = {
+      id,
+      row,
+      pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      grabDX: e.clientX - rect.left,
+      grabDY: e.clientY - rect.top,
+      startDepth: parseInt(row.style.getPropertyValue('--depth'), 10) || 0,
+      armed: false,
+      targetParentId: undefined,
+      valid: true,
+    };
+    reorgDrag = drag;
+
+    function onMove(ev) {
+      if (ev.pointerId !== pointerId) return;
+      if (!drag.armed) {
+        if (Math.abs(ev.clientX - drag.startX) <= REORG_DRAG_ARM_PX && Math.abs(ev.clientY - drag.startY) <= REORG_DRAG_ARM_PX) return;
+        drag.armed = true;
+        row.classList.add('reorg-row-dragging');
+      }
+      ev.preventDefault();
+      updateReorgDrag(ev.clientX, ev.clientY);
+    }
+    function onUp(ev) {
+      if (ev.pointerId !== pointerId) return;
+      cleanup();
+      const wasArmed = drag.armed;
+      reorgDrag = null;
+      if (wasArmed) finishReorgDrag(drag);
+    }
+    function cleanup() {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
+    }
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
+  }
+
+  // Finds the new parent for a dragged row resting at targetDepth, given its CURRENT (live,
+  // already-reflowed) DOM position — walks back through preceding siblings for the nearest one at
+  // depth (targetDepth - 1); that row is the new parent. Depth 0 (or nothing found) means top-level.
+  function reorgFindParentAtDepth(draggedRow, targetDepth) {
+    if (targetDepth === 0) return null;
+    let node = draggedRow.previousElementSibling;
+    while (node) {
+      if (node.classList.contains('reorg-row-home')) return null;
+      const d = parseInt(node.style.getPropertyValue('--depth'), 10) || 0;
+      if (d === targetDepth - 1) return node.dataset.id;
+      if (d < targetDepth - 1) return null;
+      node = node.previousElementSibling;
+    }
+    return null;
+  }
+
+  function updateReorgDrag(clientX, clientY) {
+    const d = reorgDrag;
+
+    // Nearest OTHER row by vertical center — excludes the dragged row and its own current
+    // descendants (a branch can't be dropped inside its own subtree) — plus the Home row, so
+    // hovering near the very top always resolves to "first, top-level."
+    const excluded = new Set(reorgSubtreeIds(d.id));
+    const candidates = Array.from(reorgListEl.querySelectorAll('.reorg-row'))
+      .filter((r) => r !== d.row && (r.classList.contains('reorg-row-home') || !excluded.has(r.dataset.id)));
+    let nearest = null;
+    let nearestDist = Infinity;
+    candidates.forEach((r) => {
+      const rect = r.getBoundingClientRect();
+      const dist = Math.abs(rect.top + rect.height / 2 - clientY);
+      if (dist < nearestDist) { nearestDist = dist; nearest = r; }
+    });
+    if (!nearest) return;
+
+    const nearestRect = nearest.getBoundingClientRect();
+    const isHome = nearest.classList.contains('reorg-row-home');
+    const after = !isHome && clientY > nearestRect.top + nearestRect.height / 2;
+    if (isHome || !after) nearest.before(d.row);
+    else nearest.after(d.row);
+
+    // Depth follows horizontal drag distance from the start, clamped to at most one level deeper
+    // than whatever row now immediately precedes the dragged one — matches "dropping onto a line
+    // nests one level under it," and prevents landing at an orphaned depth with no real parent.
+    const depthDelta = Math.round((clientX - d.startX) / REORG_INDENT_PX);
+    const prevRow = d.row.previousElementSibling;
+    const prevDepth = prevRow ? (prevRow.classList.contains('reorg-row-home') ? -1 : (parseInt(prevRow.style.getPropertyValue('--depth'), 10) || 0)) : -1;
+    const targetDepth = Math.max(0, Math.min(d.startDepth + depthDelta, prevDepth + 1));
+    d.row.style.setProperty('--depth', targetDepth);
+
+    const newParentId = reorgFindParentAtDepth(d.row, targetDepth);
+    const invalid = newParentId !== null && excluded.has(newParentId);
+    d.targetParentId = newParentId;
+    d.valid = !invalid;
+    d.row.classList.toggle('reorg-row-invalid', invalid);
+
+    followReorgPointer(d.row, clientX, clientY, d.grabDX, d.grabDY);
+  }
+
+  function followReorgPointer(row, x, y, grabDX, grabDY) {
+    row.style.transform = 'none';
+    const rect = row.getBoundingClientRect();
+    const dx = x - grabDX - rect.left;
+    const dy = y - grabDY - rect.top;
+    row.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
+  }
+
+  function finishReorgDrag(d) {
+    if (!d.valid) {
+      // Invalid resting spot (self/descendant) -- snap back by simply re-rendering the untouched
+      // working tree, discarding whatever the live DOM move did.
+      renderReorgList();
+      return;
+    }
+    reorgWorkingTree[d.id].parentId = d.targetParentId;
+    // Recompute `order` for every sibling now under that parent (dragged item included) from
+    // their final resting DOM order — same convention Move Entry's finishTileDrag already uses to
+    // persist a live-reflowed order back to storage.
+    Array.from(reorgListEl.querySelectorAll('.reorg-row:not(.reorg-row-home)'))
+      .filter((r) => reorgWorkingTree[r.dataset.id].parentId === d.targetParentId)
+      .forEach((r, i) => { reorgWorkingTree[r.dataset.id].order = i; });
+    renderReorgList();
+  }
+
+  // --- "+ New Category" within the reorg tool: a small dedicated dialog (not the live-site
+  // add-category-overlay) since this needs to write into reorgWorkingTree instead of real
+  // storage, and shouldn't entangle with that dialog's Rename/Sort/Home-Settings branches. ---
+  const reorgNewCategoryOverlay = document.getElementById('reorg-new-category-overlay');
+  const reorgNewCategoryClose = document.getElementById('reorg-new-category-close');
+  const reorgNewCategoryNameInput = document.getElementById('reorg-new-category-name');
+  const reorgNewCategoryError = document.getElementById('reorg-new-category-error');
+  const reorgNewCategorySubmit = document.getElementById('reorg-new-category-submit');
+
+  function openReorgNewCategory() {
+    reorgNewCategoryNameInput.value = '';
+    reorgNewCategoryError.hidden = true;
+    reorgNewCategoryOverlay.hidden = false;
+    reorgNewCategoryNameInput.focus();
+  }
+  function closeReorgNewCategory() {
+    reorgNewCategoryOverlay.hidden = true;
+  }
+  reorgNewCategoryClose.addEventListener('click', closeReorgNewCategory);
+  reorgNewCategoryOverlay.addEventListener('click', (e) => {
+    if (e.target === reorgNewCategoryOverlay) closeReorgNewCategory();
+  });
+  reorgNewCategorySubmit.addEventListener('click', () => {
+    const name = reorgNewCategoryNameInput.value.trim();
+    if (!name) {
+      reorgNewCategoryError.textContent = 'Name required.';
+      reorgNewCategoryError.hidden = false;
+      return;
+    }
+    const isDuplicate = Object.values(reorgWorkingTree).some(
+      (n) => n.parentId === null && n.name.trim().toLowerCase() === name.toLowerCase()
+    );
+    if (isDuplicate) {
+      reorgNewCategoryError.textContent = 'A category named "' + name + '" already exists here.';
+      reorgNewCategoryError.hidden = false;
+      return;
+    }
+    const siblingOrders = Object.values(reorgWorkingTree).filter((n) => n.parentId === null).map((n) => n.order);
+    const order = siblingOrders.length > 0 ? Math.max(...siblingOrders) + 1 : 0;
+    reorgWorkingTree[newCategoryId()] = { name, parentId: null, order, stripeColor: null, createdAt: Date.now() };
+    closeReorgNewCategory();
+    renderReorgList();
+  });
+
   function confirmMoveSelected() {
     if (!selectMode) return;
     const destId = currentLocationId();
@@ -1919,12 +2214,13 @@
     if (n === 0) return;
 
     if (selectMode.kind === 'tile') {
-      const label = n === 1 ? 'this tile' : n + ' tiles';
-      // Only a single-tile delete has one unambiguous element to show below the popup; a batch
-      // delete has no one specific target, so it just top-anchors like any other no-target popup.
+      // Only a single-tile delete has one unambiguous element to show below the popup (and to
+      // name in the confirmation itself); a batch delete has no one specific target, so it just
+      // top-anchors like any other no-target popup and keeps the generic "N tiles" wording.
       const targetEl = n === 1
         ? selectMode.grid.querySelector('[data-tile-id="' + CSS.escape(Array.from(selectMode.selectedIds)[0]) + '"]')
         : null;
+      const label = n === 1 ? 'the ' + targetEl.querySelector('span').textContent + ' tile' : n + ' tiles';
       openTileConfirm('Are you sure you want to remove ' + label + '?', () => {
         // Intentional, permanent easter egg — a 10% chance of a second "really sure?" prompt.
         // Never document or hint at this in user-facing help text. Tile-delete only — categories
@@ -1949,8 +2245,10 @@
       subtreeIds.forEach((id) => { tileCount += loadCategoryTiles(id).length; });
     });
     const combinedTotal = tileCount + subcategoryCount;
-    const label = n === 1 ? 'this category (and everything in it)' : n + ' categories (and everything in them)';
-    const counts = 'You are about to delete ' + tileCount + (tileCount === 1 ? ' item' : ' items')
+    const label = n === 1
+      ? 'the ' + categoryTree[roots[0]].name + ' category (and everything in it)'
+      : n + ' categories (and everything in them)';
+    const counts = 'You are about to delete ' + tileCount + (tileCount === 1 ? ' tile' : ' tiles')
       + ' and ' + subcategoryCount + (subcategoryCount === 1 ? ' subcategory' : ' subcategories')
       + ', for a combined total of ' + combinedTotal + (combinedTotal === 1 ? ' entry.' : ' entries.');
     // Friction scales by whether there are any tiles anywhere in the subtree — zero tiles (even
