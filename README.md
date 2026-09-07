@@ -1192,6 +1192,7 @@ _Backlog of items to get to eventually — not being actively worked on. Promote
 ### Tile Grouping — visual subgroups within a single category
 
 - [ ] Per the user: a category needs the ability to hold visual subgroups within its own tile list — e.g. Free vs. Paid, Groceries vs. Clothing, 3D vs. 2D — with the ability to create and manage them (add/rename/delete a grouping, presumably assign tiles to one). This is distinct from real category/subcategory structure: a grouping is purely a visual divider inside one category's own tile grid, not a nesting level — the Phase 2 Part 3/4 spec docs already referenced this same concept in passing ("cosmetic visual grouping headers," "Insert/Rename/Delete Grouping... a different, simpler system") without ever detailing it, and confirmed via this session's Part 4 review: nothing resembling it exists anywhere in the codebase yet — no data model, no UI, nothing built. Needs its own real spec/design pass before it's buildable — this entry is just to make sure it isn't lost, not a decided design.
+- [ ] **Visual shape, per the user:** a grouping divider is basically a line with a text description (the grouping's name), followed by another line after it — for separation from the tiles above/below, not a heavier box or card treatment.
 
 ### Reassign Stripe Color (category header)
 
