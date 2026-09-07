@@ -1890,7 +1890,9 @@
     name.className = 'reorg-row-name';
     name.textContent = reorgWorkingTree[id].name;
     row.append(handle, name);
-    row.addEventListener('pointerdown', (e) => startReorgDrag(row, id, e));
+    // Gated on the handle, not the whole row -- otherwise every pixel of every row is a drag
+    // target, leaving no empty space to place a finger and just scroll a long list normally.
+    handle.addEventListener('pointerdown', (e) => startReorgDrag(row, id, e));
     return row;
   }
 

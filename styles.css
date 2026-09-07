@@ -1492,7 +1492,6 @@ main {
   background: var(--surface);
   border: 1px solid var(--border);
   margin-bottom: 6px;
-  touch-action: none;
   -webkit-user-select: none;
   user-select: none;
   /* Indentation represents nesting depth — set per-row from script.js, same --depth pattern
@@ -1505,6 +1504,12 @@ main {
   color: var(--fg-muted);
   font-size: 1.1rem;
   cursor: grab;
+  /* Dragging is gated on this handle specifically, not the whole row (script.js) — touch-action
+     stays scoped to match, so the rest of the row (including the name) keeps its default
+     touch-action and scrolls normally instead of every pixel being a drag target. */
+  touch-action: none;
+  padding: 4px 8px;
+  margin: -4px -8px;
 }
 
 .reorg-row-name {
