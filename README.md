@@ -1194,7 +1194,10 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
-_Nothing queued right now — add new bugs, corrections, or feature ideas here as they come up._
+### Bug: can't drag a tile below/into a grouping that has no tiles under it yet
+
+- [ ] Per the user: created 2 new groupings under a category, could not drag-and-drop any tile under either one. **Root cause, found via code review:** Move Entry's drag-reflow (`findNearestTile`/`reflowWithinCurrentGrid`, script.js) only computes proximity to other `.tile` elements — it has no awareness of `.tile-divider` elements' positions at all. A brand-new grouping is appended to the end of the category's tiles array with nothing after it (Build Log 58's design), so there is no tile positioned below the divider for the algorithm to snap next to — "nearest tile" can only ever resolve to something *above* the divider, and the dragged tile can never cross into the empty group below it. This isn't limited to brand-new groupings — any grouping with zero tiles currently under it has the same problem, since the bug is really "the drag target-finding logic doesn't know dividers exist," not anything specific to newness.
+- [ ] Not yet fixed — needs a real design pass on how the reflow logic should treat divider positions (e.g. including dividers as their own drop-target candidates so a tile can be dropped directly against one even with no neighboring tile yet), not a quick patch.
 
 ## Build Planner
 
