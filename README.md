@@ -1194,6 +1194,10 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
+### Swap tile badge corners: info icon to bottom-right, Brazil flag to bottom-left
+
+- [ ] Per the user: the ℹ️ info icon (Build Log 58) should move from the tile's bottom-left corner to bottom-right; the still-unbuilt Brazil-flag badge (Build Planner) should take bottom-left instead of bottom-right. Just a swap of the two positions already decided — `.tile-info-icon` in styles.css currently has `left: 2px; bottom: 2px;` and needs `right: 2px; bottom: 2px;` instead (removing `left`). The Brazil badge Build Planner entry's own "decided visual treatment" note needs updating to say bottom-left, so the two stay documented as not colliding whenever that one gets built.
+
 ### Bug: can't drag a tile below/into a grouping that has no tiles under it yet
 
 - [ ] Per the user: created 2 new groupings under a category, could not drag-and-drop any tile under either one. **Root cause, found via code review:** Move Entry's drag-reflow (`findNearestTile`/`reflowWithinCurrentGrid`, script.js) only computes proximity to other `.tile` elements — it has no awareness of `.tile-divider` elements' positions at all. A brand-new grouping is appended to the end of the category's tiles array with nothing after it (Build Log 58's design), so there is no tile positioned below the divider for the algorithm to snap next to — "nearest tile" can only ever resolve to something *above* the divider, and the dragged tile can never cross into the empty group below it. This isn't limited to brand-new groupings — any grouping with zero tiles currently under it has the same problem, since the bug is really "the drag target-finding logic doesn't know dividers exist," not anything specific to newness.
@@ -1206,7 +1210,7 @@ _Backlog of items to get to eventually — not being actively worked on. Promote
 ### Brazil-flagged item badges
 
 - [ ] The user's real content list includes a "FULL BRAZIL-FLAGGED ITEM LIST" of 15 specific tiles that need some kind of visual flag/badge marker. Neither the Info Blurb addendum nor the Visual Grouping Headers spec covers a badge mechanic — a genuinely new requirement surfaced by reviewing that content, not part of either existing spec.
-- [x] **Visual treatment — decided by the user:** a tiny 🇧🇷 Brazil flag emoji badge in the bottom-right corner of an impacted tile.
+- [x] **Visual treatment — decided by the user:** a tiny 🇧🇷 Brazil flag emoji badge in the bottom-left corner of an impacted tile (swapped from bottom-right — see the corner-swap entry in the Build Queue above, so it doesn't collide with the ℹ️ info icon which is moving to bottom-right).
 - [ ] **Still open, per the user:** how a tile gets *marked* as needing the badge in the first place — no data field, no UI to toggle it, and no decision yet on whether it's a manual per-tile flag or something derived from the content list. Needs its own design pass before this is buildable.
 
 ### Tile Grouping — visual subgroups within a single category
