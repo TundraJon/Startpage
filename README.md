@@ -1183,7 +1183,26 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
-_Nothing queued right now — add new bugs, corrections, or feature ideas here as they come up._
+_Reviewed and spec'd, not yet authorized to build — per the user: "we're not going to build it yet because we need to have you review it all first and then I will let you know when to build after that."_
+
+### Info Blurb Management — Addendum to Phase 2 Part 1
+
+- [ ] Per the supplied addendum doc: each tile can carry a short, optional "best for / use case" blurb (e.g. real examples from the user's content list — eSIMs, AI Chatbots, Fashion subscription styling, Orlando Speakeasies/Hidden Bars — all fit this same short-use-case-text pattern). Data model: a new optional `blurb` field on the tile object (alongside `id`/`name`/`url`/`createdAt`/`lastUsedAt`/`useCount`), backfilled on load the same way `lastUsedAt`/`useCount` were when they were added.
+- [ ] Display mechanism per the addendum: an icon on the tile + tap-to-reveal the blurb text (exact UI not yet built — no icon, no reveal interaction exists in code today).
+- [ ] **Precedence conflict, flagged during review:** the addendum's management flow assumes the old long-press tile-menu popup, which was fully retired in Build 51 and replaced by Organize Mode (long-press → select → bottom action bar). Any blurb editor has to be designed against Organize Mode / the current tile-edit dialog, not the old popup.
+- [ ] **Editing placement — open question, not yet decided.** The user's latest ask was to place editing for "these" (this entry + Visual Grouping Headers below) in the Edit Category dialog next to Sort. Groupings are category-scoped, so that fits directly (see below). Blurbs are tile-scoped, not category-scoped, so it's not yet confirmed whether the user means blurb editing should also live there (e.g. as part of a per-tile edit surface reached from Edit Category) or somewhere tile-specific instead. Needs confirmation before building.
+
+### Visual Grouping Headers — Full Implementation Spec
+
+- [ ] Per the supplied spec: cosmetic-only visual dividers inside a single category's own tile grid (e.g. the user's real Games → RPG → Battle Maps content splits into Free/Paid groups, alphabetized within each group) — **not** real structural subcategories, just a labeled divider line with a second line after it for separation, matching what the user described earlier in this project.
+- [ ] Created via long-press on empty grid space within a category; edited/deleted via long-press directly on the divider itself. Neither empty-grid-space long-press nor divider long-press exists in code today.
+- [ ] Needs new Sort-Alphabetically logic that respects group boundaries (sort within each group, not across the whole category) — the existing Category Sort (Build Log 53) sorts the whole category flat today.
+- [ ] **Editing placement — decided by the user (this message):** grouping management (create/rename/delete a grouping, assign tiles to one) belongs in the **Edit Category dialog**, alongside the existing Sort Tiles feature (Build Log 53) — not a separate long-press-on-empty-space-only flow. Makes sense since groupings, like Sort, are scoped to one category at a time.
+- [ ] Supersedes/absorbs the older, less-detailed "Tile Grouping" Build Planner entry below — see note there.
+
+### New feature surfaced by the real content review — Brazil-flagged item badges
+
+- [ ] The user's real content list includes a "FULL BRAZIL-FLAGGED ITEM LIST" of 15 specific tiles that need some kind of visual flag/badge marker. Neither the Info Blurb addendum nor the Visual Grouping Headers spec covers a badge mechanic — this is a genuinely new requirement surfaced by reviewing the content, not yet spec'd at all (no data field, no visual treatment, no UI decided). Flagging here so it isn't lost; needs its own design pass before it can be scoped, let alone built.
 
 ## Build Planner
 
@@ -1191,8 +1210,7 @@ _Backlog of items to get to eventually — not being actively worked on. Promote
 
 ### Tile Grouping — visual subgroups within a single category
 
-- [ ] Per the user: a category needs the ability to hold visual subgroups within its own tile list — e.g. Free vs. Paid, Groceries vs. Clothing, 3D vs. 2D — with the ability to create and manage them (add/rename/delete a grouping, presumably assign tiles to one). This is distinct from real category/subcategory structure: a grouping is purely a visual divider inside one category's own tile grid, not a nesting level — the Phase 2 Part 3/4 spec docs already referenced this same concept in passing ("cosmetic visual grouping headers," "Insert/Rename/Delete Grouping... a different, simpler system") without ever detailing it, and confirmed via this session's Part 4 review: nothing resembling it exists anywhere in the codebase yet — no data model, no UI, nothing built. Needs its own real spec/design pass before it's buildable — this entry is just to make sure it isn't lost, not a decided design.
-- [ ] **Visual shape, per the user:** a grouping divider is basically a line with a text description (the grouping's name), followed by another line after it — for separation from the tiles above/below, not a heavier box or card treatment.
+- [x] **Superseded by "Visual Grouping Headers — Full Implementation Spec" in the Build Queue above.** This entry was the rough, undetailed version of the same idea; the full spec doc the user later supplied covers everything here (and more — creation/edit interaction, sort-within-group behavior, editing placement) in detail. Left here for history only, not a separate thing to build.
 
 ### Reassign Stripe Color (category header)
 
@@ -1205,6 +1223,7 @@ _Backlog of items to get to eventually — not being actively worked on. Promote
 ### Tile edit/delete (Phase 2 long-press menu)
 
 - [ ] User expected a long-press menu on tiles to delete/edit them; confirmed none exists yet — the Tile Grid System spec explicitly deferred rename/reorder/delete to a separate "Phase 2" document not yet supplied. User's explicit call: wait for that document rather than building a minimal delete-only version now. Promote to Build Queue once that spec arrives.
+- [ ] **Note:** the "Phase 2" document has since arrived (the Info Blurb Management addendum, now in the Build Queue above) but it only covers blurb display/editing, not general tile rename/reorder/delete — Organize Mode (Build 50) already covers delete and move for tiles today. What's still actually missing is per-tile **rename** and (per the addendum) blurb editing. Worth re-scoping this entry once blurb editing placement is settled.
 
 ### Consumers of tile usage statistics: sort-by, reports, unused-tile cleanup
 
