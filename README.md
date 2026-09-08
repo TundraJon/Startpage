@@ -1200,13 +1200,15 @@ _Reviewed and spec'd, not yet authorized to build — per the user: "we're not g
 - [ ] **Editing placement — decided by the user (this message):** grouping management (create/rename/delete a grouping, assign tiles to one) belongs in the **Edit Category dialog**, alongside the existing Sort Tiles feature (Build Log 53) — not a separate long-press-on-empty-space-only flow. Makes sense since groupings, like Sort, are scoped to one category at a time.
 - [ ] Supersedes/absorbs the older, less-detailed "Tile Grouping" Build Planner entry below — see note there.
 
-### New feature surfaced by the real content review — Brazil-flagged item badges
-
-- [ ] The user's real content list includes a "FULL BRAZIL-FLAGGED ITEM LIST" of 15 specific tiles that need some kind of visual flag/badge marker. Neither the Info Blurb addendum nor the Visual Grouping Headers spec covers a badge mechanic — this is a genuinely new requirement surfaced by reviewing the content, not yet spec'd at all (no data field, no visual treatment, no UI decided). Flagging here so it isn't lost; needs its own design pass before it can be scoped, let alone built.
-
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
+
+### Brazil-flagged item badges
+
+- [ ] The user's real content list includes a "FULL BRAZIL-FLAGGED ITEM LIST" of 15 specific tiles that need some kind of visual flag/badge marker. Neither the Info Blurb addendum nor the Visual Grouping Headers spec covers a badge mechanic — a genuinely new requirement surfaced by reviewing that content, not part of either existing spec.
+- [x] **Visual treatment — decided by the user:** a tiny 🇧🇷 Brazil flag emoji badge in the bottom-right corner of an impacted tile.
+- [ ] **Still open, per the user:** how a tile gets *marked* as needing the badge in the first place — no data field, no UI to toggle it, and no decision yet on whether it's a manual per-tile flag or something derived from the content list. Needs its own design pass before this is buildable.
 
 ### Tile Grouping — visual subgroups within a single category
 
