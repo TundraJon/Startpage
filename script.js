@@ -645,6 +645,7 @@
         t.id = newTileId();
         changed = true;
       }
+      if (t.type === 'divider') return; // groupings are cosmetic dividers, not real tiles — no usage-stat/blurb fields
       if (t.createdAt === undefined) {
         t.createdAt = Date.now();
         changed = true;
@@ -655,6 +656,10 @@
       }
       if (t.useCount === undefined) {
         t.useCount = 0;
+        changed = true;
+      }
+      if (t.blurb === undefined) {
+        t.blurb = null;
         changed = true;
       }
     });
@@ -695,7 +700,7 @@
     }
   }
 
-  function buildTileElement(id, name, url) {
+  function buildTileElement(id, name, url, blurb) {
     const a = document.createElement('a');
     a.className = 'tile';
     a.href = url;
@@ -717,6 +722,18 @@
     const span = document.createElement('span');
     span.textContent = name;
     a.appendChild(span);
+
+    // Info Blurb Management: an ℹ️ icon only appears when the tile has a blurb, tapping it reveals
+    // the blurb text instead of navigating — see the icon-aware branch in the click listener below.
+    let infoIcon = null;
+    if (blurb) {
+      infoIcon = document.createElement('span');
+      infoIcon.className = 'tile-info-icon';
+      infoIcon.textContent = 'ℹ️';
+      infoIcon.setAttribute('aria-label', 'Info');
+      a.appendChild(infoIcon);
+    }
+    a.dataset.blurb = blurb || '';
 
     a.addEventListener('contextmenu', (e) => e.preventDefault());
     // Long-press either enters Organize Mode (first press) or, if this tile's grid is already in
@@ -741,6 +758,13 @@
         e.preventDefault();
         e.stopPropagation();
         toggleTileSelected(a);
+        return;
+      }
+      const icon = a.querySelector('.tile-info-icon');
+      if (icon && icon.contains(e.target)) {
+        e.preventDefault();
+        e.stopPropagation();
+        openTileBlurb(a);
         return;
       }
       // Ordinary tap — a real navigation (opens in a new tab via target="_blank", so the current
@@ -779,6 +803,7 @@
   const addTileClose = document.getElementById('add-tile-close');
   const addTileNameInput = document.getElementById('add-tile-name');
   const addTileUrlInput = document.getElementById('add-tile-url');
+  const addTileBlurbInput = document.getElementById('add-tile-blurb');
   const addTileSubmit = document.getElementById('add-tile-submit');
   let addTileTargetGrid = null;
   let addTileTargetCategoryId = null;
@@ -788,6 +813,7 @@
     addTileTargetCategoryId = categoryId;
     addTileNameInput.value = '';
     addTileUrlInput.value = '';
+    addTileBlurbInput.value = '';
     addTileOverlay.hidden = false;
     addTileNameInput.focus();
   }
@@ -808,15 +834,33 @@
     const parsedUrl = normalizeTileUrl(addTileUrlInput.value);
     if (!name || !parsedUrl || !addTileTargetGrid) return;
     const url = parsedUrl.href;
+    const blurb = addTileBlurbInput.value.trim() || null;
     const id = newTileId();
-    const tile = buildTileElement(id, name, url);
+    const tile = buildTileElement(id, name, url, blurb);
     addTileTargetGrid.appendChild(tile);
     updateTileNameWrapClass(tile);
     const tiles = loadCategoryTiles(addTileTargetCategoryId);
-    tiles.push({ id, name, url, createdAt: Date.now(), lastUsedAt: null, useCount: 0 });
+    tiles.push({ id, name, url, blurb, createdAt: Date.now(), lastUsedAt: null, useCount: 0 });
     saveCategoryTiles(addTileTargetCategoryId, tiles);
     closeAddTile();
   });
+
+  // Visual Grouping Headers: a divider is a cosmetic entry stored inline in the same per-category
+  // tiles array (type: 'divider', no url/blurb/usage fields) — purely to mark a boundary in the
+  // grid's own render/storage order, not a real structural subcategory. Reuses data-tile-id so the
+  // existing order-persisting code (reorderGridDom, commitSortPreview, finishTileDrag) already
+  // treats it like any other grid item without special-casing.
+  function buildDividerElement(id, name, categoryId) {
+    const div = document.createElement('div');
+    div.className = 'tile-divider';
+    div.dataset.tileId = id;
+    const label = document.createElement('span');
+    label.className = 'tile-divider-label';
+    label.textContent = name;
+    div.appendChild(label);
+    attachLongPress(div, () => openGroupingEdit(categoryId, id, div), () => selectMode !== null);
+    return div;
+  }
 
   // categoryId -> its own .tile-grid element — used by Move Entry to resolve a cross-category
   // drop target's grid directly, without re-querying the DOM on every drag.
@@ -830,10 +874,19 @@
       const categoryId = grid.closest('.category').dataset.categoryId;
       categoryGrids.set(categoryId, grid);
       loadCategoryTiles(categoryId).forEach((t) => {
-        const tile = buildTileElement(t.id, t.name, t.url);
+        if (t.type === 'divider') {
+          grid.appendChild(buildDividerElement(t.id, t.name, categoryId));
+          return;
+        }
+        const tile = buildTileElement(t.id, t.name, t.url, t.blurb);
         grid.appendChild(tile);
         updateTileNameWrapClass(tile);
       });
+      // Long-press on empty grid space (not on a tile or an existing divider) creates a new
+      // grouping here. shouldSuppress checks the pointerdown's own target rather than just
+      // selectMode, since a press that started on a child tile/divider bubbles up to this same
+      // grid listener too — only a press landing on the grid's own background should arm this.
+      attachLongPress(grid, () => openGroupingCreate(categoryId, grid), (e) => selectMode !== null || (e && e.target !== grid));
     });
   }
 
@@ -923,6 +976,9 @@
   const sortCategoryAlphaBtn = document.getElementById('sort-category-alpha');
   const sortCategoryMostUsedBtn = document.getElementById('sort-category-most-used');
   const sortCategoryLastUsedBtn = document.getElementById('sort-category-last-used');
+  const editCategoryGroupingsSection = document.getElementById('edit-category-groupings-section');
+  const groupingListEl = document.getElementById('grouping-list');
+  const addGroupingBtn = document.getElementById('add-grouping-btn');
   // null while creating a new category; set to an existing category's id while editing one
   // (opened from the select-action-bar's 🔧 Edit button) — same dialog either way, per the
   // decision that Edit reuses the create-category overlay rather than being a separate one.
@@ -948,6 +1004,7 @@
     addCategoryError.hidden = true;
     addCategoryNameSection.hidden = false;
     editCategorySortSection.hidden = true; // a brand-new category has no tiles yet to sort
+    editCategoryGroupingsSection.hidden = true; // ...or groupings to manage
     addCategoryOverlay.hidden = false;
     addCategoryNameInput.focus();
   }
@@ -966,6 +1023,8 @@
     addCategoryError.hidden = true;
     addCategoryNameSection.hidden = false;
     editCategorySortSection.hidden = false;
+    editCategoryGroupingsSection.hidden = false;
+    renderGroupingsList(id);
     addCategoryOverlay.hidden = false;
     addCategoryNameInput.focus();
     const entry = categoryToggles.get(id);
@@ -986,9 +1045,46 @@
     addCategoryError.hidden = true;
     addCategoryNameSection.hidden = true;
     editCategorySortSection.hidden = false;
+    editCategoryGroupingsSection.hidden = false;
+    renderGroupingsList('home');
     addCategoryOverlay.hidden = false;
     scrollTargetBelowPopup(addCategoryOverlay.querySelector('.help-panel'), homeNameEl);
   }
+
+  // Groupings list shown in the Edit Category / Home Settings dialog, alongside Sort Tiles — the
+  // decided placement for grouping management (create/rename/delete), in addition to long-pressing
+  // a grouping/empty grid space directly. Just a thin read-model over the same tiles storage
+  // dividers already live in; re-rendered after every create/rename/delete.
+  function renderGroupingsList(categoryId) {
+    groupingListEl.innerHTML = '';
+    const dividers = loadCategoryTiles(categoryId).filter((t) => t.type === 'divider');
+    dividers.forEach((d) => {
+      const row = document.createElement('div');
+      row.className = 'grouping-row';
+      const name = document.createElement('span');
+      name.className = 'grouping-row-name';
+      name.textContent = d.name;
+      row.appendChild(name);
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'grouping-row-btn';
+      editBtn.setAttribute('aria-label', 'Edit grouping');
+      editBtn.textContent = '✏️';
+      editBtn.addEventListener('click', () => {
+        const grid = categoryGrids.get(categoryId);
+        const dividerEl = grid && grid.querySelector('[data-tile-id="' + CSS.escape(d.id) + '"]');
+        openGroupingEdit(categoryId, d.id, dividerEl);
+      });
+      row.appendChild(editBtn);
+      groupingListEl.appendChild(row);
+    });
+  }
+
+  addGroupingBtn.addEventListener('click', () => {
+    if (!addCategoryTargetId) return;
+    const grid = categoryGrids.get(addCategoryTargetId);
+    if (grid) openGroupingCreate(addCategoryTargetId, grid);
+  });
 
   // Reorders categoryId's grid DOM (not storage) to the given order — used by both the sort
   // preview and its eventual commit, which just persists whatever order the DOM ends up in.
@@ -1001,13 +1097,37 @@
     });
   }
 
+  // Visual Grouping Headers: sorting respects grouping boundaries — dividers never move, and each
+  // run of real tiles between two dividers (or between an end and the nearest divider) is sorted
+  // independently, rather than the comparator seeing across a boundary. A category with no
+  // dividers at all is just one run covering everything, same as before this existed.
+  function sortWithinGroups(items, comparator) {
+    const result = [];
+    let run = [];
+    function flushRun() {
+      run.sort(comparator);
+      result.push(...run);
+      run = [];
+    }
+    items.forEach((item) => {
+      if (item.type === 'divider') {
+        flushRun();
+        result.push(item);
+      } else {
+        run.push(item);
+      }
+    });
+    flushRun();
+    return result;
+  }
+
   // Previews categoryId's own direct tiles in the given order — never cascades into nested
   // subcategories, each level sorts independently if the user wants more than one sorted. Always
   // re-previews from the original pre-sort snapshot (not stacked on top of a prior preview), so
   // switching between sort modes freely is safe. Nothing is saved until Save commits it.
   function applySortPreview(categoryId, comparator) {
     if (!sortPreviewOriginalTiles) return;
-    reorderGridDom(categoryId, sortPreviewOriginalTiles.slice().sort(comparator));
+    reorderGridDom(categoryId, sortWithinGroups(sortPreviewOriginalTiles, comparator));
     sortPreviewDirty = true;
   }
   sortCategoryAlphaBtn.addEventListener('click', () => {
@@ -1031,7 +1151,11 @@
     if (sortPreviewDirty) {
       const grid = categoryGrids.get(categoryId);
       if (grid) {
-        const orderedIds = Array.from(grid.children).filter((c) => c.classList.contains('tile')).map((c) => c.dataset.tileId);
+        // Includes dividers (anything with a data-tile-id, not just .tile) — a plain
+        // classList.contains('tile') filter here would silently drop every grouping from storage
+        // on the very next Sort, since this rewrites the category's whole tiles array from
+        // scratch based on what's read back.
+        const orderedIds = Array.from(grid.children).filter((c) => c.dataset && c.dataset.tileId).map((c) => c.dataset.tileId);
         const tiles = loadCategoryTiles(categoryId);
         const byId = new Map(tiles.map((t) => [t.id, t]));
         saveCategoryTiles(categoryId, orderedIds.map((id) => byId.get(id)).filter(Boolean));
@@ -1182,6 +1306,7 @@
   const tileRenameOverlay = document.getElementById('tile-rename-overlay');
   const tileRenameClose = document.getElementById('tile-rename-close');
   const tileRenameInput = document.getElementById('tile-rename-input');
+  const tileRenameBlurbInput = document.getElementById('tile-rename-blurb');
   const tileRenameSave = document.getElementById('tile-rename-save');
   let tileRenameTargetEl = null;
 
@@ -1199,9 +1324,28 @@
   function openTileRenameFor(tileEl) {
     tileRenameTargetEl = tileEl;
     tileRenameInput.value = tileEl.querySelector('span').textContent;
+    tileRenameBlurbInput.value = tileEl.dataset.blurb || '';
     tileRenameOverlay.hidden = false;
     tileRenameInput.focus();
     scrollTargetBelowPopup(tileRenameOverlay.querySelector('.help-panel'), tileEl);
+  }
+
+  // Adds/removes/updates the ℹ️ icon on a live tile element to match its current blurb — shared by
+  // Edit Tile's save handler here (the only place a tile's blurb can change after creation).
+  function updateTileInfoIcon(tileEl, blurb) {
+    tileEl.dataset.blurb = blurb || '';
+    let icon = tileEl.querySelector('.tile-info-icon');
+    if (blurb) {
+      if (!icon) {
+        icon = document.createElement('span');
+        icon.className = 'tile-info-icon';
+        icon.textContent = 'ℹ️';
+        icon.setAttribute('aria-label', 'Info');
+        tileEl.appendChild(icon);
+      }
+    } else if (icon) {
+      icon.remove();
+    }
   }
 
   tileRenameSave.addEventListener('click', () => {
@@ -1209,17 +1353,141 @@
     if (!tileEl) return;
     const newName = tileRenameInput.value.trim();
     if (!newName) return;
+    const newBlurb = tileRenameBlurbInput.value.trim() || null;
     const categoryId = tileEl.closest('.category').dataset.categoryId;
     const tileId = tileEl.dataset.tileId;
     const tiles = loadCategoryTiles(categoryId);
     const entry = tiles.find((t) => t.id === tileId);
     if (entry) {
       entry.name = newName;
+      entry.blurb = newBlurb;
       saveCategoryTiles(categoryId, tiles);
     }
     tileEl.querySelector('span').textContent = newName;
     updateTileNameWrapClass(tileEl);
+    updateTileInfoIcon(tileEl, newBlurb);
     closeTileRename();
+  });
+
+  // Info Blurb Management: tapping a tile's ℹ️ icon reveals its blurb text instead of navigating —
+  // reuses the same full-screen .help-overlay pattern as every other popup in the app.
+  const tileBlurbOverlay = document.getElementById('tile-blurb-overlay');
+  const tileBlurbClose = document.getElementById('tile-blurb-close');
+  const tileBlurbName = document.getElementById('tile-blurb-name');
+  const tileBlurbText = document.getElementById('tile-blurb-text');
+
+  function openTileBlurb(tileEl) {
+    tileBlurbName.textContent = tileEl.querySelector('span').textContent;
+    tileBlurbText.textContent = tileEl.dataset.blurb || '';
+    tileBlurbOverlay.hidden = false;
+    scrollTargetBelowPopup(tileBlurbOverlay.querySelector('.help-panel'), tileEl);
+  }
+  function closeTileBlurb() {
+    tileBlurbOverlay.hidden = true;
+  }
+  tileBlurbClose.addEventListener('click', closeTileBlurb);
+  tileBlurbOverlay.addEventListener('click', (e) => {
+    if (e.target === tileBlurbOverlay) closeTileBlurb();
+  });
+
+  // Visual Grouping Headers: create/rename/delete a grouping (cosmetic divider). One dialog for
+  // both create and edit, same pattern as Edit Category reusing Add Category's own overlay.
+  // groupingTargetId is null while creating a new grouping, set to the divider's id while editing.
+  const groupingOverlay = document.getElementById('grouping-overlay');
+  const groupingClose = document.getElementById('grouping-close');
+  const groupingTitleEl = document.getElementById('grouping-title');
+  const groupingNameInput = document.getElementById('grouping-name-input');
+  const groupingError = document.getElementById('grouping-error');
+  const groupingSaveBtn = document.getElementById('grouping-save-btn');
+  const groupingDeleteBtn = document.getElementById('grouping-delete-btn');
+  let groupingTargetCategoryId = null;
+  let groupingTargetGrid = null;
+  let groupingTargetId = null;
+
+  function openGroupingCreate(categoryId, grid) {
+    groupingTargetCategoryId = categoryId;
+    groupingTargetGrid = grid;
+    groupingTargetId = null;
+    groupingTitleEl.textContent = 'New Grouping';
+    groupingNameInput.value = '';
+    groupingError.hidden = true;
+    groupingDeleteBtn.hidden = true;
+    groupingOverlay.hidden = false;
+    groupingNameInput.focus();
+  }
+
+  function openGroupingEdit(categoryId, dividerId, dividerEl) {
+    const tiles = loadCategoryTiles(categoryId);
+    const entry = tiles.find((t) => t.id === dividerId && t.type === 'divider');
+    if (!entry) return;
+    groupingTargetCategoryId = categoryId;
+    groupingTargetGrid = categoryGrids.get(categoryId) || null;
+    groupingTargetId = dividerId;
+    groupingTitleEl.textContent = 'Edit Grouping';
+    groupingNameInput.value = entry.name;
+    groupingError.hidden = true;
+    groupingDeleteBtn.hidden = false;
+    groupingOverlay.hidden = false;
+    groupingNameInput.focus();
+    scrollTargetBelowPopup(groupingOverlay.querySelector('.help-panel'), dividerEl);
+  }
+
+  function closeGrouping() {
+    groupingOverlay.hidden = true;
+    groupingTargetCategoryId = null;
+    groupingTargetGrid = null;
+    groupingTargetId = null;
+  }
+  groupingClose.addEventListener('click', closeGrouping);
+  groupingOverlay.addEventListener('click', (e) => {
+    if (e.target === groupingOverlay) closeGrouping();
+  });
+
+  groupingSaveBtn.addEventListener('click', () => {
+    const name = groupingNameInput.value.trim();
+    if (!name) {
+      groupingError.textContent = 'Name required.';
+      groupingError.hidden = false;
+      return;
+    }
+    if (!groupingTargetCategoryId) return;
+    const tiles = loadCategoryTiles(groupingTargetCategoryId);
+    if (groupingTargetId) {
+      const entry = tiles.find((t) => t.id === groupingTargetId && t.type === 'divider');
+      if (entry) {
+        entry.name = name;
+        saveCategoryTiles(groupingTargetCategoryId, tiles);
+        const dividerEl = groupingTargetGrid && groupingTargetGrid.querySelector('[data-tile-id="' + CSS.escape(groupingTargetId) + '"]');
+        if (dividerEl) dividerEl.querySelector('.tile-divider-label').textContent = name;
+      }
+    } else if (groupingTargetGrid) {
+      const id = newTileId();
+      tiles.push({ id, type: 'divider', name, createdAt: Date.now() });
+      saveCategoryTiles(groupingTargetCategoryId, tiles);
+      groupingTargetGrid.appendChild(buildDividerElement(id, name, groupingTargetCategoryId));
+    }
+    renderGroupingsList(groupingTargetCategoryId);
+    closeGrouping();
+  });
+
+  groupingDeleteBtn.addEventListener('click', () => {
+    if (!groupingTargetCategoryId || !groupingTargetId) return;
+    const categoryId = groupingTargetCategoryId;
+    const dividerId = groupingTargetId;
+    const name = groupingNameInput.value.trim();
+    // Closes the grouping dialog first — tile-confirm-overlay shares the base .help-overlay
+    // z-index, so left open behind it the confirm would be visually stuck underneath and
+    // unusable, the same stacking issue #grouping-overlay's own z-index bump solves relative to
+    // Edit Category.
+    closeGrouping();
+    openTileConfirm('Are you sure you want to remove the "' + name + '" grouping? Tiles in it won\'t be deleted.', () => {
+      const tiles = loadCategoryTiles(categoryId).filter((t) => t.id !== dividerId);
+      saveCategoryTiles(categoryId, tiles);
+      const grid = categoryGrids.get(categoryId);
+      const dividerEl = grid && grid.querySelector('[data-tile-id="' + CSS.escape(dividerId) + '"]');
+      if (dividerEl) dividerEl.remove();
+      renderGroupingsList(categoryId);
+    }, {});
   });
 
   function attachLongPress(el, callback, shouldSuppress) {
@@ -1238,7 +1506,7 @@
     }
 
     el.addEventListener('pointerdown', (e) => {
-      if (shouldSuppress && shouldSuppress()) return;
+      if (shouldSuppress && shouldSuppress(e)) return;
       // Suppresses the browser's own native drag-initiation (relevant for tiles, real <a> links)
       // and text-selection/focus-on-mousedown — without this, a would-be long-press that instead
       // turns into quick movement (or the separate touch-and-drag that arms Move Entry, see
@@ -1507,10 +1775,12 @@
     info.tileEl.classList.remove('move-dragging', 'move-grabbed');
 
     // Same-category reorder only — cross-category moves go through Select/Cut+Paste instead, so
-    // this is always just persisting the live DOM order back to storage.
+    // this is always just persisting the live DOM order back to storage. Includes dividers
+    // (anything with a data-tile-id, not just .tile) so a plain tile drag never drops a grouping
+    // from storage — see the identical note on commitSortPreview.
     const sourceCategoryId = info.grid.closest('.category').dataset.categoryId;
     const orderedIds = Array.from(info.grid.children)
-      .filter((c) => c.classList.contains('tile'))
+      .filter((c) => c.dataset && c.dataset.tileId)
       .map((c) => c.dataset.tileId);
     const tiles = loadCategoryTiles(sourceCategoryId);
     const byId = new Map(tiles.map((t) => [t.id, t]));

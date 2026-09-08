@@ -407,6 +407,7 @@ main {
    itself stays full width now; only the title text indents. */
 
 .tile {
+  position: relative;
   aspect-ratio: 1 / 1;
   display: flex;
   flex-direction: column;
@@ -424,6 +425,40 @@ main {
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
+}
+
+/* Info Blurb Management: ℹ️ badge, bottom-left corner — bottom-right is reserved for the
+   Brazil-flag badge (Build Planner, not yet built), so the two never collide on the same tile. */
+.tile-info-icon {
+  position: absolute;
+  left: 2px;
+  bottom: 2px;
+  font-size: 0.6rem;
+  line-height: 1;
+  background: var(--bg);
+  border-radius: 50%;
+  padding: 1px;
+}
+
+/* Visual Grouping Headers: a cosmetic divider inside one category's tile grid — spans the full
+   grid width (not a grid cell of its own) so it reads as a section break, not a tile. Per the
+   user: "basically just a line with a text description, followed by another line after it." */
+.tile-divider {
+  grid-column: 1 / -1;
+  padding: 6px 2px 4px;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.tile-divider-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--fg-muted);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
 }
 
 .tile img {
@@ -1585,4 +1620,42 @@ main {
 /* Above #reorg-view's own 300, since this dialog needs to appear on top of it while open. */
 #reorg-new-category-overlay {
   z-index: 310;
+}
+
+/* Visual Grouping Headers: management list in the Edit Category dialog, alongside Sort Tiles. */
+.grouping-list {
+  margin-bottom: 8px;
+}
+
+.grouping-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.grouping-row-name {
+  flex: 1;
+  font-size: 0.9rem;
+}
+
+.grouping-row-btn {
+  border: none;
+  background: none;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.grouping-add-btn {
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* Above .help-overlay's base 200 — this dialog can be opened from within the Edit Category
+   dialog (also a .help-overlay), and needs to appear on top of it while open. */
+#grouping-overlay {
+  z-index: 210;
 }

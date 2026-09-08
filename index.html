@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home</title>
-<link rel="stylesheet" href="styles.css?v=39">
+<link rel="stylesheet" href="styles.css?v=40">
 </head>
 <body>
 
@@ -476,6 +476,7 @@
     <section class="options-section">
       <div class="option-row"><span>Name</span><input type="text" id="add-tile-name" autocomplete="off" placeholder="Site name" style="width: 55%; min-width: 0;"></div>
       <div class="option-row"><span>URL</span><input type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" id="add-tile-url" autocomplete="off" placeholder="example.com" style="width: 55%; min-width: 0;"></div>
+      <div class="option-row"><span>Blurb</span><input type="text" id="add-tile-blurb" autocomplete="off" placeholder="Best for... (optional)" style="width: 55%; min-width: 0;"></div>
     </section>
     <button type="button" class="testing-reset-btn" id="add-tile-submit">Add Tile</button>
   </div>
@@ -506,6 +507,11 @@
         <button type="button" class="category-sort-btn" id="sort-category-most-used">Most Used</button>
         <button type="button" class="category-sort-btn" id="sort-category-last-used">Last Used</button>
       </div>
+    </section>
+    <section class="options-section" id="edit-category-groupings-section" hidden>
+      <h3>Groupings</h3>
+      <div class="grouping-list" id="grouping-list"></div>
+      <button type="button" class="category-sort-btn grouping-add-btn" id="add-grouping-btn">+ New Grouping</button>
     </section>
     <p class="add-category-error" id="add-category-error" hidden></p>
     <button type="button" class="testing-reset-btn" id="add-category-submit">Add Category</button>
@@ -538,11 +544,33 @@
 <div class="help-overlay" id="tile-rename-overlay" hidden>
   <div class="help-panel options-panel">
     <button class="help-close" id="tile-rename-close" aria-label="Close rename">&times;</button>
-    <h2>Rename Tile</h2>
+    <h2>Edit Tile</h2>
     <section class="options-section">
       <div class="option-row"><span>Name</span><input type="text" id="tile-rename-input" autocomplete="off" style="width: 55%; min-width: 0;"></div>
+      <div class="option-row"><span>Blurb</span><input type="text" id="tile-rename-blurb" autocomplete="off" placeholder="Best for... (optional)" style="width: 55%; min-width: 0;"></div>
     </section>
     <button type="button" class="testing-reset-btn" id="tile-rename-save">Save</button>
+  </div>
+</div>
+
+<div class="help-overlay" id="tile-blurb-overlay" hidden>
+  <div class="help-panel options-panel">
+    <button class="help-close" id="tile-blurb-close" aria-label="Close">&times;</button>
+    <h2 id="tile-blurb-name"></h2>
+    <p id="tile-blurb-text"></p>
+  </div>
+</div>
+
+<div class="help-overlay" id="grouping-overlay" hidden>
+  <div class="help-panel options-panel">
+    <button class="help-close" id="grouping-close" aria-label="Close">&times;</button>
+    <h2 id="grouping-title">New Grouping</h2>
+    <section class="options-section">
+      <div class="option-row"><span>Name</span><input type="text" id="grouping-name-input" autocomplete="off" placeholder="e.g. Free" style="width: 55%; min-width: 0;"></div>
+    </section>
+    <p class="add-category-error" id="grouping-error" hidden></p>
+    <button type="button" class="testing-reset-btn" id="grouping-save-btn">Save</button>
+    <button type="button" class="testing-reset-btn" id="grouping-delete-btn" hidden>Delete Grouping</button>
   </div>
 </div>
 
@@ -570,6 +598,6 @@
   </div>
 </div>
 
-<script src="script.js?v=44"></script>
+<script src="script.js?v=45"></script>
 </body>
 </html>
