@@ -1222,6 +1222,14 @@
       node.name = name;
       saveCategoryTree(categoryTree);
       commitSortPreview(targetId);
+      // Reorg Tree Tool's Properties button opens this same dialog and edits the live category
+      // right away (per the user's decision), while the tool's own working-copy clone is a
+      // separate object — without this, the Reorg list would keep showing the pre-rename name
+      // until Save/reopen even though the live rename already took effect.
+      if (reorgWorkingTree && reorgWorkingTree[targetId]) {
+        reorgWorkingTree[targetId].name = name;
+        if (!reorgView.hidden) renderReorgList();
+      }
       rebuildCategoriesAndTiles();
       closeAddCategory();
       return;
@@ -1627,20 +1635,34 @@
     finishTileDrag();
   }
 
-  function findNearestTile(grid, excludeEl, x, y) {
-    const tiles = Array.from(grid.children).filter(
-      (c) => c.classList.contains('tile') && c !== excludeEl
-    );
+  // Candidates are both .tile and .tile-divider siblings — a grouping with nothing under it yet
+  // used to be a dead end for dragging (dividers were invisible to this search entirely, so a
+  // tile could never be dropped past one with no neighboring tile to snap against). Tiles still
+  // use plain center-to-center distance, unchanged from before dividers existed; a divider spans
+  // the grid's full width, so its own "center" is a meaningless fixed horizontal point — it uses
+  // distance to the closest point on its own box instead, which collapses to a vertical-only
+  // distance whenever the pointer's x is anywhere within the grid (always true), so a drag
+  // anywhere across the row still finds it once vertically close.
+  function nearestPointDistSq(rect, x, y) {
+    const cx = Math.max(rect.left, Math.min(x, rect.right));
+    const cy = Math.max(rect.top, Math.min(y, rect.bottom));
+    return (cx - x) * (cx - x) + (cy - y) * (cy - y);
+  }
+
+  function findNearestDropTarget(grid, excludeEl, x, y) {
     let nearest = null;
     let nearestDist = Infinity;
-    tiles.forEach((t) => {
-      const r = t.getBoundingClientRect();
-      const dx = r.left + r.width / 2 - x;
-      const dy = r.top + r.height / 2 - y;
-      const dist = dx * dx + dy * dy;
+    Array.from(grid.children).forEach((c) => {
+      if (c === excludeEl) return;
+      const isDivider = c.classList.contains('tile-divider');
+      if (!isDivider && !c.classList.contains('tile')) return;
+      const r = c.getBoundingClientRect();
+      const dist = isDivider
+        ? nearestPointDistSq(r, x, y)
+        : (r.left + r.width / 2 - x) * (r.left + r.width / 2 - x) + (r.top + r.height / 2 - y) * (r.top + r.height / 2 - y);
       if (dist < nearestDist) {
         nearestDist = dist;
-        nearest = t;
+        nearest = c;
       }
     });
     return nearest;
@@ -1652,7 +1674,7 @@
   // actually get dispatched.
   function reflowWithinCurrentGrid(x, y) {
     const grid = dragInfo.grid;
-    const nearest = findNearestTile(grid, dragInfo.tileEl, x, y);
+    const nearest = findNearestDropTarget(grid, dragInfo.tileEl, x, y);
     if (!nearest) return;
     dragInfo.tileEl.style.transform = 'none';
     const ownRect = dragInfo.tileEl.getBoundingClientRect();
@@ -1660,16 +1682,16 @@
     const ownCy = ownRect.top + ownRect.height / 2;
     const distToOwnSq = (ownCx - x) * (ownCx - x) + (ownCy - y) * (ownCy - y);
     const nr = nearest.getBoundingClientRect();
-    const ncx = nr.left + nr.width / 2;
-    const ncy = nr.top + nr.height / 2;
-    const distToNearestSq = (ncx - x) * (ncx - x) + (ncy - y) * (ncy - y);
+    const distToNearestSq = nearest.classList.contains('tile-divider')
+      ? nearestPointDistSq(nr, x, y)
+      : (nr.left + nr.width / 2 - x) * (nr.left + nr.width / 2 - x) + (nr.top + nr.height / 2 - y) * (nr.top + nr.height / 2 - y);
     // Only reorder when the pointer is genuinely closer to the candidate's slot than to the
     // dragged tile's own current slot. With very few siblings (e.g. exactly one other tile in
     // the category), "nearest" is otherwise trivially always that same tile regardless of real
     // proximity, which would flip the order back and forth on every single move event.
     if (distToNearestSq < distToOwnSq) {
       const siblings = Array.from(grid.children).filter(
-        (c) => c.classList.contains('tile')
+        (c) => c.classList.contains('tile') || c.classList.contains('tile-divider')
       );
       const draggedIndex = siblings.indexOf(dragInfo.tileEl);
       const targetIndex = siblings.indexOf(nearest);
@@ -2065,8 +2087,23 @@
   const reorgListEl = document.getElementById('reorg-list');
   const reorgCancelBtn = document.getElementById('reorg-cancel-btn');
   const reorgSaveBtn = document.getElementById('reorg-save-btn');
+  const reorgPropertiesBtn = document.getElementById('reorg-properties-btn');
+  const reorgNewCategoryBtn = document.getElementById('reorg-new-category-btn');
+  const reorgNewSubcategoryBtn = document.getElementById('reorg-new-subcategory-btn');
+  const reorgRemoveCategoryBtn = document.getElementById('reorg-remove-category-btn');
+  const reorgMoveUpBtn = document.getElementById('reorg-move-up-btn');
+  const reorgMoveDownBtn = document.getElementById('reorg-move-down-btn');
   let reorgWorkingTree = null;
   let reorgDrag = null;
+  // Single-select — tap a row to select it (toggles off on a second tap), never Home. The
+  // toolbar/move buttons all act on whichever id this is; null means nothing's selected and they
+  // stay disabled. Reset on every tool open/close.
+  let reorgSelectedId = null;
+  // Per-session only (not persisted, not part of reorgWorkingTree) — which categories currently
+  // have their subtree tucked away. Purely a render concern: collapsing/expanding never touches
+  // parentId/order, so a drag that moves a collapsed row still correctly carries its (hidden)
+  // subtree along, since the hidden descendants' own parentId is untouched.
+  let reorgCollapsedIds = null;
 
   function reorgChildren(parentId) {
     return Object.keys(reorgWorkingTree)
@@ -2082,13 +2119,14 @@
 
   // Depth-first flat order matching how the live accordion itself walks categoryChildren — this
   // is both the render order and, via each row's live DOM position, the source of truth read back
-  // when a drag finishes.
+  // when a drag finishes. Skips walking into a collapsed id's own children (the row itself still
+  // renders) — collapse is render-only, so this never touches the underlying data.
   function reorgFlattenTree() {
     const out = [];
     (function walk(parentId, depth) {
       reorgChildren(parentId).forEach((id) => {
         out.push({ id, depth });
-        walk(id, depth + 1);
+        if (!reorgCollapsedIds.has(id)) walk(id, depth + 1);
       });
     })(null, 0);
     return out;
@@ -2097,6 +2135,8 @@
   function openReorgTool() {
     closeSettings();
     reorgWorkingTree = JSON.parse(JSON.stringify(categoryTree));
+    reorgSelectedId = null;
+    reorgCollapsedIds = new Set(); // starts fully expanded every time the tool opens
     reorgView.hidden = false;
     renderReorgList();
   }
@@ -2104,11 +2144,21 @@
   function closeReorgTool() {
     reorgView.hidden = true;
     reorgWorkingTree = null;
+    reorgSelectedId = null;
+    reorgCollapsedIds = null;
   }
 
   document.getElementById('open-reorg-btn').addEventListener('click', openReorgTool);
   reorgCancelBtn.addEventListener('click', closeReorgTool);
   reorgSaveBtn.addEventListener('click', () => {
+    // A category removed via Remove Category during this session only ever left reorgWorkingTree
+    // (see reorgRemoveCategoryBtn below) — its live tile storage stays untouched until this exact
+    // moment, so Cancel could still fully back out of the removal. Anything that existed in the
+    // real tree before this session but isn't in the final working tree was removed; clean up its
+    // tiles now, the same way the live Organize-Mode category delete already does.
+    Object.keys(categoryTree).forEach((id) => {
+      if (!reorgWorkingTree[id]) localStorage.removeItem(TILE_STORAGE_PREFIX + id);
+    });
     Object.keys(categoryTree).forEach((k) => delete categoryTree[k]);
     Object.assign(categoryTree, reorgWorkingTree);
     saveCategoryTree(categoryTree);
@@ -2132,20 +2182,22 @@
     const homeHandle = document.createElement('span');
     homeHandle.className = 'reorg-row-handle';
     homeHandle.textContent = '🔒';
+    // Empty spacer, same as a leaf category's — keeps Home's name aligned with every other row's,
+    // even though Home itself never gets a real collapse arrow (non-interactive, per the rest of
+    // this row).
+    const homeArrow = document.createElement('span');
+    homeArrow.className = 'reorg-row-arrow reorg-row-arrow-empty';
     const homeName = document.createElement('span');
     homeName.className = 'reorg-row-name';
     homeName.textContent = 'Home';
-    homeRow.append(homeHandle, homeName);
+    homeRow.append(homeHandle, homeArrow, homeName);
     reorgListEl.appendChild(homeRow);
 
     reorgFlattenTree().forEach(({ id, depth }) => reorgListEl.appendChild(buildReorgRow(id, depth)));
 
-    const newBtn = document.createElement('button');
-    newBtn.type = 'button';
-    newBtn.className = 'reorg-row-new';
-    newBtn.textContent = '+ New Category';
-    newBtn.addEventListener('click', openReorgNewCategory);
-    reorgListEl.appendChild(newBtn);
+    // Creation now lives only in the toolbar's New Category / New Subcategory buttons — the old
+    // in-list "+ New Category" row is gone, folded into New Category there.
+    updateReorgToolbar();
   }
 
   function buildReorgRow(id, depth) {
@@ -2153,17 +2205,83 @@
     row.className = 'reorg-row';
     row.dataset.id = id;
     row.style.setProperty('--depth', depth);
+    if (id === reorgSelectedId) row.classList.add('reorg-row-selected');
     const handle = document.createElement('span');
     handle.className = 'reorg-row-handle';
     handle.textContent = '☰';
+    const hasChildren = reorgChildren(id).length > 0;
+    const arrow = document.createElement('button');
+    arrow.type = 'button';
+    if (hasChildren) {
+      arrow.className = 'reorg-row-arrow';
+      const collapsed = reorgCollapsedIds.has(id);
+      arrow.textContent = collapsed ? '▶' : '▼';
+      arrow.setAttribute('aria-label', collapsed ? 'Expand' : 'Collapse');
+      arrow.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (reorgCollapsedIds.has(id)) reorgCollapsedIds.delete(id);
+        else reorgCollapsedIds.add(id);
+        renderReorgList();
+      });
+    } else {
+      // A leaf still reserves the arrow's own column (invisible) so every row's name lines up at
+      // the same starting point, matching the mock-up (arrows only next to rows that have them,
+      // but names still align).
+      arrow.className = 'reorg-row-arrow reorg-row-arrow-empty';
+      arrow.disabled = true;
+      arrow.tabIndex = -1;
+    }
     const name = document.createElement('span');
     name.className = 'reorg-row-name';
     name.textContent = reorgWorkingTree[id].name;
-    row.append(handle, name);
+    row.append(handle, arrow, name);
     // Gated on the handle, not the whole row -- otherwise every pixel of every row is a drag
     // target, leaving no empty space to place a finger and just scroll a long list normally.
     handle.addEventListener('pointerdown', (e) => startReorgDrag(row, id, e));
+    // Tap-to-select (toggles off on a second tap of the same row) — excludes the handle and arrow,
+    // which each own their own gesture already.
+    row.addEventListener('click', (e) => {
+      if (handle.contains(e.target) || arrow.contains(e.target)) return;
+      reorgSelectedId = reorgSelectedId === id ? null : id;
+      updateReorgSelectionUI();
+    });
     return row;
+  }
+
+  // Keeps the selected row's highlight and every toolbar/move button's enabled state in sync with
+  // reorgSelectedId — called after every selection change and folded into renderReorgList (via
+  // updateReorgToolbar) after every re-render, since a re-render rebuilds all rows from scratch.
+  function updateReorgSelectionUI() {
+    reorgListEl.querySelectorAll('.reorg-row').forEach((r) => {
+      r.classList.toggle('reorg-row-selected', r.dataset.id === reorgSelectedId);
+    });
+    updateReorgToolbar();
+  }
+
+  function reorgSiblingsOf(id) {
+    const node = reorgWorkingTree[id];
+    if (!node) return [];
+    return reorgChildren(node.parentId);
+  }
+
+  function updateReorgToolbar() {
+    const hasSelection = reorgSelectedId !== null;
+    // Properties edits the LIVE category right away (per the user's decision) — a category
+    // created this session only exists in reorgWorkingTree until Save, so Properties has nothing
+    // real to edit yet and stays disabled for it.
+    reorgPropertiesBtn.disabled = !hasSelection || !categoryTree[reorgSelectedId];
+    reorgNewSubcategoryBtn.disabled = !hasSelection;
+    reorgRemoveCategoryBtn.disabled = !hasSelection;
+    let isFirst = true;
+    let isLast = true;
+    if (hasSelection) {
+      const siblings = reorgSiblingsOf(reorgSelectedId);
+      const idx = siblings.indexOf(reorgSelectedId);
+      isFirst = idx <= 0;
+      isLast = idx === -1 || idx === siblings.length - 1;
+    }
+    reorgMoveUpBtn.disabled = !hasSelection || isFirst;
+    reorgMoveDownBtn.disabled = !hasSelection || isLast;
   }
 
   const REORG_DRAG_ARM_PX = 12; // smaller than tiles' 20px -- these rows have no competing tap action
@@ -2299,16 +2417,22 @@
     renderReorgList();
   }
 
-  // --- "+ New Category" within the reorg tool: a small dedicated dialog (not the live-site
+  // --- New Category / New Subcategory (toolbar): a small dedicated dialog (not the live-site
   // add-category-overlay) since this needs to write into reorgWorkingTree instead of real
-  // storage, and shouldn't entangle with that dialog's Rename/Sort/Home-Settings branches. ---
+  // storage, and shouldn't entangle with that dialog's Rename/Sort/Home-Settings branches. Same
+  // dialog serves both — reorgNewCategoryParentId is null for New Category (top-level, matches
+  // the old behavior), or the selected row's id for New Subcategory. ---
   const reorgNewCategoryOverlay = document.getElementById('reorg-new-category-overlay');
   const reorgNewCategoryClose = document.getElementById('reorg-new-category-close');
+  const reorgNewCategoryTitleEl = document.getElementById('reorg-new-category-title');
   const reorgNewCategoryNameInput = document.getElementById('reorg-new-category-name');
   const reorgNewCategoryError = document.getElementById('reorg-new-category-error');
   const reorgNewCategorySubmit = document.getElementById('reorg-new-category-submit');
+  let reorgNewCategoryParentId = null;
 
-  function openReorgNewCategory() {
+  function openReorgNewCategory(parentId) {
+    reorgNewCategoryParentId = parentId;
+    reorgNewCategoryTitleEl.textContent = parentId ? 'New Subcategory' : 'New Category';
     reorgNewCategoryNameInput.value = '';
     reorgNewCategoryError.hidden = true;
     reorgNewCategoryOverlay.hidden = false;
@@ -2321,6 +2445,10 @@
   reorgNewCategoryOverlay.addEventListener('click', (e) => {
     if (e.target === reorgNewCategoryOverlay) closeReorgNewCategory();
   });
+  reorgNewCategoryBtn.addEventListener('click', () => openReorgNewCategory(null));
+  reorgNewSubcategoryBtn.addEventListener('click', () => {
+    if (reorgSelectedId) openReorgNewCategory(reorgSelectedId);
+  });
   reorgNewCategorySubmit.addEventListener('click', () => {
     const name = reorgNewCategoryNameInput.value.trim();
     if (!name) {
@@ -2328,20 +2456,76 @@
       reorgNewCategoryError.hidden = false;
       return;
     }
+    const parentId = reorgNewCategoryParentId;
     const isDuplicate = Object.values(reorgWorkingTree).some(
-      (n) => n.parentId === null && n.name.trim().toLowerCase() === name.toLowerCase()
+      (n) => n.parentId === parentId && n.name.trim().toLowerCase() === name.toLowerCase()
     );
     if (isDuplicate) {
       reorgNewCategoryError.textContent = 'A category named "' + name + '" already exists here.';
       reorgNewCategoryError.hidden = false;
       return;
     }
-    const siblingOrders = Object.values(reorgWorkingTree).filter((n) => n.parentId === null).map((n) => n.order);
+    const siblingOrders = Object.values(reorgWorkingTree).filter((n) => n.parentId === parentId).map((n) => n.order);
     const order = siblingOrders.length > 0 ? Math.max(...siblingOrders) + 1 : 0;
-    reorgWorkingTree[newCategoryId()] = { name, parentId: null, order, stripeColor: null, createdAt: Date.now() };
+    reorgWorkingTree[newCategoryId()] = { name, parentId, order, stripeColor: null, createdAt: Date.now() };
+    // A New Subcategory needs its new parent expanded to actually see it appear.
+    if (parentId) reorgCollapsedIds.delete(parentId);
     closeReorgNewCategory();
     renderReorgList();
   });
+
+  // --- Properties: opens the existing, live Edit Category dialog for the selected category —
+  // per the user's decision, edits the live category right away, not this tool's own draft. See
+  // the addCategorySubmit handler for the working-copy name sync this requires. ---
+  reorgPropertiesBtn.addEventListener('click', () => {
+    if (reorgSelectedId && categoryTree[reorgSelectedId]) openEditCategory(reorgSelectedId);
+  });
+
+  // --- Remove Category: deletes the selected category (and its subtree) from the working copy
+  // only — live tile storage isn't touched until Save (see reorgSaveBtn), so this stays fully
+  // undoable by Cancel like everything else in this tool. Same named-item + impact-count
+  // confirmation as the live Organize Mode category delete, reusing that same dialog. ---
+  reorgRemoveCategoryBtn.addEventListener('click', () => {
+    if (!reorgSelectedId) return;
+    const id = reorgSelectedId;
+    const node = reorgWorkingTree[id];
+    if (!node) return;
+    const subtreeIds = reorgSubtreeIds(id);
+    const subcategoryCount = subtreeIds.length - 1; // exclude the root itself
+    let tileCount = 0;
+    subtreeIds.forEach((sid) => { tileCount += loadCategoryTiles(sid).length; });
+    const combinedTotal = tileCount + subcategoryCount;
+    const counts = 'You are about to delete ' + tileCount + (tileCount === 1 ? ' tile' : ' tiles')
+      + ' and ' + subcategoryCount + (subcategoryCount === 1 ? ' subcategory' : ' subcategories')
+      + ', for a combined total of ' + combinedTotal + (combinedTotal === 1 ? ' entry.' : ' entries.');
+    const rowEl = reorgListEl.querySelector('[data-id="' + CSS.escape(id) + '"]');
+    openTileConfirm('Are you sure you want to remove the ' + node.name + ' category (and everything in it)?', () => {
+      subtreeIds.forEach((sid) => delete reorgWorkingTree[sid]);
+      reorgSelectedId = null;
+      renderReorgList();
+    }, {
+      counts: combinedTotal > 0 ? counts : null,
+      requireTypedYes: tileCount > 0,
+      targetEl: rowEl,
+    });
+  });
+
+  // --- Category Up / Category Down: moves the selected category among its own siblings only
+  // (same parent) by swapping `order` with its neighbor — an alternative to dragging, not a
+  // replacement. No-ops at either end of the sibling group (buttons are disabled there too). ---
+  function reorgMoveSibling(id, direction) {
+    const siblings = reorgSiblingsOf(id);
+    const idx = siblings.indexOf(id);
+    const swapIdx = idx + direction;
+    if (idx === -1 || swapIdx < 0 || swapIdx >= siblings.length) return;
+    const otherId = siblings[swapIdx];
+    const tmp = reorgWorkingTree[id].order;
+    reorgWorkingTree[id].order = reorgWorkingTree[otherId].order;
+    reorgWorkingTree[otherId].order = tmp;
+    renderReorgList();
+  }
+  reorgMoveUpBtn.addEventListener('click', () => { if (reorgSelectedId) reorgMoveSibling(reorgSelectedId, -1); });
+  reorgMoveDownBtn.addEventListener('click', () => { if (reorgSelectedId) reorgMoveSibling(reorgSelectedId, 1); });
 
   function confirmMoveSelected() {
     if (!selectMode) return;

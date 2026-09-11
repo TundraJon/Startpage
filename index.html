@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home</title>
-<link rel="stylesheet" href="styles.css?v=40">
+<link rel="stylesheet" href="styles.css?v=41">
 </head>
 <body>
 
@@ -577,9 +577,19 @@
 <div id="reorg-view" hidden>
   <div class="reorg-header">
     <h2>Reorganize Categories</h2>
-    <p class="testing-note">Drag a row up/down to reorder, or onto another row to nest it underneath. Nothing changes on the live page until Save.</p>
+    <div class="reorg-toolbar">
+      <button type="button" class="reorg-toolbar-btn" id="reorg-properties-btn" disabled>🔧 Properties</button>
+      <button type="button" class="reorg-toolbar-btn" id="reorg-new-category-btn">➕ New Category</button>
+      <button type="button" class="reorg-toolbar-btn" id="reorg-new-subcategory-btn" disabled>➕ New Subcategory</button>
+      <button type="button" class="reorg-toolbar-btn reorg-toolbar-btn-danger" id="reorg-remove-category-btn" disabled>🗑️ Remove Category</button>
+    </div>
+    <p class="testing-note">Tap a row to select it, then use the buttons above. Drag the ☰ handle to reorder or nest it under another row. Nothing changes on the live page until Save.</p>
   </div>
   <div class="reorg-list" id="reorg-list"></div>
+  <div class="reorg-move-row">
+    <button type="button" class="reorg-toolbar-btn" id="reorg-move-up-btn" disabled>▲ Category Up</button>
+    <button type="button" class="reorg-toolbar-btn" id="reorg-move-down-btn" disabled>▼ Category Down</button>
+  </div>
   <div class="reorg-footer">
     <button type="button" class="testing-reset-btn" id="reorg-cancel-btn">Cancel</button>
     <button type="button" class="testing-reset-btn" id="reorg-save-btn">Save</button>
@@ -589,15 +599,15 @@
 <div class="help-overlay" id="reorg-new-category-overlay" hidden>
   <div class="help-panel options-panel">
     <button class="help-close" id="reorg-new-category-close" aria-label="Close">&times;</button>
-    <h2>New Category</h2>
+    <h2 id="reorg-new-category-title">New Category</h2>
     <section class="options-section">
       <div class="option-row"><span>Name</span><input type="text" id="reorg-new-category-name" autocomplete="off" placeholder="Category name" style="width: 55%; min-width: 0;"></div>
     </section>
     <p class="add-category-error" id="reorg-new-category-error" hidden></p>
-    <button type="button" class="testing-reset-btn" id="reorg-new-category-submit">Add Category</button>
+    <button type="button" class="testing-reset-btn" id="reorg-new-category-submit">Save</button>
   </div>
 </div>
 
-<script src="script.js?v=45"></script>
+<script src="script.js?v=46"></script>
 </body>
 </html>

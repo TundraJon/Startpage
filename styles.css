@@ -431,7 +431,7 @@ main {
    Brazil-flag badge (Build Planner, not yet built), so the two never collide on the same tile. */
 .tile-info-icon {
   position: absolute;
-  left: 2px;
+  right: 2px;
   bottom: 2px;
   font-size: 0.6rem;
   line-height: 1;
@@ -1579,19 +1579,75 @@ main {
   cursor: default;
 }
 
-.reorg-row-new {
+/* Toolbar (Properties/New Category/New Subcategory/Remove Category) + the row-select model it
+   acts on — replaces the old in-list "+ New Category" row entirely, now folded into the New
+   Category button here. */
+.reorg-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.reorg-toolbar-btn {
+  flex: 1 1 calc(50% - 4px);
+  padding: 8px 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.reorg-toolbar-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.reorg-toolbar-btn-danger:not(:disabled) {
+  background: var(--action-stop-bg);
+  color: var(--action-stop-fg);
+  border-color: var(--action-stop-bg);
+}
+
+.reorg-row-arrow {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 10px;
-  margin-top: 10px;
-  border: 1px dashed var(--fg-muted);
-  border-radius: 8px;
+  border: none;
+  background: none;
   color: var(--fg-muted);
-  background: transparent;
-  width: 100%;
-  font-size: 0.9rem;
+  font-size: 0.7rem;
+  padding: 0;
   cursor: pointer;
+}
+
+/* A leaf row still reserves the arrow's own width (invisible, non-interactive) so every row's
+   name lines up at the same starting column regardless of whether it has children. */
+.reorg-row-arrow-empty {
+  visibility: hidden;
+  cursor: default;
+}
+
+.reorg-row.reorg-row-selected {
+  border-color: var(--stripe-color, #3B82C4);
+  box-shadow: 0 0 0 2px var(--stripe-color, #3B82C4);
+}
+
+.reorg-move-row {
+  flex-shrink: 0;
+  display: flex;
+  gap: 10px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.reorg-move-row .reorg-toolbar-btn {
+  flex: 1;
 }
 
 .reorg-footer {
@@ -1654,8 +1710,24 @@ main {
   margin-top: 4px;
 }
 
-/* Above .help-overlay's base 200 — this dialog can be opened from within the Edit Category
-   dialog (also a .help-overlay), and needs to appear on top of it while open. */
+/* Reorg Tree Tool's Properties button (script.js) opens this same live Edit Category dialog
+   while #reorg-view (z-index 300) is still open behind it — needs to sit above it, since Properties
+   was previously only ever reachable from the live page with no full-screen view in the way. */
+#add-category-overlay {
+  z-index: 320;
+}
+
+/* Above .help-overlay's base 200 (and above #add-category-overlay's own 320 now) — this dialog
+   can be opened from within the Edit Category dialog, and needs to appear on top of it while
+   open, including when Edit Category itself is opened from inside the Reorg Tree Tool. */
 #grouping-overlay {
-  z-index: 210;
+  z-index: 330;
+}
+
+/* Explicit, not left to DOM-order-at-equal-z-index luck: a confirmation is the most urgent thing
+   on screen whenever it's shown, so it always sits above every other overlay, including the
+   deepest nesting this app has (Reorg Tree Tool -> Properties/Edit Category -> Groupings ->
+   delete-grouping confirm) and Reorg's own Remove Category confirm. */
+#tile-confirm-overlay {
+  z-index: 340;
 }
