@@ -220,17 +220,6 @@ main {
   text-align: left;
 }
 
-/* Selection checkmark — sits left of .category-name (DOM order, appended before it) since a
-   category is a full-width header row, not a square tile, so .tile-selected's corner-badge
-   treatment doesn't fit. Colored with the category's own top/stripe color, i.e. the same
-   --stripe-color already driving its header's border-top ("the color of the category top"). */
-.category-select-check {
-  margin-right: 6px;
-  flex-shrink: 0;
-  font-weight: bold;
-  color: var(--stripe-color, var(--home-header-bg));
-}
-
 .category-name {
   font-weight: 600;
   font-size: 1rem;
@@ -276,8 +265,11 @@ main {
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
-  background: var(--home-header-bg);
-  color: var(--home-header-fg);
+  /* --home-color-bg/-fg (set inline, script.js) are Home's own user-pickable colors — distinct
+     from --home-header-bg/-fg, which stay fixed defaults also reused as the app's general accent
+     color elsewhere (buttons, borders). Falls back to those defaults until the user picks. */
+  background: var(--home-color-bg, var(--home-header-bg));
+  color: var(--home-color-fg, var(--home-header-fg));
   border-top: none;
   padding: 10px 14px;
   /* Anchored just below .pinned-header (also fixed, at top: 0) rather than the rest of Home's
@@ -314,7 +306,7 @@ main {
 }
 
 .category--home .category-header--home .category-name {
-  color: var(--home-header-fg);
+  color: var(--home-color-fg, var(--home-header-fg));
 }
 
 .home-header-actions {
@@ -331,7 +323,7 @@ main {
 .home-header-action-btn {
   border: none;
   background: transparent;
-  color: var(--home-header-fg);
+  color: var(--home-color-fg, var(--home-header-fg));
   opacity: 0.75;
   cursor: pointer;
   font-size: 0.8rem;
@@ -459,6 +451,36 @@ main {
   color: var(--fg-muted);
   padding-bottom: 4px;
   border-bottom: 1px solid var(--border);
+}
+
+/* Long-pressed and selected (Organize Mode's grouping kind) — same blue-outline treatment as a
+   selected tile/reorg row, so it reads as one consistent "selected" language across the app. */
+.tile-divider.tile-divider-selected {
+  outline: 2px solid var(--stripe-color, #3B82C4);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Replaces .tile-divider-label in place during inline rename (✏️ on the select-action-bar, or
+   dropped straight into after ➕/creating one) — same type size/weight/color as the label it's
+   standing in for, styled as a real input rather than plain text. */
+.tile-divider-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--fg);
+  background: var(--surface);
+  border: none;
+  border-bottom: 1px solid var(--stripe-color, #3B82C4);
+  padding-bottom: 4px;
+  margin-bottom: -1px;
+}
+
+.tile-divider-input:focus {
+  outline: none;
 }
 
 .tile img {
@@ -1201,6 +1223,65 @@ main {
   border-color: var(--fg-muted);
 }
 
+/* Category Color / Home header color pickers — default swatches, a native <input type="color">
+   for a wider palette, and a hex field, kept in sync both ways. Doesn't try to match the
+   reference mock-up's own "Choose" dropdown pixel-for-pixel, per the user — same capability,
+   simpler shape. */
+.color-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.color-swatch-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.color-swatch-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  padding: 0;
+  cursor: pointer;
+}
+
+.color-picker-native {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.color-picker-hex {
+  width: 90px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--fg);
+  padding: 6px 8px;
+  font-size: 0.85rem;
+  font-family: monospace;
+}
+
+.color-picker-none-btn {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg-muted);
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
 .option-row:last-child {
   border-bottom: none;
 }
@@ -1717,17 +1798,11 @@ main {
   z-index: 320;
 }
 
-/* Above .help-overlay's base 200 (and above #add-category-overlay's own 320 now) — this dialog
-   can be opened from within the Edit Category dialog, and needs to appear on top of it while
-   open, including when Edit Category itself is opened from inside the Reorg Tree Tool. */
-#grouping-overlay {
-  z-index: 330;
-}
-
 /* Explicit, not left to DOM-order-at-equal-z-index luck: a confirmation is the most urgent thing
-   on screen whenever it's shown, so it always sits above every other overlay, including the
-   deepest nesting this app has (Reorg Tree Tool -> Properties/Edit Category -> Groupings ->
-   delete-grouping confirm) and Reorg's own Remove Category confirm. */
+   on screen whenever it's shown, so it always sits above every other overlay — including Reorg's
+   own Remove Category confirm (Reorg Tree Tool -> Properties/Edit Category -> confirm) and a
+   grouping delete confirm (which briefly hides the Reorg view entirely to reveal the live grid
+   underneath, rather than stacking above it — see revealLiveGridForGrouping, script.js). */
 #tile-confirm-overlay {
   z-index: 340;
 }

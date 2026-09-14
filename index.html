@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home</title>
-<link rel="stylesheet" href="styles.css?v=41">
+<link rel="stylesheet" href="styles.css?v=42">
 </head>
 <body>
 
@@ -489,6 +489,7 @@
     <div class="tile-menu-actions">
       <button type="button" class="tile-menu-action" id="create-menu-tile"><span class="tile-menu-icon">🔗</span><span class="tile-menu-action-label">+ Tile</span></button>
       <button type="button" class="tile-menu-action" id="create-menu-category"><span class="tile-menu-icon">📁</span><span class="tile-menu-action-label">+ Category</span></button>
+      <button type="button" class="tile-menu-action" id="create-menu-grouping"><span class="tile-menu-icon">➕</span><span class="tile-menu-action-label">+ Grouping</span></button>
     </div>
   </div>
 </div>
@@ -513,6 +514,30 @@
       <div class="grouping-list" id="grouping-list"></div>
       <button type="button" class="category-sort-btn grouping-add-btn" id="add-grouping-btn">+ New Grouping</button>
     </section>
+    <section class="options-section" id="edit-category-color-section" hidden>
+      <h3>Category Color</h3>
+      <div class="color-picker-row">
+        <div class="color-swatch-row" id="category-color-swatches"></div>
+        <input type="color" class="color-picker-native" id="category-color-native" aria-label="Choose a custom color">
+        <input type="text" class="color-picker-hex" id="category-color-hex" autocomplete="off" placeholder="#RRGGBB">
+        <button type="button" class="color-picker-none-btn" id="category-color-none">None</button>
+      </div>
+    </section>
+    <section class="options-section" id="home-color-section" hidden>
+      <h3>Header Color</h3>
+      <div class="option-row" style="border-bottom: none; padding-bottom: 0;"><span>Background</span></div>
+      <div class="color-picker-row">
+        <div class="color-swatch-row" id="home-bg-color-swatches"></div>
+        <input type="color" class="color-picker-native" id="home-bg-color-native" aria-label="Choose a custom background color">
+        <input type="text" class="color-picker-hex" id="home-bg-color-hex" autocomplete="off" placeholder="#RRGGBB">
+      </div>
+      <div class="option-row" style="border-bottom: none; padding-bottom: 0; margin-top: 14px;"><span>Text</span></div>
+      <div class="color-picker-row">
+        <div class="color-swatch-row" id="home-fg-color-swatches"></div>
+        <input type="color" class="color-picker-native" id="home-fg-color-native" aria-label="Choose a custom text color">
+        <input type="text" class="color-picker-hex" id="home-fg-color-hex" autocomplete="off" placeholder="#RRGGBB">
+      </div>
+    </section>
     <p class="add-category-error" id="add-category-error" hidden></p>
     <button type="button" class="testing-reset-btn" id="add-category-submit">Add Category</button>
   </div>
@@ -525,6 +550,7 @@
     <button type="button" class="select-action-icon-btn select-action-cut" id="select-action-cut" aria-label="Cut" disabled>✂️</button>
     <button type="button" class="select-action-icon-btn" id="select-action-rename" aria-label="Rename" disabled>✏️</button>
     <button type="button" class="select-action-icon-btn select-action-paste" id="select-action-paste" aria-label="Paste" disabled>📋</button>
+    <button type="button" class="select-action-icon-btn" id="select-action-add" aria-label="Add grouping" hidden>➕</button>
     <button type="button" class="select-action-icon-btn select-action-delete" id="select-action-delete" aria-label="Delete" disabled>🗑️</button>
     <button type="button" class="select-action-icon-btn" id="select-action-clear" aria-label="Clear selection">🆑</button>
   </div>
@@ -558,19 +584,6 @@
     <button class="help-close" id="tile-blurb-close" aria-label="Close">&times;</button>
     <h2 id="tile-blurb-name"></h2>
     <p id="tile-blurb-text"></p>
-  </div>
-</div>
-
-<div class="help-overlay" id="grouping-overlay" hidden>
-  <div class="help-panel options-panel">
-    <button class="help-close" id="grouping-close" aria-label="Close">&times;</button>
-    <h2 id="grouping-title">New Grouping</h2>
-    <section class="options-section">
-      <div class="option-row"><span>Name</span><input type="text" id="grouping-name-input" autocomplete="off" placeholder="e.g. Free" style="width: 55%; min-width: 0;"></div>
-    </section>
-    <p class="add-category-error" id="grouping-error" hidden></p>
-    <button type="button" class="testing-reset-btn" id="grouping-save-btn">Save</button>
-    <button type="button" class="testing-reset-btn" id="grouping-delete-btn" hidden>Delete Grouping</button>
   </div>
 </div>
 
@@ -608,6 +621,6 @@
   </div>
 </div>
 
-<script src="script.js?v=46"></script>
+<script src="script.js?v=47"></script>
 </body>
 </html>

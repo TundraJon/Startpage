@@ -190,6 +190,7 @@
   const selectActionCutBtn = document.getElementById('select-action-cut');
   const selectActionRenameBtn = document.getElementById('select-action-rename');
   const selectActionPasteBtn = document.getElementById('select-action-paste');
+  const selectActionAddBtn = document.getElementById('select-action-add');
   const selectActionDeleteBtn = document.getElementById('select-action-delete');
   const selectActionClearBtn = document.getElementById('select-action-clear');
 
@@ -367,7 +368,12 @@
     const section = document.createElement('section');
     section.className = 'category';
     section.dataset.categoryId = id;
-    if (node.stripeColor) section.style.setProperty('--stripe-color', node.stripeColor);
+    // A top-level category's own stripeColor applies as-is (depth 0); every subcategory gets a
+    // progressively lighter shade of its top-level ancestor's color instead of any color of its
+    // own, per the user — see primaryAncestorAndDepth/lightenForDepth.
+    const { rootId, depth } = primaryAncestorAndDepth(id);
+    const rootColor = categoryTree[rootId] && categoryTree[rootId].stripeColor;
+    if (rootColor) section.style.setProperty('--stripe-color', lightenForDepth(rootColor, depth));
 
     const header = document.createElement('div');
     header.className = 'category-header';
@@ -375,11 +381,6 @@
     mainBtn.type = 'button';
     mainBtn.className = 'category-header-main';
     mainBtn.setAttribute('aria-expanded', 'false');
-    const checkSpan = document.createElement('span');
-    checkSpan.className = 'category-select-check';
-    checkSpan.textContent = '✓';
-    checkSpan.hidden = true;
-    mainBtn.appendChild(checkSpan);
     const nameSpan = document.createElement('span');
     nameSpan.className = 'category-name';
     nameSpan.textContent = node.name;
@@ -455,27 +456,15 @@
 
       categoryToggles.set(id, { section, contentEl, ownGridEl, mainBtn, collapseBtn });
 
-      // Long-press either enters category-select mode (first press) or, if already in it, range-
-      // selects from the original anchor to this category (subsequent press) — mirrors tiles'
-      // handleTileLongPress exactly, just against the visible-category-header order instead of a
-      // grid. No drag-arming here — categories don't have a Move-Entry-style drag, only tiles do.
-      attachLongPress(mainBtn, () => handleCategoryLongPress(id), () => dragInfo !== null);
-      mainBtn.addEventListener('click', () => {
-        // pickingDestination takes priority over toggling selection — while picking where a Cut
-        // lands, every header tap means "make this the destination," regardless of selectMode.kind.
-        // Previously this fell straight into the category-toggle branch below whenever selectMode
-        // was category-kind, so tapping a destination during a category Cut just checked/unchecked
-        // it in the original cut selection instead of navigating there at all.
-        if (selectMode && pickingDestination) {
-          openCategoryPath(id);
-          return;
-        }
-        if (selectMode && selectMode.kind === 'category') {
-          toggleCategorySelected(id);
-          return;
-        }
-        openCategoryPath(id);
-      });
+      // Long-press opens the Reorg Tree Tool directly, with this category pre-selected and
+      // scrolled into view — category select mode (and its bottom action bar) is gone, per the
+      // user's decision: Properties/Remove Category inside the Reorg Tool already cover Edit and
+      // Delete, and single-category moves via that tool's own drag cover Cut. Batch category
+      // Cut+Paste is the one capability this drops, accepted as a tradeoff.
+      attachLongPress(mainBtn, () => openReorgTool(id), () => dragInfo !== null);
+      // A plain tap always navigates now — including while tile Cut+Paste is picking a
+      // destination, where "navigate here" and "make this the destination" are the same thing.
+      mainBtn.addEventListener('click', () => openCategoryPath(id));
       collapseBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         collapseFromCategory(id);
@@ -858,7 +847,7 @@
     label.className = 'tile-divider-label';
     label.textContent = name;
     div.appendChild(label);
-    attachLongPress(div, () => openGroupingEdit(categoryId, id, div), () => selectMode !== null);
+    attachLongPress(div, () => enterGroupingSelectMode(categoryId, categoryGrids.get(categoryId), id), () => selectMode !== null);
     return div;
   }
 
@@ -886,7 +875,7 @@
       // grouping here. shouldSuppress checks the pointerdown's own target rather than just
       // selectMode, since a press that started on a child tile/divider bubbles up to this same
       // grid listener too — only a press landing on the grid's own background should arm this.
-      attachLongPress(grid, () => openGroupingCreate(categoryId, grid), (e) => selectMode !== null || (e && e.target !== grid));
+      attachLongPress(grid, () => insertGrouping(categoryId, grid), (e) => selectMode !== null || (e && e.target !== grid));
     });
   }
 
@@ -928,6 +917,7 @@
   const createMenuClose = document.getElementById('create-menu-close');
   const createMenuTileBtn = document.getElementById('create-menu-tile');
   const createMenuCategoryBtn = document.getElementById('create-menu-category');
+  const createMenuGroupingBtn = document.getElementById('create-menu-grouping');
 
   function openCreateMenu() {
     createMenuOverlay.hidden = false;
@@ -946,6 +936,13 @@
     const destId = currentLocationId();
     const grid = categoryGrids.get(destId);
     if (grid) openAddTile(grid, destId);
+  });
+
+  createMenuGroupingBtn.addEventListener('click', () => {
+    closeCreateMenu();
+    const destId = currentLocationId();
+    const grid = categoryGrids.get(destId);
+    if (grid) insertGrouping(destId, grid);
   });
 
   // Popups now anchor near the top of the page (styles.css's .help-overlay) instead of vertical
@@ -979,6 +976,181 @@
   const editCategoryGroupingsSection = document.getElementById('edit-category-groupings-section');
   const groupingListEl = document.getElementById('grouping-list');
   const addGroupingBtn = document.getElementById('add-grouping-btn');
+
+  // --- Category Color / Home Header Color ---
+  // A top-level category picks its own stripeColor directly; every subcategory automatically
+  // gets a progressively lighter shade of its top-level ancestor's color, the deeper it nests —
+  // no picker of its own, purely computed (see primaryAncestorAndDepth/lightenForDepth below and
+  // their use in buildCategorySection). Home gets the same picker shape, but for its whole header
+  // background, plus an independent one for its text color (the header can go dark or light, so
+  // one fixed text color can't always stay readable) — see the --home-color-bg/-fg CSS variables
+  // (styles.css) it writes into, kept distinct from --home-header-bg/-fg so changing Home's own
+  // color doesn't recolor unrelated UI elsewhere that also borrows those as a generic accent.
+  const DEFAULT_COLOR_SWATCHES = [
+    { name: 'Black', hex: '#000000' },
+    { name: 'Blue', hex: '#3B82C4' },
+    { name: 'Gray', hex: '#7F8C8D' },
+    { name: 'Green', hex: '#2E8B57' },
+    { name: 'Orange', hex: '#F39C12' },
+    { name: 'Red', hex: '#E74C3C' },
+    { name: 'Violet', hex: '#8E44AD' },
+    { name: 'Yellow', hex: '#F1C40F' },
+  ];
+
+  function isValidHex(v) {
+    return /^#[0-9a-fA-F]{6}$/.test(v);
+  }
+
+  function hexToHsl(hex) {
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h = 0, s = 0;
+    const l = (max + min) / 2;
+    const d = max - min;
+    if (d !== 0) {
+      s = d / (1 - Math.abs(2 * l - 1));
+      switch (max) {
+        case r: h = ((g - b) / d) % 6; break;
+        case g: h = (b - r) / d + 2; break;
+        default: h = (r - g) / d + 4;
+      }
+      h *= 60;
+      if (h < 0) h += 360;
+    }
+    return [h, s * 100, l * 100];
+  }
+
+  function hslToHex(h, s, l) {
+    s /= 100; l /= 100;
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    const m = l - c / 2;
+    let r, g, b;
+    if (h < 60) [r, g, b] = [c, x, 0];
+    else if (h < 120) [r, g, b] = [x, c, 0];
+    else if (h < 180) [r, g, b] = [0, c, x];
+    else if (h < 240) [r, g, b] = [0, x, c];
+    else if (h < 300) [r, g, b] = [x, 0, c];
+    else [r, g, b] = [c, 0, x];
+    const toHex = (v) => Math.round((v + m) * 255).toString(16).padStart(2, '0');
+    return '#' + toHex(r) + toHex(g) + toHex(b);
+  }
+
+  // Every level of nesting steps lightness up by 12%, clamped well short of white so it never
+  // washes out completely even many levels deep. depth 0 (the primary category itself) returns
+  // the color unchanged.
+  function lightenForDepth(hex, depth) {
+    if (!depth || !isValidHex(hex)) return hex;
+    const [h, s, l] = hexToHsl(hex);
+    return hslToHex(h, s, Math.min(92, l + depth * 12));
+  }
+
+  // Walks parentId links in categoryTree itself (not the DOM) — works during initial tree
+  // construction, when a category's own DOM entry (categoryToggles) may not exist yet for
+  // ancestors being processed in the same pass.
+  function primaryAncestorAndDepth(id) {
+    let depth = 0;
+    let currentId = id;
+    let current = categoryTree[id];
+    while (current && current.parentId !== null && categoryTree[current.parentId]) {
+      currentId = current.parentId;
+      current = categoryTree[currentId];
+      depth++;
+    }
+    return { rootId: currentId, depth };
+  }
+
+  // Wires one picker's static DOM/listeners exactly once; each dialog-open just calls setValue +
+  // setOnChange to repoint it at whatever's currently being edited, rather than re-wiring
+  // listeners (which would stack duplicates across repeated opens).
+  function createColorPicker(swatchesEl, colorInput, hexInput, noneBtn) {
+    let onChange = null;
+    DEFAULT_COLOR_SWATCHES.forEach((c) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'color-swatch-btn';
+      btn.style.background = c.hex;
+      btn.setAttribute('aria-label', c.name);
+      btn.title = c.name;
+      btn.addEventListener('click', () => {
+        colorInput.value = c.hex;
+        hexInput.value = c.hex;
+        if (onChange) onChange(c.hex);
+      });
+      swatchesEl.appendChild(btn);
+    });
+    colorInput.addEventListener('input', () => {
+      hexInput.value = colorInput.value;
+      if (onChange) onChange(colorInput.value);
+    });
+    hexInput.addEventListener('input', () => {
+      const v = hexInput.value.trim();
+      if (isValidHex(v)) {
+        colorInput.value = v;
+        if (onChange) onChange(v);
+      }
+    });
+    if (noneBtn) {
+      noneBtn.addEventListener('click', () => {
+        hexInput.value = '';
+        if (onChange) onChange(null);
+      });
+    }
+    return {
+      setValue(hex) {
+        colorInput.value = (hex && isValidHex(hex)) ? hex : '#000000';
+        hexInput.value = hex || '';
+      },
+      setOnChange(fn) { onChange = fn; },
+    };
+  }
+
+  const categoryColorPicker = createColorPicker(
+    document.getElementById('category-color-swatches'),
+    document.getElementById('category-color-native'),
+    document.getElementById('category-color-hex'),
+    document.getElementById('category-color-none')
+  );
+  const homeBgColorPicker = createColorPicker(
+    document.getElementById('home-bg-color-swatches'),
+    document.getElementById('home-bg-color-native'),
+    document.getElementById('home-bg-color-hex'),
+    null
+  );
+  const homeFgColorPicker = createColorPicker(
+    document.getElementById('home-fg-color-swatches'),
+    document.getElementById('home-fg-color-native'),
+    document.getElementById('home-fg-color-hex'),
+    null
+  );
+
+  const editCategoryColorSection = document.getElementById('edit-category-color-section');
+  const homeColorSection = document.getElementById('home-color-section');
+  // Staged locally, only written to categoryTree/localStorage (and applied live for Home) when
+  // the dialog's own Save button is pressed — same commit-together-with-Name model the rest of
+  // this dialog already uses, not a live-preview-as-you-pick one like Sort.
+  let pendingStripeColor = null;
+  let pendingHomeBg = null;
+  let pendingHomeFg = null;
+
+  const HOME_COLOR_KEY = 'homeColor';
+  function loadHomeColor() {
+    try {
+      return JSON.parse(localStorage.getItem(HOME_COLOR_KEY) || '{}');
+    } catch (e) {
+      return {};
+    }
+  }
+  function applyHomeColor() {
+    const c = loadHomeColor();
+    if (c.bg) document.documentElement.style.setProperty('--home-color-bg', c.bg);
+    else document.documentElement.style.removeProperty('--home-color-bg');
+    if (c.fg) document.documentElement.style.setProperty('--home-color-fg', c.fg);
+    else document.documentElement.style.removeProperty('--home-color-fg');
+  }
+  applyHomeColor();
   // null while creating a new category; set to an existing category's id while editing one
   // (opened from the select-action-bar's 🔧 Edit button) — same dialog either way, per the
   // decision that Edit reuses the create-category overlay rather than being a separate one.
@@ -1005,12 +1177,13 @@
     addCategoryNameSection.hidden = false;
     editCategorySortSection.hidden = true; // a brand-new category has no tiles yet to sort
     editCategoryGroupingsSection.hidden = true; // ...or groupings to manage
+    editCategoryColorSection.hidden = true; // ...or a real position in the tree to color yet
+    homeColorSection.hidden = true;
     addCategoryOverlay.hidden = false;
     addCategoryNameInput.focus();
   }
-  // Called from the select-action-bar's Edit button (further down) — targets whichever single
-  // category is currently selected. Color editing isn't wired up here: the dialog is name-only
-  // until the category color picker itself exists (Build Planner item 4).
+  // Called from the Reorg Tree Tool's Properties button — targets whichever category is
+  // currently selected there.
   function openEditCategory(id) {
     const node = categoryTree[id];
     if (!node) return;
@@ -1025,6 +1198,15 @@
     editCategorySortSection.hidden = false;
     editCategoryGroupingsSection.hidden = false;
     renderGroupingsList(id);
+    // Color only ever applies to a top-level ("primary") category, per the user — a subcategory's
+    // stripe is always computed (lightenForDepth), never independently picked.
+    editCategoryColorSection.hidden = node.parentId !== null;
+    homeColorSection.hidden = true;
+    if (node.parentId === null) {
+      pendingStripeColor = node.stripeColor || null;
+      categoryColorPicker.setValue(pendingStripeColor);
+      categoryColorPicker.setOnChange((hex) => { pendingStripeColor = hex; });
+    }
     addCategoryOverlay.hidden = false;
     addCategoryNameInput.focus();
     const entry = categoryToggles.get(id);
@@ -1032,10 +1214,9 @@
   }
 
   // Home's own settings dialog — long-press on Home's header (wired above). Reuses this same
-  // overlay purely for its Sort section (Home isn't a categoryTree entry: no stripeColor, no
-  // rename via this dialog or anything else today), with the Name field hidden since there's
-  // nothing here for it to edit. A future color picker (Personalization, Home-only per the user)
-  // would live in this same dialog once it exists.
+  // overlay for its Sort/Groupings sections (Home isn't a categoryTree entry, but its tiles are
+  // stored the same generic way as any other category's, keyed 'home') plus its own Header Color
+  // section, with the Name field hidden since there's nothing here for it to edit.
   function openHomeSettings() {
     addCategoryTargetId = 'home';
     sortPreviewOriginalTiles = loadCategoryTiles('home').slice();
@@ -1046,7 +1227,16 @@
     addCategoryNameSection.hidden = true;
     editCategorySortSection.hidden = false;
     editCategoryGroupingsSection.hidden = false;
+    editCategoryColorSection.hidden = true;
     renderGroupingsList('home');
+    homeColorSection.hidden = false;
+    const currentHomeColor = loadHomeColor();
+    pendingHomeBg = currentHomeColor.bg || null;
+    pendingHomeFg = currentHomeColor.fg || null;
+    homeBgColorPicker.setValue(pendingHomeBg);
+    homeBgColorPicker.setOnChange((hex) => { pendingHomeBg = hex; });
+    homeFgColorPicker.setValue(pendingHomeFg);
+    homeFgColorPicker.setOnChange((hex) => { pendingHomeFg = hex; });
     addCategoryOverlay.hidden = false;
     scrollTargetBelowPopup(addCategoryOverlay.querySelector('.help-panel'), homeNameEl);
   }
@@ -1070,11 +1260,7 @@
       editBtn.className = 'grouping-row-btn';
       editBtn.setAttribute('aria-label', 'Edit grouping');
       editBtn.textContent = '✏️';
-      editBtn.addEventListener('click', () => {
-        const grid = categoryGrids.get(categoryId);
-        const dividerEl = grid && grid.querySelector('[data-tile-id="' + CSS.escape(d.id) + '"]');
-        openGroupingEdit(categoryId, d.id, dividerEl);
-      });
+      editBtn.addEventListener('click', () => focusGroupingInLiveGrid(categoryId, d.id));
       row.appendChild(editBtn);
       groupingListEl.appendChild(row);
     });
@@ -1082,8 +1268,9 @@
 
   addGroupingBtn.addEventListener('click', () => {
     if (!addCategoryTargetId) return;
-    const grid = categoryGrids.get(addCategoryTargetId);
-    if (grid) openGroupingCreate(addCategoryTargetId, grid);
+    const categoryId = addCategoryTargetId;
+    revealLiveGridForGrouping();
+    insertGrouping(categoryId, categoryGrids.get(categoryId));
   });
 
   // Reorders categoryId's grid DOM (not storage) to the given order — used by both the sort
@@ -1198,9 +1385,12 @@
 
   addCategorySubmit.addEventListener('click', () => {
     // Home Settings: no name to validate (the Name field is hidden entirely for it), nothing in
-    // categoryTree to update — just commit whatever Sort preview is active and close.
+    // categoryTree to update — commit whatever Sort preview is active, persist the header color
+    // pair and apply it live, then close.
     if (addCategoryTargetId === 'home') {
       commitSortPreview('home');
+      localStorage.setItem(HOME_COLOR_KEY, JSON.stringify({ bg: pendingHomeBg, fg: pendingHomeFg }));
+      applyHomeColor();
       closeAddCategory();
       return;
     }
@@ -1220,6 +1410,10 @@
         return;
       }
       node.name = name;
+      // Only a top-level category ever has its own stripeColor picked (editCategoryColorSection
+      // is hidden for a subcategory, so pendingStripeColor wasn't updated this session and would
+      // be stale for one) — subcategories always derive their color, never store their own.
+      if (node.parentId === null) node.stripeColor = pendingStripeColor;
       saveCategoryTree(categoryTree);
       commitSortPreview(targetId);
       // Reorg Tree Tool's Properties button opens this same dialog and edits the live category
@@ -1398,105 +1592,117 @@
     if (e.target === tileBlurbOverlay) closeTileBlurb();
   });
 
-  // Visual Grouping Headers: create/rename/delete a grouping (cosmetic divider). One dialog for
-  // both create and edit, same pattern as Edit Category reusing Add Category's own overlay.
-  // groupingTargetId is null while creating a new grouping, set to the divider's id while editing.
-  const groupingOverlay = document.getElementById('grouping-overlay');
-  const groupingClose = document.getElementById('grouping-close');
-  const groupingTitleEl = document.getElementById('grouping-title');
-  const groupingNameInput = document.getElementById('grouping-name-input');
-  const groupingError = document.getElementById('grouping-error');
-  const groupingSaveBtn = document.getElementById('grouping-save-btn');
-  const groupingDeleteBtn = document.getElementById('grouping-delete-btn');
-  let groupingTargetCategoryId = null;
-  let groupingTargetGrid = null;
-  let groupingTargetId = null;
+  // Visual Grouping Headers: long-pressing a divider selects it (a third selectMode kind,
+  // 'grouping') and shows the same bottom icon bar Organize Mode already uses for tiles — ✏️
+  // turns the label into an inline-editable field right in the grid, 🗑️ deletes it (standard
+  // named confirm), ➕ inserts another grouping right after it and drops straight into that same
+  // inline-rename state. Fully replaces the old popup-based create/edit dialog (Build Log 58) —
+  // long-pressing empty grid space and the Groupings list inside Edit Category both now do the
+  // same select+inline-rename thing instead of opening it. Always exactly one selected; no
+  // multi-select, no Cut/Paste — a grouping is purely positional within its own category.
 
-  function openGroupingCreate(categoryId, grid) {
-    groupingTargetCategoryId = categoryId;
-    groupingTargetGrid = grid;
-    groupingTargetId = null;
-    groupingTitleEl.textContent = 'New Grouping';
-    groupingNameInput.value = '';
-    groupingError.hidden = true;
-    groupingDeleteBtn.hidden = true;
-    groupingOverlay.hidden = false;
-    groupingNameInput.focus();
+  function groupingDividerEl() {
+    if (!selectMode || selectMode.kind !== 'grouping') return null;
+    const id = Array.from(selectMode.selectedIds)[0];
+    return selectMode.grid.querySelector('[data-tile-id="' + CSS.escape(id) + '"]');
   }
 
-  function openGroupingEdit(categoryId, dividerId, dividerEl) {
-    const tiles = loadCategoryTiles(categoryId);
-    const entry = tiles.find((t) => t.id === dividerId && t.type === 'divider');
-    if (!entry) return;
-    groupingTargetCategoryId = categoryId;
-    groupingTargetGrid = categoryGrids.get(categoryId) || null;
-    groupingTargetId = dividerId;
-    groupingTitleEl.textContent = 'Edit Grouping';
-    groupingNameInput.value = entry.name;
-    groupingError.hidden = true;
-    groupingDeleteBtn.hidden = false;
-    groupingOverlay.hidden = false;
-    groupingNameInput.focus();
-    scrollTargetBelowPopup(groupingOverlay.querySelector('.help-panel'), dividerEl);
+  function enterGroupingSelectMode(categoryId, grid, dividerId) {
+    if (selectMode) exitSelectMode();
+    selectMode = { kind: 'grouping', grid, categoryId, selectedIds: new Set([dividerId]) };
+    pickingDestination = false;
+    const el = grid && grid.querySelector('[data-tile-id="' + CSS.escape(dividerId) + '"]');
+    if (el) el.classList.add('tile-divider-selected');
+    updateSelectActionBar();
   }
 
-  function closeGrouping() {
-    groupingOverlay.hidden = true;
-    groupingTargetCategoryId = null;
-    groupingTargetGrid = null;
-    groupingTargetId = null;
-  }
-  groupingClose.addEventListener('click', closeGrouping);
-  groupingOverlay.addEventListener('click', (e) => {
-    if (e.target === groupingOverlay) closeGrouping();
-  });
-
-  groupingSaveBtn.addEventListener('click', () => {
-    const name = groupingNameInput.value.trim();
-    if (!name) {
-      groupingError.textContent = 'Name required.';
-      groupingError.hidden = false;
-      return;
-    }
-    if (!groupingTargetCategoryId) return;
-    const tiles = loadCategoryTiles(groupingTargetCategoryId);
-    if (groupingTargetId) {
-      const entry = tiles.find((t) => t.id === groupingTargetId && t.type === 'divider');
+  // Turns a divider's label into a focused, pre-selected text input; committing (Enter, or blur —
+  // e.g. tapping elsewhere, including the bar's other buttons) saves a non-empty trimmed name, or
+  // just reverts to whatever it was before if left empty. No popup, no separate validation error.
+  function startGroupingInlineRename(dividerEl, categoryId, dividerId) {
+    const label = dividerEl.querySelector('.tile-divider-label');
+    if (!label) return;
+    const priorName = label.textContent;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'tile-divider-input';
+    input.value = priorName;
+    label.replaceWith(input);
+    input.focus();
+    input.select();
+    let committed = false;
+    function commit() {
+      if (committed) return;
+      committed = true;
+      const newName = input.value.trim() || priorName;
+      const tiles = loadCategoryTiles(categoryId);
+      const entry = tiles.find((t) => t.id === dividerId && t.type === 'divider');
       if (entry) {
-        entry.name = name;
-        saveCategoryTiles(groupingTargetCategoryId, tiles);
-        const dividerEl = groupingTargetGrid && groupingTargetGrid.querySelector('[data-tile-id="' + CSS.escape(groupingTargetId) + '"]');
-        if (dividerEl) dividerEl.querySelector('.tile-divider-label').textContent = name;
+        entry.name = newName;
+        saveCategoryTiles(categoryId, tiles);
       }
-    } else if (groupingTargetGrid) {
-      const id = newTileId();
-      tiles.push({ id, type: 'divider', name, createdAt: Date.now() });
-      saveCategoryTiles(groupingTargetCategoryId, tiles);
-      groupingTargetGrid.appendChild(buildDividerElement(id, name, groupingTargetCategoryId));
+      const newLabel = document.createElement('span');
+      newLabel.className = 'tile-divider-label';
+      newLabel.textContent = newName;
+      input.replaceWith(newLabel);
     }
-    renderGroupingsList(groupingTargetCategoryId);
-    closeGrouping();
-  });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    });
+    input.addEventListener('blur', commit);
+  }
 
-  groupingDeleteBtn.addEventListener('click', () => {
-    if (!groupingTargetCategoryId || !groupingTargetId) return;
-    const categoryId = groupingTargetCategoryId;
-    const dividerId = groupingTargetId;
-    const name = groupingNameInput.value.trim();
-    // Closes the grouping dialog first — tile-confirm-overlay shares the base .help-overlay
-    // z-index, so left open behind it the confirm would be visually stuck underneath and
-    // unusable, the same stacking issue #grouping-overlay's own z-index bump solves relative to
-    // Edit Category.
-    closeGrouping();
-    openTileConfirm('Are you sure you want to remove the "' + name + '" grouping? Tiles in it won\'t be deleted.', () => {
-      const tiles = loadCategoryTiles(categoryId).filter((t) => t.id !== dividerId);
-      saveCategoryTiles(categoryId, tiles);
-      const grid = categoryGrids.get(categoryId);
-      const dividerEl = grid && grid.querySelector('[data-tile-id="' + CSS.escape(dividerId) + '"]');
-      if (dividerEl) dividerEl.remove();
-      renderGroupingsList(categoryId);
-    }, {});
-  });
+  // Inserts a new grouping — right after afterDividerId if given, else appended at the end (the
+  // "long-press empty space" / global "+ Grouping" case, with no divider to insert relative to) —
+  // selects it, and drops straight into inline-rename. The one shared implementation behind ➕ on
+  // the bar, long-pressing empty grid space, and the "+ Grouping" create-menu option.
+  function insertGrouping(categoryId, grid, afterDividerId) {
+    if (!grid) return;
+    const tiles = loadCategoryTiles(categoryId);
+    const id = newTileId();
+    const entry = { id, type: 'divider', name: 'New Grouping', createdAt: Date.now() };
+    if (afterDividerId) {
+      const idx = tiles.findIndex((t) => t.id === afterDividerId);
+      tiles.splice(idx === -1 ? tiles.length : idx + 1, 0, entry);
+    } else {
+      tiles.push(entry);
+    }
+    saveCategoryTiles(categoryId, tiles);
+    const dividerEl = buildDividerElement(id, entry.name, categoryId);
+    const afterEl = afterDividerId && grid.querySelector('[data-tile-id="' + CSS.escape(afterDividerId) + '"]');
+    if (afterEl) afterEl.after(dividerEl);
+    else grid.appendChild(dividerEl);
+    enterGroupingSelectMode(categoryId, grid, id);
+    startGroupingInlineRename(dividerEl, categoryId, id);
+  }
+
+  // Edit Category is now only ever reachable via the Reorg Tree Tool's Properties button, so
+  // whenever it's open, the Reorg Tool's full-screen view is always open right underneath it —
+  // which would otherwise hide the live grid this needs to scroll to and edit in. Rather than
+  // canceling the Reorg session (discarding whatever unsaved drag moves are pending), this just
+  // hides it temporarily and restores it, state untouched, once grouping select mode exits — see
+  // exitSelectMode's grouping branch.
+  let reorgHiddenForGroupingFocus = false;
+  function revealLiveGridForGrouping() {
+    closeAddCategory();
+    if (!reorgView.hidden) {
+      reorgView.hidden = true;
+      reorgHiddenForGroupingFocus = true;
+    }
+  }
+
+  // Groupings list's ✏️ (Edit Category dialog): scrolls to and selects that divider, entering the
+  // same select+bar+inline-rename state a long-press on the divider itself would, instead of the
+  // old popup.
+  function focusGroupingInLiveGrid(categoryId, dividerId) {
+    revealLiveGridForGrouping();
+    const grid = categoryGrids.get(categoryId);
+    const dividerEl = grid && grid.querySelector('[data-tile-id="' + CSS.escape(dividerId) + '"]');
+    if (!dividerEl) return;
+    dividerEl.scrollIntoView({ block: 'center' });
+    enterGroupingSelectMode(categoryId, grid, dividerId);
+    startGroupingInlineRename(dividerEl, categoryId, dividerId);
+  }
 
   function attachLongPress(el, callback, shouldSuppress) {
     const LONG_PRESS_MS = 550;
@@ -1928,82 +2134,6 @@
     document.addEventListener('pointercancel', onUp);
   }
 
-  // --- Category selection: selecting a category selects its whole subtree (subcategories + their
-  // tiles) by default; deselecting works the same way in reverse. selectMode.selectedIds holds
-  // the explicitly-pressed roots (may include redundant entries already covered by an ancestor —
-  // harmless, see prunedSelectedCategoryRoots); the visible checkmarks reflect the full expanded
-  // set via refreshCategorySelectionVisuals. ---
-
-  function categorySubtreeIds(rootId) {
-    const out = [rootId];
-    categoryChildren(rootId).forEach(([childId]) => out.push(...categorySubtreeIds(childId)));
-    return out;
-  }
-
-  // "Topmost" selected categories only — prunes any selected id that has an ancestor also
-  // selected, since that id's selection is already implied by the ancestor's subtree. This is
-  // what Edit/Cut/Delete actually operate on, and what Edit's exactly-one-selected check counts.
-  function prunedSelectedCategoryRoots() {
-    if (!selectMode || selectMode.kind !== 'category') return [];
-    return Array.from(selectMode.selectedIds).filter((id) => {
-      const ancestors = categoryAncestorChain(id).slice(0, -1);
-      return !ancestors.some((a) => selectMode.selectedIds.has(a));
-    });
-  }
-
-  function refreshCategorySelectionVisuals() {
-    const effective = new Set();
-    if (selectMode && selectMode.kind === 'category') {
-      selectMode.selectedIds.forEach((rootId) => categorySubtreeIds(rootId).forEach((id) => effective.add(id)));
-    }
-    categoryToggles.forEach((entry, id) => {
-      const selected = effective.has(id);
-      const check = entry.mainBtn.querySelector('.category-select-check');
-      if (check) check.hidden = !selected;
-    });
-  }
-
-  function toggleCategorySelected(id) {
-    if (!selectMode || selectMode.kind !== 'category') return;
-    if (selectMode.selectedIds.has(id)) selectMode.selectedIds.delete(id);
-    else selectMode.selectedIds.add(id);
-    refreshCategorySelectionVisuals();
-    updateSelectActionBar();
-  }
-
-  // Currently-visible category headers, top-to-bottom in real render order — a collapsed
-  // subcategory's header is hidden along with the rest of its parent's content, so this
-  // naturally excludes anything not actually reachable/tappable right now.
-  function visibleCategoryHeaderIds() {
-    return Array.from(categoryToggles.entries())
-      .filter(([, entry]) => entry.mainBtn.offsetParent !== null)
-      .map(([id]) => id);
-  }
-
-  function rangeSelectCategories(targetId) {
-    if (!selectMode || selectMode.kind !== 'category') return;
-    const order = visibleCategoryHeaderIds();
-    const anchorIdx = order.indexOf(selectMode.rangeAnchorId);
-    const targetIdx = order.indexOf(targetId);
-    if (anchorIdx === -1 || targetIdx === -1) {
-      toggleCategorySelected(targetId);
-      return;
-    }
-    const lo = Math.min(anchorIdx, targetIdx);
-    const hi = Math.max(anchorIdx, targetIdx);
-    for (let i = lo; i <= hi; i++) selectMode.selectedIds.add(order[i]);
-    refreshCategorySelectionVisuals();
-    updateSelectActionBar();
-  }
-
-  function handleCategoryLongPress(id) {
-    if (selectMode && selectMode.kind === 'category') {
-      rangeSelectCategories(id);
-    } else {
-      enterCategorySelectMode(id);
-    }
-  }
-
   function enterSelectMode(tileEl) {
     if (selectMode) exitSelectMode();
     const grid = tileEl.parentElement;
@@ -2017,13 +2147,6 @@
     pickingDestination = false;
     grid.classList.add('select-mode');
     toggleTileSelected(tileEl);
-  }
-
-  function enterCategorySelectMode(id) {
-    if (selectMode) exitSelectMode();
-    selectMode = { kind: 'category', selectedIds: new Set(), rangeAnchorId: id };
-    pickingDestination = false;
-    toggleCategorySelected(id);
   }
 
   // Organize Mode's own inactivity auto-close — only while idle with nothing selected. The
@@ -2044,36 +2167,25 @@
     clearTimeout(selectModeTimeoutId);
     selectModeTimeoutId = null;
     if (dragInfo) cancelTileDrag();
-    if (wasSelectMode) {
-      if (wasSelectMode.kind === 'tile') {
-        wasSelectMode.grid.classList.remove('select-mode');
-        // Query the whole document, not just wasSelectMode.grid — confirmMoveSelected already
-        // reparents moved tiles into the destination grid before calling this, so scoping the
-        // cleanup to the (now smaller) source grid missed them and left the moved tiles stuck
-        // showing the selected outline/checkmark in their new category.
-        document.querySelectorAll('.tile-selected').forEach((t) => t.classList.remove('tile-selected'));
-      } else if (wasSelectMode.kind === 'category') {
-        categoryToggles.forEach((entry) => {
-          const check = entry.mainBtn.querySelector('.category-select-check');
-          if (check) check.hidden = true;
-        });
+    if (wasSelectMode && wasSelectMode.kind === 'tile') {
+      wasSelectMode.grid.classList.remove('select-mode');
+      // Query the whole document, not just wasSelectMode.grid — confirmMoveSelected already
+      // reparents moved tiles into the destination grid before calling this, so scoping the
+      // cleanup to the (now smaller) source grid missed them and left the moved tiles stuck
+      // showing the selected outline/checkmark in their new category.
+      document.querySelectorAll('.tile-selected').forEach((t) => t.classList.remove('tile-selected'));
+    } else if (wasSelectMode && wasSelectMode.kind === 'grouping') {
+      const dividerId = Array.from(wasSelectMode.selectedIds)[0];
+      const el = wasSelectMode.grid && wasSelectMode.grid.querySelector('[data-tile-id="' + CSS.escape(dividerId) + '"]');
+      if (el) el.classList.remove('tile-divider-selected');
+      // Restores the Reorg Tool's full-screen view, state untouched, if it was only hidden (not
+      // cancelled) to reveal the live grid for this — see revealLiveGridForGrouping.
+      if (reorgHiddenForGroupingFocus) {
+        reorgHiddenForGroupingFocus = false;
+        reorgView.hidden = false;
       }
     }
     updateSelectActionBar();
-  }
-
-  function moveCategorySubtree(rootId, newParentId) {
-    const parentIdForOrder = newParentId === 'home' ? null : newParentId;
-    // Refuse a move into itself or into one of its own descendants — either would orphan the
-    // subtree into an unreachable cycle.
-    if (parentIdForOrder === rootId || categorySubtreeIds(rootId).includes(parentIdForOrder)) return;
-    const node = categoryTree[rootId];
-    if (!node) return;
-    const siblingOrders = Object.values(categoryTree)
-      .filter((n) => n.parentId === parentIdForOrder)
-      .map((n) => n.order);
-    node.parentId = parentIdForOrder;
-    node.order = siblingOrders.length > 0 ? Math.max(...siblingOrders) + 1 : 0;
   }
 
   // --- Phase 2 Part 4: Whole-Structure Reorg Tree Tool ---
@@ -2132,13 +2244,25 @@
     return out;
   }
 
-  function openReorgTool() {
+  // presetSelectedId: when opened by long-pressing a specific category header (see
+  // wireCategoryHeaders), that category is pre-selected and scrolled into view immediately,
+  // rather than opening at the tool's plain default state.
+  function openReorgTool(presetSelectedId) {
     closeSettings();
+    // A tile or grouping left selected (its bottom bar never auto-times-out while something's
+    // selected) shouldn't stay active underneath the Reorg Tool — most concretely, a lingering
+    // 'grouping' selectMode's own exit path un-hides this same view again the moment anything
+    // calls exitSelectMode(), fighting the tool's own open/close state.
+    if (selectMode) exitSelectMode();
     reorgWorkingTree = JSON.parse(JSON.stringify(categoryTree));
-    reorgSelectedId = null;
+    reorgSelectedId = presetSelectedId || null;
     reorgCollapsedIds = new Set(); // starts fully expanded every time the tool opens
     reorgView.hidden = false;
     renderReorgList();
+    if (reorgSelectedId) {
+      const row = reorgListEl.querySelector('[data-id="' + CSS.escape(reorgSelectedId) + '"]');
+      if (row) row.scrollIntoView({ block: 'center' });
+    }
   }
 
   function closeReorgTool() {
@@ -2527,68 +2651,45 @@
   reorgMoveUpBtn.addEventListener('click', () => { if (reorgSelectedId) reorgMoveSibling(reorgSelectedId, -1); });
   reorgMoveDownBtn.addEventListener('click', () => { if (reorgSelectedId) reorgMoveSibling(reorgSelectedId, 1); });
 
+  // Cut+Paste is tile-only — category select mode is gone (long-press opens the Reorg Tree Tool
+  // instead, whose own drag covers single-category moves), and groupings are purely positional
+  // within one category, never moved cross-category.
   function confirmMoveSelected() {
-    if (!selectMode) return;
+    if (!selectMode || selectMode.kind !== 'tile') return;
     const destId = currentLocationId();
-    if (selectMode.kind === 'tile') {
-      const sourceId = selectMode.categoryId;
-      if (destId !== sourceId) {
-        const sourceTiles = loadCategoryTiles(sourceId);
-        const moving = sourceTiles.filter((t) => selectMode.selectedIds.has(t.id));
-        const remaining = sourceTiles.filter((t) => !selectMode.selectedIds.has(t.id));
-        saveCategoryTiles(sourceId, remaining);
-        const destTiles = loadCategoryTiles(destId).concat(moving);
-        saveCategoryTiles(destId, destTiles);
-        const destGrid = categoryGrids.get(destId);
-        moving.forEach((t) => {
-          const el = selectMode.grid.querySelector('[data-tile-id="' + t.id + '"]');
-          if (el && destGrid) destGrid.appendChild(el);
-        });
-      }
-    } else {
-      prunedSelectedCategoryRoots().forEach((rootId) => moveCategorySubtree(rootId, destId));
-      saveCategoryTree(categoryTree);
-      // Reset the open path rather than leave it referencing whatever was just moved — a moved
-      // category may no longer be nested where openPath still says it is (e.g. moving the very
-      // category the user is currently inside of, which selecting-then-cutting makes possible for
-      // the first time). Back to Home is the one state guaranteed to still be valid afterward.
-      openPath = [];
-      rebuildCategoriesAndTiles();
+    const sourceId = selectMode.categoryId;
+    if (destId !== sourceId) {
+      const sourceTiles = loadCategoryTiles(sourceId);
+      const moving = sourceTiles.filter((t) => selectMode.selectedIds.has(t.id));
+      const remaining = sourceTiles.filter((t) => !selectMode.selectedIds.has(t.id));
+      saveCategoryTiles(sourceId, remaining);
+      const destTiles = loadCategoryTiles(destId).concat(moving);
+      saveCategoryTiles(destId, destTiles);
+      const destGrid = categoryGrids.get(destId);
+      moving.forEach((t) => {
+        const el = selectMode.grid.querySelector('[data-tile-id="' + t.id + '"]');
+        if (el && destGrid) destGrid.appendChild(el);
+      });
     }
     exitSelectMode();
   }
 
   function deleteSelected() {
-    if (!selectMode) return;
-    if (selectMode.kind === 'tile') {
-      const grid = selectMode.grid;
-      const categoryId = selectMode.categoryId;
-      const remaining = loadCategoryTiles(categoryId).filter((t) => !selectMode.selectedIds.has(t.id));
-      saveCategoryTiles(categoryId, remaining);
-      selectMode.selectedIds.forEach((tileId) => {
-        const el = grid.querySelector('[data-tile-id="' + CSS.escape(tileId) + '"]');
-        if (el) el.remove();
-      });
-    } else {
-      prunedSelectedCategoryRoots().forEach((rootId) => {
-        categorySubtreeIds(rootId).forEach((id) => {
-          delete categoryTree[id];
-          localStorage.removeItem(TILE_STORAGE_PREFIX + id);
-        });
-      });
-      saveCategoryTree(categoryTree);
-      // Same reasoning as confirmMoveSelected's category branch — the deleted category (or one of
-      // its ancestors on the current path) may no longer exist; Home is the one guaranteed-valid
-      // state to fall back to.
-      openPath = [];
-      rebuildCategoriesAndTiles();
-    }
+    if (!selectMode || selectMode.kind !== 'tile') return;
+    const grid = selectMode.grid;
+    const categoryId = selectMode.categoryId;
+    const remaining = loadCategoryTiles(categoryId).filter((t) => !selectMode.selectedIds.has(t.id));
+    saveCategoryTiles(categoryId, remaining);
+    selectMode.selectedIds.forEach((tileId) => {
+      const el = grid.querySelector('[data-tile-id="' + CSS.escape(tileId) + '"]');
+      if (el) el.remove();
+    });
     exitSelectMode();
   }
 
   function selectedCount() {
     if (!selectMode) return 0;
-    return selectMode.kind === 'category' ? prunedSelectedCategoryRoots().length : selectMode.selectedIds.size;
+    return selectMode.selectedIds.size;
   }
 
   function updateSelectActionBar() {
@@ -2602,19 +2703,27 @@
     // during live drag activity (resetMoveModeTimeout).
     resetSelectModeTimeout();
     selectActionBar.hidden = false;
-    const isCategory = selectMode.kind === 'category';
+    // Category select mode is gone — long-press on a category header opens the Reorg Tree Tool
+    // directly instead. Only 'tile' and 'grouping' remain, so this now just tells the two apart.
+    const isGrouping = selectMode.kind === 'grouping';
     const n = selectedCount();
 
-    selectActionSelectAllBtn.hidden = isCategory; // Select All is tiles-only, per the decision
+    // Select All, Cut, Paste don't apply to a grouping — it's always exactly one, and purely
+    // positional within its own category, never moved cross-category. ➕ is the reverse: only
+    // grouping ever shows it, tiles have no equivalent "add" action on this bar.
+    selectActionSelectAllBtn.hidden = isGrouping;
     selectActionSelectAllBtn.disabled = pickingDestination;
-    selectActionRenameBtn.textContent = isCategory ? '🔧' : '✏️';
-    selectActionRenameBtn.setAttribute('aria-label', isCategory ? 'Edit category' : 'Rename');
+    selectActionCutBtn.hidden = isGrouping;
+    selectActionPasteBtn.hidden = isGrouping;
+    selectActionAddBtn.hidden = !isGrouping;
+    selectActionAddBtn.disabled = pickingDestination;
+    selectActionRenameBtn.setAttribute('aria-label', isGrouping ? 'Rename grouping' : 'Rename');
     selectActionRenameBtn.disabled = n !== 1 || pickingDestination;
     selectActionCutBtn.disabled = n === 0 || pickingDestination;
     selectActionDeleteBtn.disabled = n === 0 || pickingDestination;
 
     if (!pickingDestination) {
-      selectActionStatus.textContent = n + ' selected';
+      selectActionStatus.textContent = isGrouping ? 'Grouping selected' : n + ' selected';
       selectActionPasteBtn.disabled = true;
     } else {
       // Same convention as currentLocationId() (used by Create) — "nothing open" now resolves to
@@ -2659,9 +2768,16 @@
       const tileId = Array.from(selectMode.selectedIds)[0];
       const tileEl = selectMode.grid.querySelector('[data-tile-id="' + CSS.escape(tileId) + '"]');
       if (tileEl) openTileRenameFor(tileEl);
-    } else {
-      openEditCategory(prunedSelectedCategoryRoots()[0]);
+    } else if (selectMode.kind === 'grouping') {
+      const dividerEl = groupingDividerEl();
+      if (dividerEl) startGroupingInlineRename(dividerEl, selectMode.categoryId, Array.from(selectMode.selectedIds)[0]);
     }
+  });
+
+  selectActionAddBtn.addEventListener('click', () => {
+    if (!selectMode || selectMode.kind !== 'grouping') return;
+    const dividerId = Array.from(selectMode.selectedIds)[0];
+    insertGrouping(selectMode.categoryId, selectMode.grid, dividerId);
   });
 
   selectActionDeleteBtn.addEventListener('click', () => {
@@ -2690,35 +2806,23 @@
       return;
     }
 
-    // Category branch: impact is computed recursively across every selected (pruned) root, since
-    // deleting a category also deletes its full nested subtree.
-    const roots = prunedSelectedCategoryRoots();
-    let tileCount = 0;
-    let subcategoryCount = 0;
-    roots.forEach((rootId) => {
-      const subtreeIds = categorySubtreeIds(rootId);
-      subcategoryCount += subtreeIds.length - 1; // exclude the root itself
-      subtreeIds.forEach((id) => { tileCount += loadCategoryTiles(id).length; });
-    });
-    const combinedTotal = tileCount + subcategoryCount;
-    const label = n === 1
-      ? 'the ' + categoryTree[roots[0]].name + ' category (and everything in it)'
-      : n + ' categories (and everything in them)';
-    const counts = 'You are about to delete ' + tileCount + (tileCount === 1 ? ' tile' : ' tiles')
-      + ' and ' + subcategoryCount + (subcategoryCount === 1 ? ' subcategory' : ' subcategories')
-      + ', for a combined total of ' + combinedTotal + (combinedTotal === 1 ? ' entry.' : ' entries.');
-    // Friction scales by whether there are any tiles anywhere in the subtree — zero tiles (even
-    // with subcategories nested underneath) stays a plain Yes/No; the impact count itself is
-    // shown independent of that, whenever there's anything nested at all. No random easter egg
-    // for categories, ever — that's tile-delete-only.
-    // Same single-target rule as tile delete: only show something below the popup when exactly
-    // one category is targeted, not for a multi-select batch.
-    const targetEntry = n === 1 ? categoryToggles.get(roots[0]) : null;
-    openTileConfirm('Are you sure you want to remove ' + label + '?', deleteSelected, {
-      counts: combinedTotal > 0 ? counts : null,
-      requireTypedYes: tileCount > 0,
-      targetEl: targetEntry && targetEntry.mainBtn,
-    });
+    // Grouping branch: purely cosmetic (deleting it never touches any tile), so a plain named
+    // confirm — no impact count, no typed-yes friction, matching the addendum's "simpler system"
+    // framing. Reads the name from storage rather than the DOM, since an in-progress unsaved
+    // inline rename (if the user opened this without committing one first) shouldn't be shown as
+    // if it were already saved.
+    const dividerId = Array.from(selectMode.selectedIds)[0];
+    const categoryId = selectMode.categoryId;
+    const tiles = loadCategoryTiles(categoryId);
+    const entry = tiles.find((t) => t.id === dividerId && t.type === 'divider');
+    const name = entry ? entry.name : 'grouping';
+    const dividerEl = groupingDividerEl();
+    openTileConfirm('Are you sure you want to remove the "' + name + '" grouping? Tiles in it won\'t be deleted.', () => {
+      const remaining = loadCategoryTiles(categoryId).filter((t) => t.id !== dividerId);
+      saveCategoryTiles(categoryId, remaining);
+      if (dividerEl) dividerEl.remove();
+      exitSelectMode();
+    }, { targetEl: dividerEl });
   });
 
   const CLOCK_SETTINGS_KEY = 'clockSettings';
