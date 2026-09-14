@@ -1223,7 +1223,9 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
-_Nothing queued right now — add new bugs, corrections, or feature ideas here as they come up._
+### Grouping icon: 🔣 instead of ➕
+
+- [ ] Per the user: the grouping icon should be 🔣, not ➕. Two spots currently use ➕ for it (Build Log 60) — the global "+" create-menu's "+ Grouping" option (`#create-menu-grouping`, index.html) and the select-action-bar's ➕ for inserting another grouping while one's selected (`#select-action-add`, index.html/script.js aria-label "Add grouping"). Swapping both to 🔣 gives groupings a visually distinct icon instead of sharing the same ➕ Tile/Category creation already uses.
 
 ## Build Planner
 
