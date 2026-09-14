@@ -1218,6 +1218,15 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 - [x] **Pre-select + scroll-to — decided by the user:** long-pressing a specific category opens the Reorg Tool with that exact category already selected (highlighted) and scrolled into view, not just opened at its default state.
 - [ ] Out of scope, unaffected: tile long-press (Reorg Tool doesn't touch tiles at all) and Home's long-press (already its own separate thing — Home Settings — not part of category select mode to begin with).
 
+### Category Color picker — Edit Category dialog, below Groupings
+
+- [ ] Per the user, with a reference mock-up (a desktop app's "Category Color" picker: a list of categories on the left, a "Choose" swatch dropdown on the right listing named defaults — Black/Blue/Gray/Green/Orange/Red/Violet/Yellow — plus "Choose" for a wider picker and "None"). Explicitly **not** required to function exactly like the mock-up — it's a reference for the shape (pick a category, then pick a color for its stripe), not a spec to match pixel-for-pixel.
+- [ ] **Groupings-in-Edit-Category is already built** (Build Log 58) — list existing groupings with add/rename/delete, right there in the dialog. The user's description of that part is already satisfied; flagging so it isn't mistaken for new work.
+- [ ] **New:** a "Category Color" section in the Edit Category dialog, positioned below Groupings (Sort Tiles → Groupings → Category Color, top to bottom, per the user). Sets `stripeColor` — the field already exists on every category in the data model (this Build Planner entry has been waiting specifically for this), there's just never been a picker to change it after creation.
+- [ ] **Three capabilities requested, all needed:** a small set of default swatches (the mock-up's 8 named colors are a reasonable starting set, not locked in); a way to reach a wider palette beyond those defaults; and a way to type in a hex value directly.
+- [ ] **Open question, not decided:** does this apply to every category regardless of nesting depth, or only top-level ("primary") categories, per the mock-up's own wording? The `stripeColor` field exists on every category already, but it's not confirmed whether subcategories' stripes are even visually shown anywhere today.
+- [ ] **Open question, not decided:** does Home get a color too (it already has its own Settings dialog, Sort-only so far), or is this categories-only?
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
@@ -1231,10 +1240,6 @@ _Backlog of items to get to eventually — not being actively worked on. Promote
 ### Tile Grouping — visual subgroups within a single category
 
 - [x] **Superseded by "Visual Grouping Headers — Full Implementation Spec" in the Build Queue above.** This entry was the rough, undetailed version of the same idea; the full spec doc the user later supplied covers everything here (and more — creation/edit interaction, sort-within-group behavior, editing placement) in detail. Left here for history only, not a separate thing to build.
-
-### Reassign Stripe Color (category header)
-
-- [ ] Held on purpose, per the user — tie this to the broader Personalization/Settings work (color palette, etc.) rather than building it standalone now. The `stripeColor` field already exists on every category in the data model; there's just no picker to change it after creation. Promote to Build Queue once Personalization work starts.
 
 ### Add a favicon
 
