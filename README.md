@@ -1210,7 +1210,13 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
-_Nothing queued right now — add new bugs, corrections, or feature ideas here as they come up._
+### Category long-press opens the Reorg Tree Tool instead of Organize Mode's select bar
+
+- [ ] Per the user: long-pressing a category header should open the Reorganize Categories screen directly, instead of the current behavior — entering Organize Mode's category-select state and showing the bottom action bar (✂️ Cut, 🔧 Edit, 🗑️ Delete, 🆑 Clear). Reasoning, per the user: those functions are all now handled inside the Reorg Tree Tool (Build Log 59 added Properties = Edit, Remove Category = Delete, right there in that screen).
+- [ ] **Checked against the actual code — Edit and Delete really are fully covered already**, confirming the user's reasoning: Reorg's Properties button opens the same live Edit Category dialog the bottom bar's 🔧 does, and Remove Category uses the same confirmation flow the bottom bar's 🗑️ does.
+- [ ] **One real gap, not yet covered anywhere: batch category Cut+Paste.** Category select mode supports multi-select (`handleCategoryLongPress` → `rangeSelectCategories` on a second long-press) — Cut+Paste on a multi-selection moves every selected category to one destination in a single action. If long-press always opens the Reorg Tool instead, category select mode can never be entered at all anymore, and that capability becomes entirely unreachable — not just less convenient. The Reorg Tool's own drag only re-nests one category at a time; there's no way to move several categories to the same new parent in one action there today. **Question for the user:** is losing batch category Cut+Paste acceptable (single-category moves still work fine via Reorg's own drag), or does something need to replace it?
+- [ ] **Also open:** should long-pressing a specific category pre-select/scroll-to that category inside the Reorg Tool when it opens (so the tool opens "on" the category you pressed), or just open the tool at its default state with nothing selected? Not specified.
+- [ ] Out of scope, unaffected: tile long-press (Reorg Tool doesn't touch tiles at all) and Home's long-press (already its own separate thing — Home Settings — not part of category select mode to begin with).
 
 ## Build Planner
 
