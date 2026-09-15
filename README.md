@@ -1244,6 +1244,11 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 - [x] **Placement — decided (this exchange):** ⬆️⬇️ join ✏️🗑️➕ on the same select-action-bar already showing for a selected grouping — not a separate row, not a new location. General principle going forward, per the user's own broader point about inconsistent "how things move" across the app: whenever something is selected via long-press, its move controls live on whatever bar is already showing for it, rather than each context inventing its own layout. (Categories in the Reorg Tree Tool keep their own separate Up/Down row as already built — that tool is a different, full-screen list-editor paradigm, not a contextual selection bar, so it wasn't re-examined here.)
 - [x] **Scope — decided:** tiles stay drag-only, per the user. This is scoped to groupings; tiles' existing drag-to-reorder isn't changing.
 - [ ] **Mechanism, following the existing data model:** tiles and dividers already share one flat ordered array per category (the same array dragging already respects) — Up/Down for a selected grouping swaps its position with whichever array entry sits immediately before/after it, tile or divider, same as a one-step drag would produce. No new ordering concept needed, just a button-driven version of what a drag already does.
+
+### Reorg Tree Tool toolbar: drop the redundant "New" from the button labels
+
+- [ ] Per the user: `#reorg-new-category-btn` reads "➕ New Category" → should be "➕ Category". `#reorg-new-subcategory-btn` reads "➕ New Subcategory" → should be "➕ Subcategory". No reason for the redundant "New" — the ➕ icon already says "add/new."
+- [ ] **Related, not explicitly asked, flagging for a decision at build time:** the New Category/Subcategory dialog these buttons open has its own `<h2>` heading (`#reorg-new-category-title`) that dynamically reads "New Category" or "New Subcategory" (set in script.js's `openReorgNewCategory`). The user only named the toolbar buttons — unclear whether they want that dialog heading trimmed to match ("Category"/"Subcategory") or left as-is, since a modal's own title reading "New Category" is a more normal, expected pattern than a button label repeating it.
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
