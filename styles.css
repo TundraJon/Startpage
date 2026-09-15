@@ -1798,6 +1798,16 @@ main {
   cursor: pointer;
 }
 
+/* Add (Build 61's ➕ swapped for a plain "+" glyph, per the user) — reuses the same green
+   light/dark-aware tokens the Cut/Paste action bar already established (Build 47) rather than
+   introducing a third green, styled as bold/slightly larger text since it's a plain character
+   standing in among the row's other emoji, not an emoji itself. */
+.grouping-toolbar-btn-plus {
+  color: var(--action-go-fg);
+  font-weight: 700;
+  font-size: 1.3rem;
+}
+
 .grouping-toolbar-btn:disabled {
   opacity: 0.4;
   cursor: default;
