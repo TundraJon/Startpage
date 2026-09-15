@@ -128,6 +128,7 @@ body {
   color: var(--fg);
   width: 32px;
   height: 32px;
+  padding: 0;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -144,6 +145,15 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* Explicit, like every other [hidden] rule in this file — a bare inline <svg>'s `hidden`
+   attribute doesn't get the browser's usual [hidden]{display:none} treatment on its own here
+   (confirmed directly: the attribute was present, computed display stayed "block" regardless),
+   so these two default-icon SVGs need the same rule spelled out as everything else does. */
+#profile-btn-default-icon[hidden],
+#profile-photo-default-preview[hidden] {
+  display: none;
 }
 
 .search-row {

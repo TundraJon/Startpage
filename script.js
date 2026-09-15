@@ -129,16 +129,26 @@
 
   // Reflects whatever's currently in storage onto both the header icon and the Settings preview
   // -- the one place either of those ever gets updated, called after every set/remove.
+  // Plain `el.hidden = ...` doesn't reliably add/remove the `hidden` *attribute* on an SVG
+  // element the way it does on a normal HTML element (confirmed directly: the property sets fine,
+  // but `hasAttribute('hidden')` stays false and the element keeps rendering) -- explicit
+  // setAttribute/removeAttribute works correctly regardless of element type, so this is used for
+  // every hidden-toggle here rather than mixing the two approaches.
+  function setElementHidden(el, hidden) {
+    if (hidden) el.setAttribute('hidden', '');
+    else el.removeAttribute('hidden');
+  }
+
   function applyProfilePhoto() {
     const dataUrl = localStorage.getItem(PROFILE_PHOTO_KEY);
     const hasPhoto = !!dataUrl;
     profileBtnImg.src = hasPhoto ? dataUrl : '';
-    profileBtnImg.hidden = !hasPhoto;
-    profileBtnDefaultIcon.hidden = hasPhoto;
+    setElementHidden(profileBtnImg, !hasPhoto);
+    setElementHidden(profileBtnDefaultIcon, hasPhoto);
     profilePhotoPreview.src = hasPhoto ? dataUrl : '';
-    profilePhotoPreview.hidden = !hasPhoto;
-    profilePhotoDefaultPreview.hidden = hasPhoto;
-    profilePhotoRemoveBtn.hidden = !hasPhoto;
+    setElementHidden(profilePhotoPreview, !hasPhoto);
+    setElementHidden(profilePhotoDefaultPreview, hasPhoto);
+    setElementHidden(profilePhotoRemoveBtn, !hasPhoto);
   }
   applyProfilePhoto();
 
@@ -2036,6 +2046,18 @@
     return nearest;
   }
 
+  // Which side of `candidate` the pointer (x, y) is currently on — "before" or "after" in DOM
+  // order. Purely geometric, using only candidate's own rect: above/below its row first (a
+  // divider spans the grid's full width, so this alone always decides it), then left/right of
+  // its own center once the pointer's y is genuinely within that row (the normal same-row
+  // tile-to-tile case).
+  function pointerSideOf(candidate, x, y) {
+    const r = candidate.getBoundingClientRect();
+    if (y < r.top) return 'before';
+    if (y > r.bottom) return 'after';
+    return x < r.left + r.width / 2 ? 'before' : 'after';
+  }
+
   // Reorders dragInfo.grid around the dragged tile based on cursor position. Nearest-tile-center
   // (rather than exact hit-test under the cursor) so a fast or coalesced drag still resolves to
   // the correct slot even if intermediate pointermove events over specific sibling tiles never
@@ -2044,43 +2066,27 @@
     const grid = dragInfo.grid;
     const nearest = findNearestDropTarget(grid, dragInfo.tileEl, x, y);
     if (!nearest) return;
-    // Already sitting immediately next to this candidate, on either side — nothing to do.
-    // Without this, a divider is the real culprit: it spans the grid's full width, so its own
-    // "closest point" distance barely differs whichever side the dragged tile ends up on, while
-    // the dragged tile's own "current position" (measured below, used to decide whether it's
-    // still worth moving) is self-referential — right next to the divider, that position is
-    // itself a result of the last reorder, so comparing against it can swing the decision back
-    // the other way on literally every subsequent pointermove, forever, since neither side is
-    // ever decisively closer than the other once already adjacent. That's an infinite before/after
-    // flip confirmed live: the dragged tile's real DOM slot (not its visual, cursor-following
-    // position) toggling every couple of pixels, which shoves whichever real tile sits on the far
-    // side of that flip back and forth — the reported "vibrating" neighbor. Stopping as soon as
-    // the tile is already touching its nearest candidate closes the loop: which exact side it
-    // landed on first is fine, there's nothing left worth re-deciding.
-    if (dragInfo.tileEl.previousElementSibling === nearest || dragInfo.tileEl.nextElementSibling === nearest) return;
-    dragInfo.tileEl.style.transform = 'none';
-    const ownRect = dragInfo.tileEl.getBoundingClientRect();
-    const ownCx = ownRect.left + ownRect.width / 2;
-    const ownCy = ownRect.top + ownRect.height / 2;
-    const distToOwnSq = (ownCx - x) * (ownCx - x) + (ownCy - y) * (ownCy - y);
-    const nr = nearest.getBoundingClientRect();
-    const distToNearestSq = nearest.classList.contains('tile-divider')
-      ? nearestPointDistSq(nr, x, y)
-      : (nr.left + nr.width / 2 - x) * (nr.left + nr.width / 2 - x) + (nr.top + nr.height / 2 - y) * (nr.top + nr.height / 2 - y);
-    // Only reorder when the pointer is genuinely closer to the candidate's slot than to the
-    // dragged tile's own current slot. With very few siblings (e.g. exactly one other tile in
-    // the category), "nearest" is otherwise trivially always that same tile regardless of real
-    // proximity, which would flip the order back and forth on every single move event.
-    if (distToNearestSq < distToOwnSq) {
-      const siblings = Array.from(grid.children).filter(
-        (c) => c.classList.contains('tile') || c.classList.contains('tile-divider')
-      );
-      const draggedIndex = siblings.indexOf(dragInfo.tileEl);
-      const targetIndex = siblings.indexOf(nearest);
-      if (draggedIndex !== -1 && targetIndex !== -1 && draggedIndex !== targetIndex) {
-        if (draggedIndex < targetIndex) nearest.after(dragInfo.tileEl);
-        else nearest.before(dragInfo.tileEl);
-      }
+    // Decided purely from which side of `nearest` the pointer is on — never from the dragged
+    // tile's own current position. That self-reference was the actual cause of two real, both
+    // confirmed-live bugs: (1) right next to a divider — which spans the grid's full width, so
+    // its own "closest point" distance barely differs whichever side the dragged tile ends up on
+    // — the tile's "current position" is itself the result of the last reorder, so comparing
+    // against it could swing the decision back the other way on literally every pointermove,
+    // forever (the reported "vibrating" neighbor tile). (2) a since-reverted attempt to fix that
+    // by bailing out early whenever the tile was already adjacent to `nearest` on *either* side —
+    // which stopped the jitter but also permanently blocked a tile that *starts out* already
+    // adjacent to a divider (the last tile before a new empty group, or the only tile inside one)
+    // from ever being dragged past it to the other side at all. Deciding by pointer side avoids
+    // both: it's stable regardless of the tile's own position (fixes #1), and still fires for a
+    // genuine first-time cross past an already-adjacent divider, since that's judged by where the
+    // pointer actually is, not by current DOM adjacency (fixes #2). The idempotency check below
+    // (only move if it isn't already there) is the only thing standing in for the old bail-out —
+    // it's a no-op check, not a decision gate, so it can't reintroduce either bug.
+    const side = pointerSideOf(nearest, x, y);
+    if (side === 'after') {
+      if (dragInfo.tileEl.previousElementSibling !== nearest) nearest.after(dragInfo.tileEl);
+    } else if (dragInfo.tileEl.nextElementSibling !== nearest) {
+      nearest.before(dragInfo.tileEl);
     }
   }
 
