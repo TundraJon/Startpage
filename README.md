@@ -1242,9 +1242,10 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 - [ ] Per the user: `#sort-category-alpha`/`-most-used`/`-last-used` (currently icon-only since Build 61: 🔤/📈/⏱️) get short text labels back alongside the icons. **Confirmed label style:** abbreviated, not the original full words — 🔤 Alpha, 📈 Used, ⏱️ Recent.
 
-### Edit Category, Groupings toolbar: replace ➕ with a styled "+" (bold, green)
+### Edit Category, Groupings toolbar: replace ➕ with a styled "+" (bold, green, a bit bigger)
 
 - [ ] Per the user: `#grouping-add-btn` (the shared icon row's Add button, Build 61) swaps its ➕ emoji for a plain "+" character, styled bold and green — a text glyph with custom styling instead of an emoji, unlike the row's other four buttons (🔺🔻✏️🗑️) which stay as emoji.
+- [ ] **Follow-up from the user: "Maybe make the font a bit bigger, too."** The "+" glyph's font-size should step up somewhat from the row's normal `.grouping-toolbar-btn` size — no exact value given, so this is a judgment call at build time (something modestly larger, not a drastic jump), consistent with it otherwise being a plain-text glyph rather than an emoji among emoji.
 
 ## Build Planner
 
