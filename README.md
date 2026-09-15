@@ -1266,7 +1266,29 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
-_Empty — everything above has been built. Log new items here as they come in._
+### Build 64's drag rewrite fixed the adjacency regression but introduced a directional bug — same root cause explains both reported symptoms
+
+User report (verbatim): "I can now drag up and down to groups at the bottom or the main category at the top at will. However, when I try to drag from one group to another, it almost always has the tiles there shift to the right and when I drop the tile it goes to the leftmost position no matter where I was holding it. Dragging from left to right within the same category seems to work fine. Dragging from right to left in the same category gives you about a 50% chance of it going to the left when you drop it."
+
+Reproduced live via Playwright (5 plain tiles in one row, no grouping): dragging `t0` rightward through each tile's center landed correctly at every single step (`t1,t0,...` → `t1,t2,t3,t4,t0`, exactly as expected). Dragging `t4` leftward through the same centers, in reverse, did **not** mirror it — first step (pointer at `t3`'s exact center) produced **no reorder at all**, then subsequent steps each moved `t4` one slot further than intended, and the final result was `t0,t4,t1,t2,t3` — one slot short of the leftmost position, not `t4,t0,t1,t2,t3`.
+
+**Root cause — one bug, two symptoms, both in `pointerSideOf` (script.js):**
+
+```js
+function pointerSideOf(candidate, x, y) {
+  const r = candidate.getBoundingClientRect();
+  if (y < r.top) return 'before';
+  if (y > r.bottom) return 'after';
+  return x < r.left + r.width / 2 ? 'before' : 'after';
+}
+```
+
+1. **Same-row left/right flakiness.** The tie at exactly (or numerically at) the candidate's own center resolves to `'after'`, never `'before'` — the comparison is a strict `<`. Dragging rightward, that tie always agrees with the direction of travel, so it just works every time (confirmed: zero misfires across 4 steps). Dragging leftward, the pointer has to get *strictly* past the left half of a candidate before a reorder fires; sitting at or near dead-center — completely normal for a real drag — keeps resolving `'after'`, landing the tile one slot right of where the user stopped. That's the reported "~50% chance," and it depends purely on which side of that exact midpoint the pointer happens to be on when the event fires.
+2. **Cross-group "always leftmost, ignores x."** A grouping divider spans the grid's full row width, so `pointerSideOf`'s y-check (`y < r.top` / `y > r.bottom`) is *unconditionally* decisive for it — x is never even reached once the pointer's y is below the divider's own thin row, which is true for virtually the entire body of the target group. Compounding that, `findNearestDropTarget` very often picks the divider itself as "nearest" over any tile already in that group's row: the divider's distance metric (closest point on its full-width box) collapses to pure vertical distance, which is frequently smaller than the diagonal distance to a tile sitting away from the pointer horizontally. So a drag into a group commonly resolves `nearest = divider`, and once that happens placement is unconditionally "right after the divider" — the leftmost slot in that group — no matter where in the row the pointer actually is. Every existing tile in that row shifts one slot right to make room, matching "tiles there shift to the right... goes to the leftmost position no matter where I was holding it" exactly.
+
+**Proposed fix direction (not designed in full, not built):** both symptoms trace to deciding placement from a single nearest candidate's own left/right split. A gap-based approach — find which gap between two *adjacent current siblings* in the target row the pointer's x falls into, rather than which side of one candidate's own center — would remove the directional tie (no single midpoint to get stuck at) and stop the divider from unconditionally claiming the leftmost slot (a divider would just be the left edge of the first gap in its group, not an x-blind decision-maker). Needs real design work — in particular how this interacts with the divider's y-based "which group am I even in" role, which is still correct and should stay — before writing any code.
+
+Not yet authorized to build.
 
 ## Build Planner
 
