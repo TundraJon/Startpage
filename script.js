@@ -2013,80 +2013,101 @@
     finishTileDrag();
   }
 
-  // Candidates are both .tile and .tile-divider siblings — a grouping with nothing under it yet
-  // used to be a dead end for dragging (dividers were invisible to this search entirely, so a
-  // tile could never be dropped past one with no neighboring tile to snap against). Tiles still
-  // use plain center-to-center distance, unchanged from before dividers existed; a divider spans
-  // the grid's full width, so its own "center" is a meaningless fixed horizontal point — it uses
-  // distance to the closest point on its own box instead, which collapses to a vertical-only
-  // distance whenever the pointer's x is anywhere within the grid (always true), so a drag
-  // anywhere across the row still finds it once vertically close.
-  function nearestPointDistSq(rect, x, y) {
-    const cx = Math.max(rect.left, Math.min(x, rect.right));
-    const cy = Math.max(rect.top, Math.min(y, rect.bottom));
-    return (cx - x) * (cx - x) + (cy - y) * (cy - y);
-  }
-
-  function findNearestDropTarget(grid, excludeEl, x, y) {
-    let nearest = null;
-    let nearestDist = Infinity;
-    Array.from(grid.children).forEach((c) => {
-      if (c === excludeEl) return;
-      const isDivider = c.classList.contains('tile-divider');
-      if (!isDivider && !c.classList.contains('tile')) return;
-      const r = c.getBoundingClientRect();
-      const dist = isDivider
-        ? nearestPointDistSq(r, x, y)
-        : (r.left + r.width / 2 - x) * (r.left + r.width / 2 - x) + (r.top + r.height / 2 - y) * (r.top + r.height / 2 - y);
-      if (dist < nearestDist) {
-        nearestDist = dist;
-        nearest = c;
-      }
-    });
-    return nearest;
-  }
-
-  // Which side of `candidate` the pointer (x, y) is currently on — "before" or "after" in DOM
-  // order. Purely geometric, using only candidate's own rect: above/below its row first (a
-  // divider spans the grid's full width, so this alone always decides it), then left/right of
-  // its own center once the pointer's y is genuinely within that row (the normal same-row
-  // tile-to-tile case).
-  function pointerSideOf(candidate, x, y) {
-    const r = candidate.getBoundingClientRect();
-    if (y < r.top) return 'before';
-    if (y > r.bottom) return 'after';
-    return x < r.left + r.width / 2 ? 'before' : 'after';
-  }
-
-  // Reorders dragInfo.grid around the dragged tile based on cursor position. Nearest-tile-center
-  // (rather than exact hit-test under the cursor) so a fast or coalesced drag still resolves to
-  // the correct slot even if intermediate pointermove events over specific sibling tiles never
-  // actually get dispatched.
+  // Reorders dragInfo.grid around the dragged tile based on cursor position. Two-step: (1) find
+  // which *row* the pointer is nearest to (a "row" is either every tile sharing one grid row's
+  // top, or one grouping divider alone in its own full-width row), (2) place the dragged tile
+  // within that row. Row-first — rather than one global nearest-candidate search mixing tile
+  // centers and divider-box distances into a single Euclidean metric — is what fixes dropping
+  // into a group: a divider sitting just above a tile row could out-score every tile in that row
+  // on raw distance even when the pointer's y is genuinely inside the row, which made the divider
+  // "win" far too often and, once it did, placement had no x information left to use at all (see
+  // below) — landing the tile leftmost in the group no matter where across the row the pointer
+  // actually was. Picking the row by a y-band (0 distance whenever the pointer's y is already
+  // between a row's own top and bottom, which is true for nearly the whole time the pointer is
+  // over that row) makes a tile row win over its divider whenever the pointer is actually in it.
   function reflowWithinCurrentGrid(x, y) {
     const grid = dragInfo.grid;
-    const nearest = findNearestDropTarget(grid, dragInfo.tileEl, x, y);
-    if (!nearest) return;
-    // Decided purely from which side of `nearest` the pointer is on — never from the dragged
-    // tile's own current position. That self-reference was the actual cause of two real, both
-    // confirmed-live bugs: (1) right next to a divider — which spans the grid's full width, so
-    // its own "closest point" distance barely differs whichever side the dragged tile ends up on
-    // — the tile's "current position" is itself the result of the last reorder, so comparing
-    // against it could swing the decision back the other way on literally every pointermove,
-    // forever (the reported "vibrating" neighbor tile). (2) a since-reverted attempt to fix that
-    // by bailing out early whenever the tile was already adjacent to `nearest` on *either* side —
-    // which stopped the jitter but also permanently blocked a tile that *starts out* already
-    // adjacent to a divider (the last tile before a new empty group, or the only tile inside one)
-    // from ever being dragged past it to the other side at all. Deciding by pointer side avoids
-    // both: it's stable regardless of the tile's own position (fixes #1), and still fires for a
-    // genuine first-time cross past an already-adjacent divider, since that's judged by where the
-    // pointer actually is, not by current DOM adjacency (fixes #2). The idempotency check below
-    // (only move if it isn't already there) is the only thing standing in for the old bail-out —
-    // it's a no-op check, not a decision gate, so it can't reintroduce either bug.
-    const side = pointerSideOf(nearest, x, y);
-    if (side === 'after') {
-      if (dragInfo.tileEl.previousElementSibling !== nearest) nearest.after(dragInfo.tileEl);
-    } else if (dragInfo.tileEl.nextElementSibling !== nearest) {
-      nearest.before(dragInfo.tileEl);
+    const others = Array.from(grid.children).filter(
+      (c) => c !== dragInfo.tileEl && (c.classList.contains('tile') || c.classList.contains('tile-divider'))
+    );
+    if (others.length === 0) return;
+
+    // Tracks the pointer's x across calls only to break an exact tie in the direction it's
+    // actually moving — never compared against the dragged tile's own position (see below).
+    const movingLeft = dragInfo.lastReflowX !== undefined && x < dragInfo.lastReflowX;
+    dragInfo.lastReflowX = x;
+
+    const rows = [];
+    others.forEach((el) => {
+      const r = el.getBoundingClientRect();
+      let row = rows.find((rw) => Math.abs(rw.top - r.top) < 1);
+      if (!row) {
+        row = { top: r.top, bottom: r.bottom, items: [] };
+        rows.push(row);
+      }
+      row.items.push({ el, r });
+      row.bottom = Math.max(row.bottom, r.bottom);
+    });
+
+    let nearestRow = rows[0];
+    let nearestRowDist = Infinity;
+    rows.forEach((row) => {
+      const d = y < row.top ? row.top - y : y > row.bottom ? y - row.bottom : 0;
+      if (d < nearestRowDist) {
+        nearestRowDist = d;
+        nearestRow = row;
+      }
+    });
+
+    // A divider is always alone in its own row (it spans the grid's full width) — x is
+    // meaningless for a full-width element, so before/after is decided purely by which half of
+    // its own band the pointer's y is in, same as before this rewrite. Ties toward "after" (into
+    // the group the divider heads), not "before": a group's own label reads as belonging to the
+    // content that follows it, and defaulting the other way undid an already-correct in-progress
+    // placement the moment the pointer settled on the divider's own dead-center — confirmed live
+    // while dragging into a brand-new empty group at the bottom of a long, auto-scrolled category.
+    if (nearestRow.items.length === 1 && nearestRow.items[0].el.classList.contains('tile-divider')) {
+      const divEl = nearestRow.items[0].el;
+      const r = nearestRow.items[0].r;
+      const mid = (r.top + r.bottom) / 2;
+      if (y < mid) {
+        if (dragInfo.tileEl.nextElementSibling !== divEl) divEl.before(dragInfo.tileEl);
+      } else if (dragInfo.tileEl.previousElementSibling !== divEl) {
+        divEl.after(dragInfo.tileEl);
+      }
+      return;
+    }
+
+    // A tile row: scan left-to-right for the first item the pointer is still to the left of, and
+    // land before it — after the last item if the pointer is past all of them. Scanning the whole
+    // row (rather than picking one nearest candidate first) means the decision always reflects
+    // every tile actually in the row, not whichever one a Euclidean-distance search happened to
+    // pick. The tie exactly at an item's own center — which is not a rare edge case here, since a
+    // reorder shifts every later item by exactly one uniform track width, so a pointer easing
+    // toward a neighboring tile's center keeps landing on that same exact boundary — is broken
+    // toward the direction the pointer is actually moving. A fixed tie-break (e.g. always
+    // "after") is invisible dragging one direction, because it agrees with the direction of
+    // travel, but fights the other: that was the confirmed, reproduced cause of "left-to-right
+    // reorder works, right-to-left is a coin flip." This never compares against the dragged
+    // tile's own position (only against where the pointer itself was last) — that self-reference
+    // was the cause of a different, earlier bug (the divider "vibrating" neighbor, and later, a
+    // fix for that which blocked a tile already adjacent to a divider from ever crossing it) —
+    // Build 64 fixed both by removing it, and this keeps it removed.
+    const items = nearestRow.items.slice().sort((a, b) => a.r.left - b.r.left);
+    let target = null;
+    for (const item of items) {
+      const center = item.r.left + item.r.width / 2;
+      const before = movingLeft ? x <= center : x < center;
+      if (before) {
+        target = item;
+        break;
+      }
+    }
+    if (target) {
+      if (dragInfo.tileEl.nextElementSibling !== target.el) target.el.before(dragInfo.tileEl);
+    } else {
+      const last = items[items.length - 1];
+      if (dragInfo.tileEl.previousElementSibling !== last.el) last.el.after(dragInfo.tileEl);
     }
   }
 
