@@ -1255,6 +1255,13 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
+### Bug (unreproduced): can't drag a tile under a new group added at the bottom of a category
+
+- [ ] Per the user: "When adding a new group to the bottom of the category, there is no way to drag a tile into/under it."
+- [ ] **Tried hard to reproduce live via Playwright across three realistic scenarios — all three worked correctly, no failure found:** (1) a simple 2-tile category with a new empty group appended at the bottom — dragging one tile onto/past the new divider correctly landed it after the divider, in both the live grid and storage; (2) a more realistic category with two existing groups (Free, Paid) plus a new empty group appended after both — dragging a tile from the *first* group, past the second, down to the new bottom one, correctly landed it there too; (3) a long (20-tile) category where the new bottom group starts off-screen, requiring the drag's own auto-scroll to reach it — auto-scroll engaged correctly, the divider's position was correctly recomputed after scrolling, and the tile still landed after it correctly. Storage and the live grid stayed in sync in every case, zero page errors.
+- [ ] **Best-effort theory, unconfirmed, since the mechanism itself checks out:** most likely a real-device precision/discoverability issue rather than a broken mechanism — an empty group's divider is a thin (~29px-tall, full-width) row with no visual "empty drop zone" affordance inviting a drop there, unlike a populated group where there are real tiles to aim for. On a touchscreen (vs. this session's exact-coordinate mouse simulation), landing a drag precisely on that thin strip — especially if it's near the very bottom of the visible content, right where auto-scroll also kicks in and keeps shifting things — could plausibly feel like "there's no way," even though the underlying drop logic accepts it correctly once actually hit. Needs a real device to confirm before treating this as an actual functional bug rather than a UX/target-size issue.
+- [ ] **If it does turn out to be a target-size problem once confirmed, not yet decided:** whether the fix is a larger drop target/hit area for an empty divider specifically (e.g. padding the row so its hit area extends beyond its 29px visual height), some kind of visual empty-group placeholder, or something else — no design decided yet, pending confirmation of what's actually going wrong.
+
 ### Bug: profile photo shows padding on the sides of the circular header icon
 
 - [ ] Per the user: "The header profile icon image has a circle cut out, but the image is rectangular, so it has padding on the left and right sides. That padding needs to be removed."
