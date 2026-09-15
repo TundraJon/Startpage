@@ -26,7 +26,7 @@
   });
 
   const themeToggle = document.getElementById('theme-toggle');
-  const settingsOverlay = document.getElementById('settings-overlay');
+  const settingsView = document.getElementById('settings-view');
   const settingsClose = document.getElementById('settings-close');
   const themeAutoToggleInput = document.getElementById('theme-auto-toggle');
 
@@ -102,16 +102,82 @@
     refreshLiveWeather(true);
   });
 
+  // Settings is a genuine full-screen view (like the Reorg Tree Tool), not a .help-overlay popup
+  // -- there's no dimmed backdrop to tap outside of, so closing is only ever the explicit × button.
   function openSettings() {
     themeAutoToggleInput.checked = themeAutoMode;
-    settingsOverlay.hidden = false;
+    settingsView.hidden = false;
   }
   function closeSettings() {
-    settingsOverlay.hidden = true;
+    settingsView.hidden = true;
   }
   settingsClose.addEventListener('click', closeSettings);
-  settingsOverlay.addEventListener('click', (e) => {
-    if (e.target === settingsOverlay) closeSettings();
+
+  // --- Profile Photo: a real photo from the user's own device, native picker, nothing ever
+  // uploaded anywhere. Shrunk client-side before it's stored at all -- drawing it into a small
+  // <canvas> center-cropped to a square is the "sample it down to icon size" the user asked
+  // about, so a plain localStorage data URL is small enough to not need IndexedDB. ---
+  const PROFILE_PHOTO_KEY = 'profilePhoto';
+  const PROFILE_PHOTO_TARGET_PX = 64; // ~2x a 32px icon, for retina
+  const profileBtnImg = document.getElementById('profile-btn-img');
+  const profileBtnDefaultIcon = document.getElementById('profile-btn-default-icon');
+  const profilePhotoPreview = document.getElementById('profile-photo-preview');
+  const profilePhotoDefaultPreview = document.getElementById('profile-photo-default-preview');
+  const profilePhotoChooseBtn = document.getElementById('profile-photo-choose-btn');
+  const profilePhotoRemoveBtn = document.getElementById('profile-photo-remove-btn');
+  const profilePhotoInput = document.getElementById('profile-photo-input');
+
+  // Reflects whatever's currently in storage onto both the header icon and the Settings preview
+  // -- the one place either of those ever gets updated, called after every set/remove.
+  function applyProfilePhoto() {
+    const dataUrl = localStorage.getItem(PROFILE_PHOTO_KEY);
+    const hasPhoto = !!dataUrl;
+    profileBtnImg.src = hasPhoto ? dataUrl : '';
+    profileBtnImg.hidden = !hasPhoto;
+    profileBtnDefaultIcon.hidden = hasPhoto;
+    profilePhotoPreview.src = hasPhoto ? dataUrl : '';
+    profilePhotoPreview.hidden = !hasPhoto;
+    profilePhotoDefaultPreview.hidden = hasPhoto;
+    profilePhotoRemoveBtn.hidden = !hasPhoto;
+  }
+  applyProfilePhoto();
+
+  // Center-crops the source image to a square, downscales it to PROFILE_PHOTO_TARGET_PX via
+  // <canvas> (its own drawImage scaling *is* the pixel-sampling this shrinks with -- no separate
+  // algorithm needed), and hands back a small JPEG data URL.
+  function shrinkPhotoToIcon(file, callback) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const size = Math.min(img.naturalWidth, img.naturalHeight);
+        const sx = (img.naturalWidth - size) / 2;
+        const sy = (img.naturalHeight - size) / 2;
+        const canvas = document.createElement('canvas');
+        canvas.width = PROFILE_PHOTO_TARGET_PX;
+        canvas.height = PROFILE_PHOTO_TARGET_PX;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, sx, sy, size, size, 0, 0, PROFILE_PHOTO_TARGET_PX, PROFILE_PHOTO_TARGET_PX);
+        callback(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  profilePhotoChooseBtn.addEventListener('click', () => profilePhotoInput.click());
+  profilePhotoInput.addEventListener('change', () => {
+    const file = profilePhotoInput.files && profilePhotoInput.files[0];
+    profilePhotoInput.value = '';
+    if (!file) return;
+    shrinkPhotoToIcon(file, (dataUrl) => {
+      localStorage.setItem(PROFILE_PHOTO_KEY, dataUrl);
+      applyProfilePhoto();
+    });
+  });
+  profilePhotoRemoveBtn.addEventListener('click', () => {
+    localStorage.removeItem(PROFILE_PHOTO_KEY);
+    applyProfilePhoto();
   });
 
   themeAutoToggleInput.addEventListener('change', () => {
@@ -1354,23 +1420,40 @@
   // Keeps the live grid in sync (the divider still needs to render/exist there for tile
   // drag-to-reorder and Sort-within-groups to keep working), even though it's never edited from
   // the grid anymore.
+  // Index one past the end of dividerId's own block (its divider plus every tile under it) --
+  // the next divider's index, or tiles.length if it's the last grouping. Shared by
+  // addGroupingToCategory's insertion point below and mirrors the same block-boundary concept
+  // moveGroupingBlock computes inline for Up/Down.
+  function groupingBlockEndIndex(tiles, dividerId) {
+    const start = tiles.findIndex((t) => t.id === dividerId);
+    if (start === -1) return tiles.length;
+    for (let i = start + 1; i < tiles.length; i++) {
+      if (tiles[i].type === 'divider') return i;
+    }
+    return tiles.length;
+  }
+
   function addGroupingToCategory(categoryId) {
     const tiles = loadCategoryTiles(categoryId);
     const id = newTileId();
     const entry = { id, type: 'divider', name: 'New Grouping', createdAt: Date.now() };
     const afterDividerId = groupingSelectedId;
+    // Insert after the *entire block* belonging to afterDividerId (its divider plus every tile
+    // under it) -- not right after the divider itself, which would wedge the new grouping
+    // between the selected one's header and its own tiles.
+    let insertIdx = tiles.length;
+    let beforeTileId = null;
     if (afterDividerId) {
-      const idx = tiles.findIndex((t) => t.id === afterDividerId);
-      tiles.splice(idx === -1 ? tiles.length : idx + 1, 0, entry);
-    } else {
-      tiles.push(entry);
+      insertIdx = groupingBlockEndIndex(tiles, afterDividerId);
+      beforeTileId = insertIdx < tiles.length ? tiles[insertIdx].id : null;
     }
+    tiles.splice(insertIdx, 0, entry);
     saveCategoryTiles(categoryId, tiles);
     const grid = categoryGrids.get(categoryId);
     if (grid) {
       const dividerEl = buildDividerElement(id, entry.name, categoryId);
-      const afterEl = afterDividerId && grid.querySelector('[data-tile-id="' + CSS.escape(afterDividerId) + '"]');
-      if (afterEl) afterEl.after(dividerEl);
+      const beforeEl = beforeTileId && grid.querySelector('[data-tile-id="' + CSS.escape(beforeTileId) + '"]');
+      if (beforeEl) beforeEl.before(dividerEl);
       else grid.appendChild(dividerEl);
     }
     groupingSelectedId = id;
@@ -1441,11 +1524,24 @@
     // count, no typed-yes friction. No targetEl: the row lives inside this same dialog stack, not
     // the live page underneath, so there's nothing meaningful to scroll into view for it.
     openTileConfirm('Are you sure you want to remove the "' + name + '" grouping? Tiles in it won\'t be deleted.', () => {
-      const remaining = loadCategoryTiles(categoryId).filter((t) => t.id !== dividerId);
-      saveCategoryTiles(categoryId, remaining);
+      const current = loadCategoryTiles(categoryId);
+      const startIdx = current.findIndex((t) => t.id === dividerId);
+      if (startIdx === -1) { groupingSelectedId = null; renderGroupingsList(categoryId); return; }
+      const endIdx = groupingBlockEndIndex(current, dividerId);
+      // The deleted grouping's own tiles (not the divider itself) — left in place, they'd read
+      // as if they belonged to whatever grouping used to precede them, per the user. Un-group
+      // them instead: move them up into the category's ungrouped run at the top, after any
+      // tiles that were genuinely never in a grouping, but before the first remaining divider.
+      const orphanedTiles = current.slice(startIdx + 1, endIdx);
+      const remaining = current.slice(0, startIdx).concat(current.slice(endIdx));
+      const firstDividerIdx = remaining.findIndex((t) => t.type === 'divider');
+      const insertAt = firstDividerIdx === -1 ? remaining.length : firstDividerIdx;
+      const newTiles = remaining.slice(0, insertAt).concat(orphanedTiles).concat(remaining.slice(insertAt));
       const grid = categoryGrids.get(categoryId);
       const dividerEl = grid && grid.querySelector('[data-tile-id="' + CSS.escape(dividerId) + '"]');
       if (dividerEl) dividerEl.remove();
+      saveCategoryTiles(categoryId, newTiles);
+      reorderGridDom(categoryId, newTiles);
       groupingSelectedId = null;
       renderGroupingsList(categoryId);
     });
@@ -1948,6 +2044,20 @@
     const grid = dragInfo.grid;
     const nearest = findNearestDropTarget(grid, dragInfo.tileEl, x, y);
     if (!nearest) return;
+    // Already sitting immediately next to this candidate, on either side — nothing to do.
+    // Without this, a divider is the real culprit: it spans the grid's full width, so its own
+    // "closest point" distance barely differs whichever side the dragged tile ends up on, while
+    // the dragged tile's own "current position" (measured below, used to decide whether it's
+    // still worth moving) is self-referential — right next to the divider, that position is
+    // itself a result of the last reorder, so comparing against it can swing the decision back
+    // the other way on literally every subsequent pointermove, forever, since neither side is
+    // ever decisively closer than the other once already adjacent. That's an infinite before/after
+    // flip confirmed live: the dragged tile's real DOM slot (not its visual, cursor-following
+    // position) toggling every couple of pixels, which shoves whichever real tile sits on the far
+    // side of that flip back and forth — the reported "vibrating" neighbor. Stopping as soon as
+    // the tile is already touching its nearest candidate closes the loop: which exact side it
+    // landed on first is fine, there's nothing left worth re-deciding.
+    if (dragInfo.tileEl.previousElementSibling === nearest || dragInfo.tileEl.nextElementSibling === nearest) return;
     dragInfo.tileEl.style.transform = 'none';
     const ownRect = dragInfo.tileEl.getBoundingClientRect();
     const ownCx = ownRect.left + ownRect.width / 2;
