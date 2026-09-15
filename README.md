@@ -1243,6 +1243,12 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
+### Bug: creating a new grouping inserts it inside the currently-selected grouping's own tiles, not after them
+
+- [ ] Per the user: with a "Free" group already holding 3 tiles, adding a new "Paid" group pushes all 3 of Free's tiles down *below* Paid — Free ends up empty at the top, Paid appears right after it, then the 3 tiles that used to be under Free. "Adding a new group does not respect existing tile groupings."
+- [ ] **Confirmed directly by reading the code, not just a theory — a real off-by-a-block bug in `addGroupingToCategory` (script.js):** when a grouping is selected (`groupingSelectedId`) — which it will be right after long-pressing a divider to get here, since that pre-selects it — ➕'s insertion point is computed as `tiles.findIndex(t => t.id === afterDividerId)` (the *divider's own* array index) `+ 1`, i.e. immediately after the divider entry itself, before any of its own tiles. The live grid DOM insertion (a few lines down, `afterEl.after(dividerEl)` against the same divider element) makes the identical mistake. This matches the report exactly: the new divider lands wedged between the selected grouping's own header and its tiles, not after the whole block.
+- [ ] **The fix:** insertion (both the storage splice and the live-grid DOM placement) needs to happen after the *entire run* belonging to `afterDividerId` — its divider plus every tile under it, up to (but not including) the next divider or the end of the array — the same "block" boundary `moveGroupingBlock` already computes correctly for Up/Down. `addGroupingToCategory` should reuse that same block-end logic to find where to actually insert, instead of just the divider's own index.
+
 ### Bug: dragging a tile jitters/vibrates an unrelated tile in a different grouping
 
 - [ ] Per the user, with a screenshot (Sample Category A: GitHub ungrouped, then "Free" — Google/Translate — then "Not free" — Wikipedia alone): while dragging the Translate tile around, the first tile of whichever group sits just past the nearest divider vibrates left/right — not a fixed tile, and not about proximity to that tile itself.
