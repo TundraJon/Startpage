@@ -1234,7 +1234,17 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
-_Empty — everything above has been built. Log new items here as they come in._
+### Add panel: Grouping icon → 🔣
+
+- [ ] Per the user: `#create-menu-grouping`'s icon (index.html) changes from ➕ to 🔣. **Confirmed scope:** icon line only — the button keeps Build 61's 3-line icon/+/name layout (🔣 / + / Grouping), the "+" line stays as-is. This is the same swap logged once before and then explicitly dropped ("Forget about 🔣") — the user is bringing it back, scoped to just this one button now that the grid-based select-action-bar target from the original ask (`#select-action-add`) no longer exists (removed in Build 61).
+
+### Edit Category, Sort Tiles: add abbreviated text labels back next to the icons
+
+- [ ] Per the user: `#sort-category-alpha`/`-most-used`/`-last-used` (currently icon-only since Build 61: 🔤/📈/⏱️) get short text labels back alongside the icons. **Confirmed label style:** abbreviated, not the original full words — 🔤 Alpha, 📈 Used, ⏱️ Recent.
+
+### Edit Category, Groupings toolbar: replace ➕ with a styled "+" (bold, green)
+
+- [ ] Per the user: `#grouping-add-btn` (the shared icon row's Add button, Build 61) swaps its ➕ emoji for a plain "+" character, styled bold and green — a text glyph with custom styling instead of an emoji, unlike the row's other four buttons (🔺🔻✏️🗑️) which stay as emoji.
 
 ## Build Planner
 
