@@ -1249,6 +1249,12 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 - [ ] Per the user: `#reorg-new-category-btn` reads "➕ New Category" → should be "➕ Category". `#reorg-new-subcategory-btn` reads "➕ New Subcategory" → should be "➕ Subcategory". No reason for the redundant "New" — the ➕ icon already says "add/new."
 - [ ] **Related, not explicitly asked, flagging for a decision at build time:** the New Category/Subcategory dialog these buttons open has its own `<h2>` heading (`#reorg-new-category-title`) that dynamically reads "New Category" or "New Subcategory" (set in script.js's `openReorgNewCategory`). The user only named the toolbar buttons — unclear whether they want that dialog heading trimmed to match ("Category"/"Subcategory") or left as-is, since a modal's own title reading "New Category" is a more normal, expected pattern than a button label repeating it.
+
+### Edit Category dialog: icons instead of words for Sort Tiles and Groupings
+
+- [ ] **Sort Tiles, per the user:** the three text buttons (`#sort-category-alpha` "Alphabetical", `#sort-category-most-used` "Most Used", `#sort-category-last-used` "Last Used") become icon-only: 🔤 (Alphabetical), 📈 (Most Used), ⏱️ (Last Used/most recent).
+- [ ] **Groupings, per the user:** the Groupings section gets 🔺 🔻 ➕ ✏️ 🗑️. Confirmed location: inside the Edit Category dialog, under the "Groupings" heading — not the tile grid's own select-action-bar (a separate, already-spec'd feature above with the same icon set, for reordering a grouping selected directly in the grid).
+- [ ] **My own resolved reading, not explicitly re-confirmed after asking — flagging clearly so it can be corrected if wrong:** since 🔺🔻 (individual up/down) and ✏️/🗑️ only make sense tied to one specific grouping, this is logged as *each row* in the Groupings list (`#grouping-list`, currently name + a single ✏️ per row) gaining all 5 icons inline — full reorder/add/rename/delete for that grouping without leaving the dialog or touching the live grid. Replaces the current single ✏️-per-row plus the separate "+ New Grouping" text button below the list. ➕'s row-relative behavior presumably mirrors the select-action-bar's already-decided ➕ (insert a new grouping right after this one, ready to rename) for consistency, though that wasn't explicitly restated for this location.
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
