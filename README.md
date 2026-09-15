@@ -1227,6 +1227,10 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 - [ ] Per the user: the grouping icon should be 🔣, not ➕. Two spots currently use ➕ for it (Build Log 60) — the global "+" create-menu's "+ Grouping" option (`#create-menu-grouping`, index.html) and the select-action-bar's ➕ for inserting another grouping while one's selected (`#select-action-add`, index.html/script.js aria-label "Add grouping"). Swapping both to 🔣 gives groupings a visually distinct icon instead of sharing the same ➕ Tile/Category creation already uses.
 
+### Add panel: split each option into 3 stacked lines (icon / + / name)
+
+- [ ] Per the user: on the "Add" panel (`#create-menu-overlay`'s `.tile-menu-actions`, opened via Home's global "+"), each of the three buttons (Tile, Category, Grouping) currently renders as 2 lines — `.tile-menu-icon` (🔗/📁/➕) on its own line, then a combined `.tile-menu-action-label` reading "+ Tile" / "+ Category" / "+ Grouping" as the second line (index.html). The user wants 3 separate lines instead: the icon, then a standalone "+" on its own line, then just the name ("Tile" / "Category" / "Grouping") — splitting the label's baked-in "+ " prefix out into its own line rather than sharing a line with the name. Applies to all three buttons. Overlaps with the grouping-icon-swap entry above (🔣 instead of ➕) — same markup, worth doing together.
+
 ## Build Planner
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
