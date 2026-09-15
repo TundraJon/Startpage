@@ -190,7 +190,6 @@
   const selectActionCutBtn = document.getElementById('select-action-cut');
   const selectActionRenameBtn = document.getElementById('select-action-rename');
   const selectActionPasteBtn = document.getElementById('select-action-paste');
-  const selectActionAddBtn = document.getElementById('select-action-add');
   const selectActionDeleteBtn = document.getElementById('select-action-delete');
   const selectActionClearBtn = document.getElementById('select-action-clear');
 
@@ -847,7 +846,7 @@
     label.className = 'tile-divider-label';
     label.textContent = name;
     div.appendChild(label);
-    attachLongPress(div, () => enterGroupingSelectMode(categoryId, categoryGrids.get(categoryId), id), () => selectMode !== null);
+    attachLongPress(div, () => openEditCategoryForGrouping(categoryId, id), () => selectMode !== null);
     return div;
   }
 
@@ -871,11 +870,6 @@
         grid.appendChild(tile);
         updateTileNameWrapClass(tile);
       });
-      // Long-press on empty grid space (not on a tile or an existing divider) creates a new
-      // grouping here. shouldSuppress checks the pointerdown's own target rather than just
-      // selectMode, since a press that started on a child tile/divider bubbles up to this same
-      // grid listener too — only a press landing on the grid's own background should arm this.
-      attachLongPress(grid, () => insertGrouping(categoryId, grid), (e) => selectMode !== null || (e && e.target !== grid));
     });
   }
 
@@ -941,8 +935,9 @@
   createMenuGroupingBtn.addEventListener('click', () => {
     closeCreateMenu();
     const destId = currentLocationId();
-    const grid = categoryGrids.get(destId);
-    if (grid) insertGrouping(destId, grid);
+    if (destId === 'home') openHomeSettings();
+    else openEditCategory(destId);
+    addGroupingToCategory(destId);
   });
 
   // Popups now anchor near the top of the page (styles.css's .help-overlay) instead of vertical
@@ -975,7 +970,16 @@
   const sortCategoryLastUsedBtn = document.getElementById('sort-category-last-used');
   const editCategoryGroupingsSection = document.getElementById('edit-category-groupings-section');
   const groupingListEl = document.getElementById('grouping-list');
-  const addGroupingBtn = document.getElementById('add-grouping-btn');
+  const groupingMoveUpBtn = document.getElementById('grouping-move-up-btn');
+  const groupingMoveDownBtn = document.getElementById('grouping-move-down-btn');
+  const groupingAddBtn = document.getElementById('grouping-add-btn');
+  const groupingEditBtn = document.getElementById('grouping-edit-btn');
+  const groupingDeleteBtn = document.getElementById('grouping-delete-btn');
+  // Single-select within the Groupings list — the one and only place groupings get created,
+  // renamed, reordered, and deleted now (per the user: "there should only be one place to edit
+  // ... a grouping"). Reset to null every time the Edit Category / Home Settings dialog opens,
+  // unless a specific grouping was pre-selected (long-pressing its divider in the grid).
+  let groupingSelectedId = null;
 
   // --- Category Color / Home Header Color ---
   // A top-level category picks its own stripeColor directly; every subcategory automatically
@@ -1095,6 +1099,7 @@
     if (noneBtn) {
       noneBtn.addEventListener('click', () => {
         hexInput.value = '';
+        colorInput.value = '#000000';
         if (onChange) onChange(null);
       });
     }
@@ -1183,8 +1188,10 @@
     addCategoryNameInput.focus();
   }
   // Called from the Reorg Tree Tool's Properties button — targets whichever category is
-  // currently selected there.
-  function openEditCategory(id) {
+  // currently selected there — and from long-pressing a divider directly (see
+  // openEditCategoryForGrouping), which passes presetGroupingId to land pre-selected on that
+  // specific grouping in the list below.
+  function openEditCategory(id, presetGroupingId) {
     const node = categoryTree[id];
     if (!node) return;
     addCategoryTargetId = id;
@@ -1197,6 +1204,7 @@
     addCategoryNameSection.hidden = false;
     editCategorySortSection.hidden = false;
     editCategoryGroupingsSection.hidden = false;
+    groupingSelectedId = presetGroupingId || null;
     renderGroupingsList(id);
     // Color only ever applies to a top-level ("primary") category, per the user — a subcategory's
     // stripe is always computed (lightenForDepth), never independently picked.
@@ -1211,13 +1219,17 @@
     addCategoryNameInput.focus();
     const entry = categoryToggles.get(id);
     scrollTargetBelowPopup(addCategoryOverlay.querySelector('.help-panel'), entry && entry.mainBtn);
+    if (presetGroupingId) {
+      const row = groupingListEl.querySelector('[data-divider-id="' + CSS.escape(presetGroupingId) + '"]');
+      if (row) row.scrollIntoView({ block: 'center' });
+    }
   }
 
   // Home's own settings dialog — long-press on Home's header (wired above). Reuses this same
   // overlay for its Sort/Groupings sections (Home isn't a categoryTree entry, but its tiles are
   // stored the same generic way as any other category's, keyed 'home') plus its own Header Color
   // section, with the Name field hidden since there's nothing here for it to edit.
-  function openHomeSettings() {
+  function openHomeSettings(presetGroupingId) {
     addCategoryTargetId = 'home';
     sortPreviewOriginalTiles = loadCategoryTiles('home').slice();
     sortPreviewDirty = false;
@@ -1228,6 +1240,7 @@
     editCategorySortSection.hidden = false;
     editCategoryGroupingsSection.hidden = false;
     editCategoryColorSection.hidden = true;
+    groupingSelectedId = presetGroupingId || null;
     renderGroupingsList('home');
     homeColorSection.hidden = false;
     const currentHomeColor = loadHomeColor();
@@ -1239,6 +1252,19 @@
     homeFgColorPicker.setOnChange((hex) => { pendingHomeFg = hex; });
     addCategoryOverlay.hidden = false;
     scrollTargetBelowPopup(addCategoryOverlay.querySelector('.help-panel'), homeNameEl);
+    if (presetGroupingId) {
+      const row = groupingListEl.querySelector('[data-divider-id="' + CSS.escape(presetGroupingId) + '"]');
+      if (row) row.scrollIntoView({ block: 'center' });
+    }
+  }
+
+  // Long-pressing a divider in the grid opens Edit Category (or Home Settings) directly, with
+  // that grouping pre-selected — mirrors how a category header's own long-press opens the Reorg
+  // Tree Tool pre-selected (Build 60). Grouping editing lives only in that dialog now; the grid
+  // itself is never revealed or edited into again.
+  function openEditCategoryForGrouping(categoryId, dividerId) {
+    if (categoryId === 'home') openHomeSettings(dividerId);
+    else openEditCategory(categoryId, dividerId);
   }
 
   // Groupings list shown in the Edit Category / Home Settings dialog, alongside Sort Tiles — the
@@ -1251,26 +1277,178 @@
     dividers.forEach((d) => {
       const row = document.createElement('div');
       row.className = 'grouping-row';
+      row.dataset.dividerId = d.id;
+      if (d.id === groupingSelectedId) row.classList.add('grouping-row-selected');
       const name = document.createElement('span');
       name.className = 'grouping-row-name';
       name.textContent = d.name;
       row.appendChild(name);
-      const editBtn = document.createElement('button');
-      editBtn.type = 'button';
-      editBtn.className = 'grouping-row-btn';
-      editBtn.setAttribute('aria-label', 'Edit grouping');
-      editBtn.textContent = '✏️';
-      editBtn.addEventListener('click', () => focusGroupingInLiveGrid(categoryId, d.id));
-      row.appendChild(editBtn);
+      // Tap to select (toggles off on a second tap) — ignored while a click lands on the row's
+      // own inline-rename input, so positioning the cursor there doesn't also toggle selection.
+      row.addEventListener('click', (e) => {
+        if (e.target.tagName === 'INPUT') return;
+        groupingSelectedId = groupingSelectedId === d.id ? null : d.id;
+        renderGroupingsList(categoryId);
+      });
       groupingListEl.appendChild(row);
     });
+    updateGroupingToolbar(categoryId);
   }
 
-  addGroupingBtn.addEventListener('click', () => {
+  // Mirrors updateReorgToolbar exactly: buttons stay disabled until something's selected, and
+  // Up/Down individually disable at either end of the groupings list.
+  function updateGroupingToolbar(categoryId) {
+    const dividers = loadCategoryTiles(categoryId).filter((t) => t.type === 'divider');
+    const idx = dividers.findIndex((d) => d.id === groupingSelectedId);
+    const hasSelection = idx !== -1;
+    groupingMoveUpBtn.disabled = !hasSelection || idx === 0;
+    groupingMoveDownBtn.disabled = !hasSelection || idx === dividers.length - 1;
+    groupingEditBtn.disabled = !hasSelection;
+    groupingDeleteBtn.disabled = !hasSelection;
+  }
+
+  // Turns a grouping row's name into a focused, pre-selected text input, right here in the
+  // dialog's own list — committing (Enter, or blur) saves a non-empty trimmed name, or reverts if
+  // left empty. Also keeps the live grid's divider label in sync, even though it's no longer
+  // editable there directly.
+  function startGroupingRowInlineRename(row, categoryId, dividerId) {
+    const label = row.querySelector('.grouping-row-name');
+    if (!label) return;
+    const priorName = label.textContent;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'grouping-row-input';
+    input.value = priorName;
+    label.replaceWith(input);
+    input.focus();
+    input.select();
+    let committed = false;
+    function commit() {
+      if (committed) return;
+      committed = true;
+      const newName = input.value.trim() || priorName;
+      const tiles = loadCategoryTiles(categoryId);
+      const entry = tiles.find((t) => t.id === dividerId && t.type === 'divider');
+      if (entry) {
+        entry.name = newName;
+        saveCategoryTiles(categoryId, tiles);
+      }
+      const grid = categoryGrids.get(categoryId);
+      const dividerEl = grid && grid.querySelector('[data-tile-id="' + CSS.escape(dividerId) + '"]');
+      const dividerLabel = dividerEl && dividerEl.querySelector('.tile-divider-label');
+      if (dividerLabel) dividerLabel.textContent = newName;
+      const newLabel = document.createElement('span');
+      newLabel.className = 'grouping-row-name';
+      newLabel.textContent = newName;
+      input.replaceWith(newLabel);
+    }
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    });
+    input.addEventListener('blur', commit);
+  }
+
+  // Inserts a new grouping — right after whichever one is currently selected, or appended at the
+  // end if nothing's selected (also how Home's "+ Grouping" and this dialog's own ➕ with nothing
+  // selected both behave) — selects it in the list, and drops straight into inline-rename there.
+  // Keeps the live grid in sync (the divider still needs to render/exist there for tile
+  // drag-to-reorder and Sort-within-groups to keep working), even though it's never edited from
+  // the grid anymore.
+  function addGroupingToCategory(categoryId) {
+    const tiles = loadCategoryTiles(categoryId);
+    const id = newTileId();
+    const entry = { id, type: 'divider', name: 'New Grouping', createdAt: Date.now() };
+    const afterDividerId = groupingSelectedId;
+    if (afterDividerId) {
+      const idx = tiles.findIndex((t) => t.id === afterDividerId);
+      tiles.splice(idx === -1 ? tiles.length : idx + 1, 0, entry);
+    } else {
+      tiles.push(entry);
+    }
+    saveCategoryTiles(categoryId, tiles);
+    const grid = categoryGrids.get(categoryId);
+    if (grid) {
+      const dividerEl = buildDividerElement(id, entry.name, categoryId);
+      const afterEl = afterDividerId && grid.querySelector('[data-tile-id="' + CSS.escape(afterDividerId) + '"]');
+      if (afterEl) afterEl.after(dividerEl);
+      else grid.appendChild(dividerEl);
+    }
+    groupingSelectedId = id;
+    renderGroupingsList(categoryId);
+    const row = groupingListEl.querySelector('[data-divider-id="' + CSS.escape(id) + '"]');
+    if (row) startGroupingRowInlineRename(row, categoryId, id);
+  }
+
+  // Moves a grouping's entire block — its divider plus every tile under it, up to the next
+  // divider or the end of the category — past the adjacent grouping's block, as one unit. Not a
+  // single-slot swap. Acts immediately on live storage, same as every other grouping operation
+  // here (insert/rename/delete), not staged behind this dialog's own Save.
+  function moveGroupingBlock(categoryId, dividerId, direction) {
+    const tiles = loadCategoryTiles(categoryId);
+    const dividerIndices = [];
+    tiles.forEach((t, i) => { if (t.type === 'divider') dividerIndices.push(i); });
+    const pos = dividerIndices.findIndex((i) => tiles[i].id === dividerId);
+    if (pos === -1) return;
+    const start = dividerIndices[pos];
+    const end = (pos + 1 < dividerIndices.length) ? dividerIndices[pos + 1] : tiles.length;
+    let newTiles;
+    if (direction < 0) {
+      if (pos === 0) return;
+      const prevStart = dividerIndices[pos - 1];
+      newTiles = tiles.slice(0, prevStart)
+        .concat(tiles.slice(start, end))
+        .concat(tiles.slice(prevStart, start))
+        .concat(tiles.slice(end));
+    } else {
+      if (pos === dividerIndices.length - 1) return;
+      const nextEnd = (pos + 2 < dividerIndices.length) ? dividerIndices[pos + 2] : tiles.length;
+      newTiles = tiles.slice(0, start)
+        .concat(tiles.slice(end, nextEnd))
+        .concat(tiles.slice(start, end))
+        .concat(tiles.slice(nextEnd));
+    }
+    saveCategoryTiles(categoryId, newTiles);
+    reorderGridDom(categoryId, newTiles);
+  }
+
+  groupingMoveUpBtn.addEventListener('click', () => {
+    if (!addCategoryTargetId || !groupingSelectedId) return;
+    moveGroupingBlock(addCategoryTargetId, groupingSelectedId, -1);
+    renderGroupingsList(addCategoryTargetId);
+  });
+  groupingMoveDownBtn.addEventListener('click', () => {
+    if (!addCategoryTargetId || !groupingSelectedId) return;
+    moveGroupingBlock(addCategoryTargetId, groupingSelectedId, 1);
+    renderGroupingsList(addCategoryTargetId);
+  });
+  groupingAddBtn.addEventListener('click', () => {
     if (!addCategoryTargetId) return;
+    addGroupingToCategory(addCategoryTargetId);
+  });
+  groupingEditBtn.addEventListener('click', () => {
+    if (!addCategoryTargetId || !groupingSelectedId) return;
+    const row = groupingListEl.querySelector('[data-divider-id="' + CSS.escape(groupingSelectedId) + '"]');
+    if (row) startGroupingRowInlineRename(row, addCategoryTargetId, groupingSelectedId);
+  });
+  groupingDeleteBtn.addEventListener('click', () => {
+    if (!addCategoryTargetId || !groupingSelectedId) return;
     const categoryId = addCategoryTargetId;
-    revealLiveGridForGrouping();
-    insertGrouping(categoryId, categoryGrids.get(categoryId));
+    const dividerId = groupingSelectedId;
+    const tiles = loadCategoryTiles(categoryId);
+    const entry = tiles.find((t) => t.id === dividerId && t.type === 'divider');
+    const name = entry ? entry.name : 'grouping';
+    // Purely cosmetic (deleting it never touches any tile), so a plain named confirm — no impact
+    // count, no typed-yes friction. No targetEl: the row lives inside this same dialog stack, not
+    // the live page underneath, so there's nothing meaningful to scroll into view for it.
+    openTileConfirm('Are you sure you want to remove the "' + name + '" grouping? Tiles in it won\'t be deleted.', () => {
+      const remaining = loadCategoryTiles(categoryId).filter((t) => t.id !== dividerId);
+      saveCategoryTiles(categoryId, remaining);
+      const grid = categoryGrids.get(categoryId);
+      const dividerEl = grid && grid.querySelector('[data-tile-id="' + CSS.escape(dividerId) + '"]');
+      if (dividerEl) dividerEl.remove();
+      groupingSelectedId = null;
+      renderGroupingsList(categoryId);
+    });
   });
 
   // Reorders categoryId's grid DOM (not storage) to the given order — used by both the sort
@@ -1591,118 +1769,6 @@
   tileBlurbOverlay.addEventListener('click', (e) => {
     if (e.target === tileBlurbOverlay) closeTileBlurb();
   });
-
-  // Visual Grouping Headers: long-pressing a divider selects it (a third selectMode kind,
-  // 'grouping') and shows the same bottom icon bar Organize Mode already uses for tiles — ✏️
-  // turns the label into an inline-editable field right in the grid, 🗑️ deletes it (standard
-  // named confirm), ➕ inserts another grouping right after it and drops straight into that same
-  // inline-rename state. Fully replaces the old popup-based create/edit dialog (Build Log 58) —
-  // long-pressing empty grid space and the Groupings list inside Edit Category both now do the
-  // same select+inline-rename thing instead of opening it. Always exactly one selected; no
-  // multi-select, no Cut/Paste — a grouping is purely positional within its own category.
-
-  function groupingDividerEl() {
-    if (!selectMode || selectMode.kind !== 'grouping') return null;
-    const id = Array.from(selectMode.selectedIds)[0];
-    return selectMode.grid.querySelector('[data-tile-id="' + CSS.escape(id) + '"]');
-  }
-
-  function enterGroupingSelectMode(categoryId, grid, dividerId) {
-    if (selectMode) exitSelectMode();
-    selectMode = { kind: 'grouping', grid, categoryId, selectedIds: new Set([dividerId]) };
-    pickingDestination = false;
-    const el = grid && grid.querySelector('[data-tile-id="' + CSS.escape(dividerId) + '"]');
-    if (el) el.classList.add('tile-divider-selected');
-    updateSelectActionBar();
-  }
-
-  // Turns a divider's label into a focused, pre-selected text input; committing (Enter, or blur —
-  // e.g. tapping elsewhere, including the bar's other buttons) saves a non-empty trimmed name, or
-  // just reverts to whatever it was before if left empty. No popup, no separate validation error.
-  function startGroupingInlineRename(dividerEl, categoryId, dividerId) {
-    const label = dividerEl.querySelector('.tile-divider-label');
-    if (!label) return;
-    const priorName = label.textContent;
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'tile-divider-input';
-    input.value = priorName;
-    label.replaceWith(input);
-    input.focus();
-    input.select();
-    let committed = false;
-    function commit() {
-      if (committed) return;
-      committed = true;
-      const newName = input.value.trim() || priorName;
-      const tiles = loadCategoryTiles(categoryId);
-      const entry = tiles.find((t) => t.id === dividerId && t.type === 'divider');
-      if (entry) {
-        entry.name = newName;
-        saveCategoryTiles(categoryId, tiles);
-      }
-      const newLabel = document.createElement('span');
-      newLabel.className = 'tile-divider-label';
-      newLabel.textContent = newName;
-      input.replaceWith(newLabel);
-    }
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
-    });
-    input.addEventListener('blur', commit);
-  }
-
-  // Inserts a new grouping — right after afterDividerId if given, else appended at the end (the
-  // "long-press empty space" / global "+ Grouping" case, with no divider to insert relative to) —
-  // selects it, and drops straight into inline-rename. The one shared implementation behind ➕ on
-  // the bar, long-pressing empty grid space, and the "+ Grouping" create-menu option.
-  function insertGrouping(categoryId, grid, afterDividerId) {
-    if (!grid) return;
-    const tiles = loadCategoryTiles(categoryId);
-    const id = newTileId();
-    const entry = { id, type: 'divider', name: 'New Grouping', createdAt: Date.now() };
-    if (afterDividerId) {
-      const idx = tiles.findIndex((t) => t.id === afterDividerId);
-      tiles.splice(idx === -1 ? tiles.length : idx + 1, 0, entry);
-    } else {
-      tiles.push(entry);
-    }
-    saveCategoryTiles(categoryId, tiles);
-    const dividerEl = buildDividerElement(id, entry.name, categoryId);
-    const afterEl = afterDividerId && grid.querySelector('[data-tile-id="' + CSS.escape(afterDividerId) + '"]');
-    if (afterEl) afterEl.after(dividerEl);
-    else grid.appendChild(dividerEl);
-    enterGroupingSelectMode(categoryId, grid, id);
-    startGroupingInlineRename(dividerEl, categoryId, id);
-  }
-
-  // Edit Category is now only ever reachable via the Reorg Tree Tool's Properties button, so
-  // whenever it's open, the Reorg Tool's full-screen view is always open right underneath it —
-  // which would otherwise hide the live grid this needs to scroll to and edit in. Rather than
-  // canceling the Reorg session (discarding whatever unsaved drag moves are pending), this just
-  // hides it temporarily and restores it, state untouched, once grouping select mode exits — see
-  // exitSelectMode's grouping branch.
-  let reorgHiddenForGroupingFocus = false;
-  function revealLiveGridForGrouping() {
-    closeAddCategory();
-    if (!reorgView.hidden) {
-      reorgView.hidden = true;
-      reorgHiddenForGroupingFocus = true;
-    }
-  }
-
-  // Groupings list's ✏️ (Edit Category dialog): scrolls to and selects that divider, entering the
-  // same select+bar+inline-rename state a long-press on the divider itself would, instead of the
-  // old popup.
-  function focusGroupingInLiveGrid(categoryId, dividerId) {
-    revealLiveGridForGrouping();
-    const grid = categoryGrids.get(categoryId);
-    const dividerEl = grid && grid.querySelector('[data-tile-id="' + CSS.escape(dividerId) + '"]');
-    if (!dividerEl) return;
-    dividerEl.scrollIntoView({ block: 'center' });
-    enterGroupingSelectMode(categoryId, grid, dividerId);
-    startGroupingInlineRename(dividerEl, categoryId, dividerId);
-  }
 
   function attachLongPress(el, callback, shouldSuppress) {
     const LONG_PRESS_MS = 550;
@@ -2174,16 +2240,6 @@
       // cleanup to the (now smaller) source grid missed them and left the moved tiles stuck
       // showing the selected outline/checkmark in their new category.
       document.querySelectorAll('.tile-selected').forEach((t) => t.classList.remove('tile-selected'));
-    } else if (wasSelectMode && wasSelectMode.kind === 'grouping') {
-      const dividerId = Array.from(wasSelectMode.selectedIds)[0];
-      const el = wasSelectMode.grid && wasSelectMode.grid.querySelector('[data-tile-id="' + CSS.escape(dividerId) + '"]');
-      if (el) el.classList.remove('tile-divider-selected');
-      // Restores the Reorg Tool's full-screen view, state untouched, if it was only hidden (not
-      // cancelled) to reveal the live grid for this — see revealLiveGridForGrouping.
-      if (reorgHiddenForGroupingFocus) {
-        reorgHiddenForGroupingFocus = false;
-        reorgView.hidden = false;
-      }
     }
     updateSelectActionBar();
   }
@@ -2249,10 +2305,8 @@
   // rather than opening at the tool's plain default state.
   function openReorgTool(presetSelectedId) {
     closeSettings();
-    // A tile or grouping left selected (its bottom bar never auto-times-out while something's
-    // selected) shouldn't stay active underneath the Reorg Tool — most concretely, a lingering
-    // 'grouping' selectMode's own exit path un-hides this same view again the moment anything
-    // calls exitSelectMode(), fighting the tool's own open/close state.
+    // A tile left selected (its bottom bar never auto-times-out while something's selected)
+    // shouldn't stay active underneath the Reorg Tool.
     if (selectMode) exitSelectMode();
     reorgWorkingTree = JSON.parse(JSON.stringify(categoryTree));
     reorgSelectedId = presetSelectedId || null;
@@ -2704,26 +2758,17 @@
     resetSelectModeTimeout();
     selectActionBar.hidden = false;
     // Category select mode is gone — long-press on a category header opens the Reorg Tree Tool
-    // directly instead. Only 'tile' and 'grouping' remain, so this now just tells the two apart.
-    const isGrouping = selectMode.kind === 'grouping';
+    // directly instead. Grouping select mode is gone too — long-press on a divider opens Edit
+    // Category directly, pre-selected. This bar is tile-only now.
     const n = selectedCount();
 
-    // Select All, Cut, Paste don't apply to a grouping — it's always exactly one, and purely
-    // positional within its own category, never moved cross-category. ➕ is the reverse: only
-    // grouping ever shows it, tiles have no equivalent "add" action on this bar.
-    selectActionSelectAllBtn.hidden = isGrouping;
     selectActionSelectAllBtn.disabled = pickingDestination;
-    selectActionCutBtn.hidden = isGrouping;
-    selectActionPasteBtn.hidden = isGrouping;
-    selectActionAddBtn.hidden = !isGrouping;
-    selectActionAddBtn.disabled = pickingDestination;
-    selectActionRenameBtn.setAttribute('aria-label', isGrouping ? 'Rename grouping' : 'Rename');
     selectActionRenameBtn.disabled = n !== 1 || pickingDestination;
     selectActionCutBtn.disabled = n === 0 || pickingDestination;
     selectActionDeleteBtn.disabled = n === 0 || pickingDestination;
 
     if (!pickingDestination) {
-      selectActionStatus.textContent = isGrouping ? 'Grouping selected' : n + ' selected';
+      selectActionStatus.textContent = n + ' selected';
       selectActionPasteBtn.disabled = true;
     } else {
       // Same convention as currentLocationId() (used by Create) — "nothing open" now resolves to
@@ -2764,20 +2809,9 @@
 
   selectActionRenameBtn.addEventListener('click', () => {
     if (!selectMode || selectedCount() !== 1) return;
-    if (selectMode.kind === 'tile') {
-      const tileId = Array.from(selectMode.selectedIds)[0];
-      const tileEl = selectMode.grid.querySelector('[data-tile-id="' + CSS.escape(tileId) + '"]');
-      if (tileEl) openTileRenameFor(tileEl);
-    } else if (selectMode.kind === 'grouping') {
-      const dividerEl = groupingDividerEl();
-      if (dividerEl) startGroupingInlineRename(dividerEl, selectMode.categoryId, Array.from(selectMode.selectedIds)[0]);
-    }
-  });
-
-  selectActionAddBtn.addEventListener('click', () => {
-    if (!selectMode || selectMode.kind !== 'grouping') return;
-    const dividerId = Array.from(selectMode.selectedIds)[0];
-    insertGrouping(selectMode.categoryId, selectMode.grid, dividerId);
+    const tileId = Array.from(selectMode.selectedIds)[0];
+    const tileEl = selectMode.grid.querySelector('[data-tile-id="' + CSS.escape(tileId) + '"]');
+    if (tileEl) openTileRenameFor(tileEl);
   });
 
   selectActionDeleteBtn.addEventListener('click', () => {
@@ -2785,44 +2819,22 @@
     const n = selectedCount();
     if (n === 0) return;
 
-    if (selectMode.kind === 'tile') {
-      // Only a single-tile delete has one unambiguous element to show below the popup (and to
-      // name in the confirmation itself); a batch delete has no one specific target, so it just
-      // top-anchors like any other no-target popup and keeps the generic "N tiles" wording.
-      const targetEl = n === 1
-        ? selectMode.grid.querySelector('[data-tile-id="' + CSS.escape(Array.from(selectMode.selectedIds)[0]) + '"]')
-        : null;
-      const label = n === 1 ? 'the ' + targetEl.querySelector('span').textContent + ' tile' : n + ' tiles';
-      openTileConfirm('Are you sure you want to remove ' + label + '?', () => {
-        // Intentional, permanent easter egg — a 10% chance of a second "really sure?" prompt.
-        // Never document or hint at this in user-facing help text. Tile-delete only — categories
-        // get their own, non-random friction below, scaled to what's actually being deleted.
-        if (Math.random() < 0.10) {
-          openTileConfirm('Are you REALLY sure? 😳', deleteSelected, { targetEl });
-        } else {
-          deleteSelected();
-        }
-      }, { targetEl });
-      return;
-    }
-
-    // Grouping branch: purely cosmetic (deleting it never touches any tile), so a plain named
-    // confirm — no impact count, no typed-yes friction, matching the addendum's "simpler system"
-    // framing. Reads the name from storage rather than the DOM, since an in-progress unsaved
-    // inline rename (if the user opened this without committing one first) shouldn't be shown as
-    // if it were already saved.
-    const dividerId = Array.from(selectMode.selectedIds)[0];
-    const categoryId = selectMode.categoryId;
-    const tiles = loadCategoryTiles(categoryId);
-    const entry = tiles.find((t) => t.id === dividerId && t.type === 'divider');
-    const name = entry ? entry.name : 'grouping';
-    const dividerEl = groupingDividerEl();
-    openTileConfirm('Are you sure you want to remove the "' + name + '" grouping? Tiles in it won\'t be deleted.', () => {
-      const remaining = loadCategoryTiles(categoryId).filter((t) => t.id !== dividerId);
-      saveCategoryTiles(categoryId, remaining);
-      if (dividerEl) dividerEl.remove();
-      exitSelectMode();
-    }, { targetEl: dividerEl });
+    // Only a single-tile delete has one unambiguous element to show below the popup (and to name
+    // in the confirmation itself); a batch delete has no one specific target, so it just
+    // top-anchors like any other no-target popup and keeps the generic "N tiles" wording.
+    const targetEl = n === 1
+      ? selectMode.grid.querySelector('[data-tile-id="' + CSS.escape(Array.from(selectMode.selectedIds)[0]) + '"]')
+      : null;
+    const label = n === 1 ? 'the ' + targetEl.querySelector('span').textContent + ' tile' : n + ' tiles';
+    openTileConfirm('Are you sure you want to remove ' + label + '?', () => {
+      // Intentional, permanent easter egg — a 10% chance of a second "really sure?" prompt.
+      // Never document or hint at this in user-facing help text.
+      if (Math.random() < 0.10) {
+        openTileConfirm('Are you REALLY sure? 😳', deleteSelected, { targetEl });
+      } else {
+        deleteSelected();
+      }
+    }, { targetEl });
   });
 
   const CLOCK_SETTINGS_KEY = 'clockSettings';

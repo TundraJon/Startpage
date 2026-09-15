@@ -453,36 +453,6 @@ main {
   border-bottom: 1px solid var(--border);
 }
 
-/* Long-pressed and selected (Organize Mode's grouping kind) — same blue-outline treatment as a
-   selected tile/reorg row, so it reads as one consistent "selected" language across the app. */
-.tile-divider.tile-divider-selected {
-  outline: 2px solid var(--stripe-color, #3B82C4);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-
-/* Replaces .tile-divider-label in place during inline rename (✏️ on the select-action-bar, or
-   dropped straight into after ➕/creating one) — same type size/weight/color as the label it's
-   standing in for, styled as a real input rather than plain text. */
-.tile-divider-input {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  font: inherit;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--fg);
-  background: var(--surface);
-  border: none;
-  border-bottom: 1px solid var(--stripe-color, #3B82C4);
-  padding-bottom: 4px;
-  margin-bottom: -1px;
-}
-
-.tile-divider-input:focus {
-  outline: none;
-}
-
 .tile img {
   width: 75%;
   height: 75%;
@@ -1460,6 +1430,12 @@ main {
   line-height: 1;
 }
 
+.tile-menu-action-plus {
+  font-size: 0.7rem;
+  line-height: 1;
+  font-weight: 600;
+}
+
 .tile-menu-action-label {
   font-size: 0.65rem;
   line-height: 1.1;
@@ -1759,7 +1735,9 @@ main {
   z-index: 310;
 }
 
-/* Visual Grouping Headers: management list in the Edit Category dialog, alongside Sort Tiles. */
+/* Groupings are managed entirely from this one list + the shared icon row beneath it — tap a row
+   to select it (single-select), then the row of buttons below acts on whichever one is selected,
+   enabling/disabling exactly like the Reorg Tree Tool's own toolbar does for categories. */
 .grouping-list {
   margin-bottom: 8px;
 }
@@ -1767,10 +1745,12 @@ main {
 .grouping-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  cursor: pointer;
 }
 
 .grouping-row-name {
@@ -1778,17 +1758,49 @@ main {
   font-size: 0.9rem;
 }
 
-.grouping-row-btn {
-  border: none;
-  background: none;
-  font-size: 1rem;
-  cursor: pointer;
-  padding: 4px;
+.grouping-row.grouping-row-selected {
+  border-color: var(--stripe-color, #3B82C4);
+  box-shadow: 0 0 0 2px var(--stripe-color, #3B82C4);
 }
 
-.grouping-add-btn {
-  width: 100%;
+/* Replaces .grouping-row-name in place during inline rename (✏️ on the shared icon row below) —
+   same type size/color as the label it's standing in for, styled as a real input rather than
+   plain text. Editing now happens right here in the dialog's own row, never in the live grid. */
+.grouping-row-input {
+  flex: 1;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--fg);
+  background: var(--surface);
+  border: none;
+  border-bottom: 1px solid var(--stripe-color, #3B82C4);
+  padding: 0 0 2px;
+}
+
+.grouping-row-input:focus {
+  outline: none;
+}
+
+.grouping-toolbar {
+  display: flex;
+  gap: 8px;
   margin-top: 4px;
+}
+
+.grouping-toolbar-btn {
+  flex: 1;
+  padding: 8px 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.grouping-toolbar-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 /* Reorg Tree Tool's Properties button (script.js) opens this same live Edit Category dialog
@@ -1800,9 +1812,8 @@ main {
 
 /* Explicit, not left to DOM-order-at-equal-z-index luck: a confirmation is the most urgent thing
    on screen whenever it's shown, so it always sits above every other overlay — including Reorg's
-   own Remove Category confirm (Reorg Tree Tool -> Properties/Edit Category -> confirm) and a
-   grouping delete confirm (which briefly hides the Reorg view entirely to reveal the live grid
-   underneath, rather than stacking above it — see revealLiveGridForGrouping, script.js). */
+   own Remove Category confirm and a grouping delete confirm (Reorg Tree Tool -> Properties/Edit
+   Category -> confirm), both stacking on top rather than needing anything hidden underneath. */
 #tile-confirm-overlay {
   z-index: 340;
 }
