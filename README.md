@@ -1284,6 +1284,20 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
+### Consolidate Add Tile and Edit Tile into one dialog
+
+Per the user, directly: two near-identical dialogs for one concept (a tile's editable fields) is silly when only one field actually differs.
+
+**Current state, confirmed by reading both (`index.html` `#add-tile-overlay` / `#tile-rename-overlay`):**
+- Shared fields: Name, Blurb, 🇧🇷 Brazil (added Build 66) — identical `option-row` markup in both.
+- **The one real field difference the user's referring to: URL.** Add Tile has a URL field; Edit Tile has none at all — there is currently no way to change a tile's URL after creation, full stop.
+- Other differences: `<h2>` text ("Add Tile" vs "Edit Tile"), submit button label ("Add Tile" vs "Save"), and the underlying handler — `addTileSubmit` creates a new id and appends a tile to the grid + storage array; `tileRenameSave` finds an existing entry by id and mutates it in place, updating the live DOM element rather than creating one.
+- Different open-state tracking too: `addTileTargetGrid`/`addTileTargetCategoryId` (add) vs `tileRenameTargetEl` (edit) — would need to unify into one mode flag + target.
+
+**Open question worth settling before this is buildable:** consolidating raises a real scope question beyond just merging markup — should Edit Tile *gain* URL editing (a tile's link could actually be fixed/changed after creation, which doesn't exist today), or does the shared dialog conditionally hide the URL row in edit mode to keep today's behavior identical? The user's framing ("only 1 field is different") suggests they may want URL editing added as part of this, not just dialog plumbing merged — worth confirming which before building, since it changes the scope from a pure refactor to a small feature addition.
+
+Not yet authorized to build.
+
 ### Export / Import backup (Two-Instance Mechanism — Per-Device Storage spec)
 
 User shared the "Two-Instance Mechanism — Per-Device Storage: Full Implementation Spec" document. Reconciled against the current implementation first, per that document's own precedence rule (built behavior wins on conflict).
