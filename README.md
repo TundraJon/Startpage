@@ -1300,32 +1300,32 @@ Not yet authorized to build.
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
 
-### Brazil-flagged item badges
+### Planner 1. Brazil-flagged item badges
 
 - [ ] The user's real content list includes a "FULL BRAZIL-FLAGGED ITEM LIST" of 15 specific tiles that need some kind of visual flag/badge marker. Neither the Info Blurb addendum nor the Visual Grouping Headers spec covers a badge mechanic — a genuinely new requirement surfaced by reviewing that content, not part of either existing spec.
 - [x] **Visual treatment — decided by the user:** a tiny 🇧🇷 Brazil flag emoji badge in the bottom-left corner of an impacted tile, so it doesn't collide with the ℹ️ info icon (bottom-right) — the corner swap itself is built (Build Log 59).
 - [ ] **Still open, per the user:** how a tile gets *marked* as needing the badge in the first place — no data field, no UI to toggle it, and no decision yet on whether it's a manual per-tile flag or something derived from the content list. Needs its own design pass before this is buildable.
 
-### Tile Grouping — visual subgroups within a single category
+### Planner 2. Tile Grouping — visual subgroups within a single category
 
 - [x] **Superseded by "Visual Grouping Headers — Full Implementation Spec," since fully built (Build Logs 58/59/60/61).** This entry was the rough, undetailed version of the same idea; the full spec doc the user later supplied covered everything here (and more — creation/edit interaction, sort-within-group behavior, editing placement), and every piece of it shipped. Left here for history only, not a separate thing to build.
 
-### Add a favicon
+### Planner 3. Add a favicon
 
 - [ ] No `<link rel="icon">` is declared in `index.html` and no `favicon.ico` file exists in the repo, so browsers automatically request `/favicon.ico` on every load and it 404s. Purely cosmetic (console/server-log noise only), unrelated to any widget functionality. Low priority — planned for the final build stage.
 
-### Tile edit/delete (Phase 2 long-press menu)
+### Planner 4. Tile edit/delete (Phase 2 long-press menu)
 
 - [x] **Resolved — nothing left to build here.** Delete and Move were already covered by Organize Mode (Build 50); Rename was already covered by the Edit Tile dialog (select-action-bar's ✏️) before this entry was even written, so that part of the original report was stale. The "Phase 2" document this entry was waiting on turned out to be the Info Blurb Management addendum — built in Build Log 58, which added blurb editing to that same Edit Tile dialog. Left here for history only.
 
-### Consumers of tile usage statistics: sort-by, reports, unused-tile cleanup
+### Planner 5. Consumers of tile usage statistics: sort-by, reports, unused-tile cleanup
 
 - [x] **The underlying dependency is satisfied — corrected, this used to say "depends on the tile usage statistics entry in the Build Queue" as blocking, but that data (`createdAt`/`lastUsedAt`/`useCount` per tile) has existed on every tile since Build 58, and is already live in the Sort Tiles feature (Build 61's 📈 Used / ⏱️ Recent buttons read `useCount`/`lastUsedAt` directly).** Nothing below is blocked anymore — each consumer item is just undesigned, not waiting on data that doesn't exist yet.
 - [ ] **"Sort category by..."** — a way to reorder a single category's tiles by something other than manual drag order: by name (A–Z), most recently used, most used (`useCount` descending), or newest (`createdAt` descending). **Open question to settle before promoting:** is this a one-time re-sort that permanently rewrites the stored order (same array Move Entry/multi-select already reorder), or a live view toggle that displays sorted without touching the stored order (would need its own per-category preference, e.g. `category-sort-<id>` in localStorage, and a render-time sort pass instead of a storage rewrite)? These behave very differently once the user manually drags a tile afterward. Also undecided: where the control lives — a small menu near each category header, akin to `.category-collapse-btn`'s spot, is the leading candidate but not settled.
 - [ ] **"Reports"** — a summary view across *all* categories, not just one: candidates include most-used tiles overall, least/never-used tiles, and recently-added tiles. Needs a way to enumerate every category's stored tiles at once — either `document.querySelectorAll('.category[data-category-id]')` (DOM-driven, matches what's actually rendered) or scanning `localStorage` keys by the `category-tiles-` prefix (storage-driven, would also catch orphaned data for a since-removed category). Where this renders is completely open — a new popup reusing the `.help-overlay` pattern every other popup already uses is the natural fit structurally, but the actual layout/content of a "report" hasn't been designed at all yet.
 - [ ] **Aid in removal of unused tiles** — surface tiles that are stale (e.g. `useCount === 0`, or `lastUsedAt` older than some threshold) so they're easy to find and clean up, rather than requiring the user to notice them on their own. Likely pairs naturally with the "Reports" view above (a "never used" or "not used in N days" list) as the entry point. **Open question:** does removal reuse the existing single-tile Delete (tile menu) one at a time from that list, or does this need batch delete added to multi-select (which today only supports Move, not Delete, for a selected group)? Not decided — worth revisiting once the reports view itself has a shape.
 
-### Organizational system overhaul — full spec (supersedes the earlier +/🔧/▲ toolbar idea)
+### Planner 6. Organizational system overhaul — full spec (supersedes the earlier +/🔧/▲ toolbar idea)
 
 _The user supplied a full written spec for a Solid-Explorer-style file-manager UX (categories = folders, tiles = files), with an explicit precedence rule: anything already decided/built supersedes the document on conflict, stop and ask rather than silently pick. Three real conflicts surfaced and were resolved directly with the user before logging this:_
 - _**This document replaces** the earlier `+`/🔧/▲ Home-header-toolbar idea (logged only in chat, never written to README) — that concept is dropped in favor of the design below._
