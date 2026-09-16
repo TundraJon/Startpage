@@ -1276,7 +1276,25 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
-_Empty — everything above has been built. Log new items here as they come in._
+### Export / Import backup (Two-Instance Mechanism — Per-Device Storage spec)
+
+User shared the "Two-Instance Mechanism — Per-Device Storage: Full Implementation Spec" document. Reconciled against the current implementation first, per that document's own precedence rule (built behavior wins on conflict).
+
+**Already built, matches the spec, no conflicts — nothing to do:**
+- Per-device localStorage (not accounts) — how everything already works (`categoryTree`, `category-tiles-*`, `clockSettings`, `weatherSettings`, `homeColor`, etc.)
+- First-load seed initialization — `CATEGORY_SEED_DATA` + `CATEGORY_TREE_MIGRATED_FLAG` seeds once, never re-seeds after
+- Immediate persistence on every edit, with the Reorg Tree tool's working-copy-until-Save as the one deliberate exception — exactly matches the spec's own carve-out
+- Widget preferences (clock mode/scheme/12-24hr, weather toggles + unit default) already persist with this shape
+- Profile photo (spec Section 3.4) — already built in Build 63/64 using the spec's own *recommended* approach: compressed to a 64×64 thumbnail, stored as a base64 JPEG string, not a full blob
+- Storage tech — already localStorage everywhere, the spec's default recommendation; no sign of hitting size limits
+
+**Not built at all — the one real gap (spec Section 6, confirmed requirement there):** Export / Import backup. Grepped the whole codebase for export/import/download/backup — zero hits.
+
+- [ ] **Export:** a Settings option ("Export My Data" or similar) that serializes the full current state — content tree, all tile data, all personalization/widget settings, profile photo — to JSON and triggers a browser file download. No account/server involved.
+- [ ] **Import:** a corresponding Settings option that opens a file picker for a previously-exported JSON file, does a basic structural sanity check (reject/warn on something that clearly isn't a valid export rather than silently applying it), shows a confirm/cancel warning that importing replaces all current data before proceeding, then on confirm replaces the stored state and re-renders.
+- [ ] Placement: bottom of Settings, near the other data-ish controls (Weather API Key already lives at the very bottom per Build 63 — Export/Import should sit near there, exact ordering an implementer call at build time).
+
+Not yet authorized to build.
 
 ## Build Planner
 
