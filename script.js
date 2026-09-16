@@ -764,7 +764,7 @@
     }
   }
 
-  function buildTileElement(id, name, url, blurb) {
+  function buildTileElement(id, name, url, blurb, brazil) {
     const a = document.createElement('a');
     a.className = 'tile';
     a.href = url;
@@ -798,6 +798,17 @@
       a.appendChild(infoIcon);
     }
     a.dataset.blurb = blurb || '';
+
+    // Brazil-flagged item badge: 🇧🇷, bottom-left corner — bottom-right is the ℹ️ info icon
+    // above, so the two never collide on the same tile.
+    if (brazil) {
+      const brazilBadge = document.createElement('span');
+      brazilBadge.className = 'tile-brazil-badge';
+      brazilBadge.textContent = '🇧🇷';
+      brazilBadge.setAttribute('aria-label', 'Brazil');
+      a.appendChild(brazilBadge);
+    }
+    a.dataset.brazil = brazil ? 'true' : '';
 
     a.addEventListener('contextmenu', (e) => e.preventDefault());
     // Long-press either enters Organize Mode (first press) or, if this tile's grid is already in
@@ -868,6 +879,7 @@
   const addTileNameInput = document.getElementById('add-tile-name');
   const addTileUrlInput = document.getElementById('add-tile-url');
   const addTileBlurbInput = document.getElementById('add-tile-blurb');
+  const addTileBrazilInput = document.getElementById('add-tile-brazil');
   const addTileSubmit = document.getElementById('add-tile-submit');
   let addTileTargetGrid = null;
   let addTileTargetCategoryId = null;
@@ -878,6 +890,7 @@
     addTileNameInput.value = '';
     addTileUrlInput.value = '';
     addTileBlurbInput.value = '';
+    addTileBrazilInput.checked = false;
     addTileOverlay.hidden = false;
     addTileNameInput.focus();
   }
@@ -899,12 +912,13 @@
     if (!name || !parsedUrl || !addTileTargetGrid) return;
     const url = parsedUrl.href;
     const blurb = addTileBlurbInput.value.trim() || null;
+    const brazil = addTileBrazilInput.checked;
     const id = newTileId();
-    const tile = buildTileElement(id, name, url, blurb);
+    const tile = buildTileElement(id, name, url, blurb, brazil);
     addTileTargetGrid.appendChild(tile);
     updateTileNameWrapClass(tile);
     const tiles = loadCategoryTiles(addTileTargetCategoryId);
-    tiles.push({ id, name, url, blurb, createdAt: Date.now(), lastUsedAt: null, useCount: 0 });
+    tiles.push({ id, name, url, blurb, brazil, createdAt: Date.now(), lastUsedAt: null, useCount: 0 });
     saveCategoryTiles(addTileTargetCategoryId, tiles);
     closeAddTile();
   });
@@ -942,7 +956,7 @@
           grid.appendChild(buildDividerElement(t.id, t.name, categoryId));
           return;
         }
-        const tile = buildTileElement(t.id, t.name, t.url, t.blurb);
+        const tile = buildTileElement(t.id, t.name, t.url, t.blurb, t.brazil);
         grid.appendChild(tile);
         updateTileNameWrapClass(tile);
       });
@@ -1793,6 +1807,7 @@
   const tileRenameClose = document.getElementById('tile-rename-close');
   const tileRenameInput = document.getElementById('tile-rename-input');
   const tileRenameBlurbInput = document.getElementById('tile-rename-blurb');
+  const tileRenameBrazilInput = document.getElementById('tile-rename-brazil');
   const tileRenameSave = document.getElementById('tile-rename-save');
   let tileRenameTargetEl = null;
 
@@ -1811,6 +1826,7 @@
     tileRenameTargetEl = tileEl;
     tileRenameInput.value = tileEl.querySelector('span').textContent;
     tileRenameBlurbInput.value = tileEl.dataset.blurb || '';
+    tileRenameBrazilInput.checked = tileEl.dataset.brazil === 'true';
     tileRenameOverlay.hidden = false;
     tileRenameInput.focus();
     scrollTargetBelowPopup(tileRenameOverlay.querySelector('.help-panel'), tileEl);
@@ -1834,12 +1850,31 @@
     }
   }
 
+  // Adds/removes the 🇧🇷 badge on a live tile element to match its current Brazil-flag status —
+  // shared by Edit Tile's save handler here, the only place this can change after creation.
+  function updateTileBrazilBadge(tileEl, brazil) {
+    tileEl.dataset.brazil = brazil ? 'true' : '';
+    let badge = tileEl.querySelector('.tile-brazil-badge');
+    if (brazil) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'tile-brazil-badge';
+        badge.textContent = '🇧🇷';
+        badge.setAttribute('aria-label', 'Brazil');
+        tileEl.appendChild(badge);
+      }
+    } else if (badge) {
+      badge.remove();
+    }
+  }
+
   tileRenameSave.addEventListener('click', () => {
     const tileEl = tileRenameTargetEl;
     if (!tileEl) return;
     const newName = tileRenameInput.value.trim();
     if (!newName) return;
     const newBlurb = tileRenameBlurbInput.value.trim() || null;
+    const newBrazil = tileRenameBrazilInput.checked;
     const categoryId = tileEl.closest('.category').dataset.categoryId;
     const tileId = tileEl.dataset.tileId;
     const tiles = loadCategoryTiles(categoryId);
@@ -1847,11 +1882,13 @@
     if (entry) {
       entry.name = newName;
       entry.blurb = newBlurb;
+      entry.brazil = newBrazil;
       saveCategoryTiles(categoryId, tiles);
     }
     tileEl.querySelector('span').textContent = newName;
     updateTileNameWrapClass(tileEl);
     updateTileInfoIcon(tileEl, newBlurb);
+    updateTileBrazilBadge(tileEl, newBrazil);
     closeTileRename();
   });
 

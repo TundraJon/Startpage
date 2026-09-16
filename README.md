@@ -1274,6 +1274,14 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
   3. Along the way, found and fixed a related tie in the divider-row branch: it defaulted to "before" the divider on an exact y-center tie, which could undo an already-correct in-progress placement the moment a drag (e.g. into a brand-new, auto-scrolled-to empty group) settled on the divider's own dead-center band. Flipped to default "after" — a group's own label reads as belonging to the section that follows it, not the one before.
 - [x] **Verified via Playwright, full regression pass:** the original divider-jitter reproduction (one clean flip, stable after — still fixed); all three empty-group-drop scenarios from Build 64 (simple, multi-group, and the long auto-scroll case) still land inside the new group, and the auto-scroll case's remaining flakiness (landing just *before* the new divider instead of inside it) is the one this build's divider-tie fix directly resolved; both Build 64 already-adjacent-to-a-divider scenarios still cross correctly in both directions; a same-row left-to-right and right-to-left drag across 5 tiles now produce mirror-image correct results end to end; a cross-group drag descending into a different group's row and sliding across it tracks the pointer correctly tile-by-tile, landing wherever it's released rather than always leftmost. Zero page errors across every run.
 
+## Build Log 66 (completed)
+
+### Brazil-flagged item badge — the marking mechanism Planner 1 was missing, built end to end
+
+- [x] **Manual per-tile checkbox, in both Add Tile and Edit Tile — resolves Planner 1's open question.** A `🇧🇷 Brazil` checkbox now sits in both dialogs (`index.html`'s `#add-tile-overlay` and `#tile-rename-overlay`), styled with the existing `.option-row input[type="checkbox"]` pattern already used everywhere else (weather toggles, theme auto-mode). Add Tile always resets it unchecked on open; Edit Tile prefills it from the tile's current status. New tile data field: `brazil` (boolean), alongside `blurb` in the same per-category `tiles` array — no migration needed, a missing/undefined value on old tiles is simply falsy.
+- [x] **The actual 🇧🇷 badge — decided in the planner but never actually rendered anywhere, built now.** `buildTileElement` takes a new `brazil` param and appends a `.tile-brazil-badge` span when true; a new `updateTileBrazilBadge()` (mirroring the existing `updateTileInfoIcon()`) adds/removes it live from Edit Tile's save handler. Bottom-left corner, mirroring the ℹ️ info icon's own bottom-right rule in CSS — the two now visibly coexist on the same tile without colliding, exactly as Planner 1's already-decided visual treatment called for. Also caught and fixed a stale CSS comment while touching this rule: it described the info icon as bottom-left/Brazil as bottom-right-reserved, backwards from both the actual `right/bottom` values already in place and Planner 1's own description — corrected to match reality.
+- [x] **Verified via Playwright:** adding a tile with the checkbox checked renders the badge immediately and persists `brazil: true` to storage; a plain tile gets no badge; editing an existing tile to check the box adds the badge live and persists it; re-opening Edit Tile shows the checkbox still checked; unchecking it removes the badge live; the flag survives a full page reload. Zero page errors. Screenshot-confirmed placement: badge and info icon sit in opposite corners with no visual overlap, checkbox reads cleanly in both dialogs.
+
 ## Build Queue
 
 ### Export / Import backup (Two-Instance Mechanism — Per-Device Storage spec)
@@ -1300,11 +1308,11 @@ Not yet authorized to build.
 
 _Backlog of items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start._
 
-### Planner 1. Brazil-flagged item badges
+### Planner 1. Brazil-flagged item badges — resolved, fully built (Build Log 66)
 
-- [ ] The user's real content list includes a "FULL BRAZIL-FLAGGED ITEM LIST" of 15 specific tiles that need some kind of visual flag/badge marker. Neither the Info Blurb addendum nor the Visual Grouping Headers spec covers a badge mechanic — a genuinely new requirement surfaced by reviewing that content, not part of either existing spec.
-- [x] **Visual treatment — decided by the user:** a tiny 🇧🇷 Brazil flag emoji badge in the bottom-left corner of an impacted tile, so it doesn't collide with the ℹ️ info icon (bottom-right) — the corner swap itself is built (Build Log 59).
-- [ ] **Still open, per the user:** how a tile gets *marked* as needing the badge in the first place — no data field, no UI to toggle it, and no decision yet on whether it's a manual per-tile flag or something derived from the content list. Needs its own design pass before this is buildable.
+- [x] The user's real content list includes a "FULL BRAZIL-FLAGGED ITEM LIST" of 15 specific tiles that need some kind of visual flag/badge marker. Neither the Info Blurb addendum nor the Visual Grouping Headers spec covers a badge mechanic — a genuinely new requirement surfaced by reviewing that content, not part of either existing spec.
+- [x] **Visual treatment — decided by the user:** a tiny 🇧🇷 Brazil flag emoji badge in the bottom-left corner of an impacted tile, so it doesn't collide with the ℹ️ info icon (bottom-right) — built (Build Log 66; the corner swap alone was Build Log 59, the badge itself wasn't rendered anywhere until now).
+- [x] **Marking mechanism — resolved: manual per-tile checkbox, per the user.** A `🇧🇷 Brazil` checkbox in both Add Tile and Edit Tile (Build Log 66) — the user chose Edit Tile be included too, specifically so the 15 already-existing tiles on the real content list can be flagged without recreating them, not just new tiles going forward.
 
 ### Planner 2. Tile Grouping — visual subgroups within a single category
 
