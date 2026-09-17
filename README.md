@@ -1312,6 +1312,12 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
+### Profile photo preview: 40px → 50px
+
+Per the user. `.profile-photo-preview-wrap` (`styles.css`) is currently `width: 40px; height: 40px` — the circular preview shown in Settings. Change both to 50px. Leaves the default-icon-before-a-photo-is-chosen sub-rule (`.profile-photo-preview.profile-photo-default`, currently 24×24px within that circle) untouched unless the user wants it scaled up proportionally too. The underlying stored thumbnail is 64×64 (`PROFILE_PHOTO_TARGET_PX`), so there's still headroom at 50px — no quality loss.
+
+Not yet authorized to build.
+
 ### Tile search glow: pulse, 2.5s, Home category color
 
 Per the user — a refinement to the already-shipped Build 69 glow, not a new feature. Current exact code (`styles.css`):
