@@ -764,6 +764,23 @@
     }
   }
 
+  // Builds the favicon <img> for a tile — factored out of buildTileElement so Edit Tile's URL
+  // change (updateTileUrl below) can retry a fresh favicon against the new domain the same way,
+  // rather than duplicating the fallback-to-.tile-fallback logic in two places.
+  function createTileFaviconImg(tileEl, url) {
+    const img = document.createElement('img');
+    img.alt = '';
+    img.loading = 'lazy';
+    img.src = faviconUrlForDomain(new URL(url).hostname);
+    img.addEventListener('error', () => {
+      img.remove();
+      tileEl.classList.add('tile-fallback');
+      const span = tileEl.querySelector('span');
+      if (span) span.classList.remove('tile-name-wrap');
+    });
+    return img;
+  }
+
   function buildTileElement(id, name, url, blurb, brazil) {
     const a = document.createElement('a');
     a.className = 'tile';
@@ -772,16 +789,7 @@
     a.rel = 'noopener';
     a.dataset.tileId = id;
 
-    const img = document.createElement('img');
-    img.alt = '';
-    img.loading = 'lazy';
-    img.src = faviconUrlForDomain(new URL(url).hostname);
-    img.addEventListener('error', () => {
-      img.remove();
-      a.classList.add('tile-fallback');
-      span.classList.remove('tile-name-wrap');
-    });
-    a.appendChild(img);
+    a.appendChild(createTileFaviconImg(a, url));
 
     const span = document.createElement('span');
     span.textContent = name;
@@ -874,53 +882,90 @@
     }
   }
 
-  const addTileOverlay = document.getElementById('add-tile-overlay');
-  const addTileClose = document.getElementById('add-tile-close');
-  const addTileNameInput = document.getElementById('add-tile-name');
-  const addTileUrlInput = document.getElementById('add-tile-url');
-  const addTileBlurbInput = document.getElementById('add-tile-blurb');
-  const addTileBrazilInput = document.getElementById('add-tile-brazil');
-  const addTileSubmit = document.getElementById('add-tile-submit');
-  let addTileTargetGrid = null;
-  let addTileTargetCategoryId = null;
+  // Unified Tile dialog — Add Tile and Edit Tile used to be two near-identical dialogs (same
+  // Name/Blurb/Brazil fields, Edit Tile alone missing URL entirely, so a tile's URL could never
+  // be changed after creation). One dialog now serves both, switched by tileDialogMode ('add' |
+  // 'edit'); openAddTile/openTileRenameFor stay as the two named entry points other code already
+  // calls, they just both drive this shared dialog + submit handler now.
+  const tileDialogOverlay = document.getElementById('tile-dialog-overlay');
+  const tileDialogClose = document.getElementById('tile-dialog-close');
+  const tileDialogTitle = document.getElementById('tile-dialog-title');
+  const tileDialogNameInput = document.getElementById('tile-dialog-name');
+  const tileDialogUrlInput = document.getElementById('tile-dialog-url');
+  const tileDialogBlurbInput = document.getElementById('tile-dialog-blurb');
+  const tileDialogBrazilInput = document.getElementById('tile-dialog-brazil');
+  const tileDialogSubmit = document.getElementById('tile-dialog-submit');
+  let tileDialogMode = null;
+  let tileDialogTargetGrid = null;
+  let tileDialogTargetCategoryId = null;
+  let tileDialogTargetEl = null;
 
   function openAddTile(grid, categoryId) {
-    addTileTargetGrid = grid;
-    addTileTargetCategoryId = categoryId;
-    addTileNameInput.value = '';
-    addTileUrlInput.value = '';
-    addTileBlurbInput.value = '';
-    addTileBrazilInput.checked = false;
-    addTileOverlay.hidden = false;
-    addTileNameInput.focus();
+    tileDialogMode = 'add';
+    tileDialogTargetGrid = grid;
+    tileDialogTargetCategoryId = categoryId;
+    tileDialogTargetEl = null;
+    tileDialogTitle.textContent = 'Add Tile';
+    tileDialogSubmit.textContent = 'Add Tile';
+    tileDialogNameInput.value = '';
+    tileDialogUrlInput.value = '';
+    tileDialogBlurbInput.value = '';
+    tileDialogBrazilInput.checked = false;
+    tileDialogOverlay.hidden = false;
+    tileDialogNameInput.focus();
   }
 
-  function closeAddTile() {
-    addTileOverlay.hidden = true;
-    addTileTargetGrid = null;
-    addTileTargetCategoryId = null;
+  function closeTileDialog() {
+    tileDialogOverlay.hidden = true;
+    tileDialogMode = null;
+    tileDialogTargetGrid = null;
+    tileDialogTargetCategoryId = null;
+    tileDialogTargetEl = null;
   }
 
-  addTileClose.addEventListener('click', closeAddTile);
-  addTileOverlay.addEventListener('click', (e) => {
-    if (e.target === addTileOverlay) closeAddTile();
+  tileDialogClose.addEventListener('click', closeTileDialog);
+  tileDialogOverlay.addEventListener('click', (e) => {
+    if (e.target === tileDialogOverlay) closeTileDialog();
   });
 
-  addTileSubmit.addEventListener('click', () => {
-    const name = addTileNameInput.value.trim();
-    const parsedUrl = normalizeTileUrl(addTileUrlInput.value);
-    if (!name || !parsedUrl || !addTileTargetGrid) return;
+  tileDialogSubmit.addEventListener('click', () => {
+    const name = tileDialogNameInput.value.trim();
+    const parsedUrl = normalizeTileUrl(tileDialogUrlInput.value);
+    if (!name || !parsedUrl) return;
     const url = parsedUrl.href;
-    const blurb = addTileBlurbInput.value.trim() || null;
-    const brazil = addTileBrazilInput.checked;
-    const id = newTileId();
-    const tile = buildTileElement(id, name, url, blurb, brazil);
-    addTileTargetGrid.appendChild(tile);
-    updateTileNameWrapClass(tile);
-    const tiles = loadCategoryTiles(addTileTargetCategoryId);
-    tiles.push({ id, name, url, blurb, brazil, createdAt: Date.now(), lastUsedAt: null, useCount: 0 });
-    saveCategoryTiles(addTileTargetCategoryId, tiles);
-    closeAddTile();
+    const blurb = tileDialogBlurbInput.value.trim() || null;
+    const brazil = tileDialogBrazilInput.checked;
+
+    if (tileDialogMode === 'add') {
+      if (!tileDialogTargetGrid) return;
+      const id = newTileId();
+      const tile = buildTileElement(id, name, url, blurb, brazil);
+      tileDialogTargetGrid.appendChild(tile);
+      updateTileNameWrapClass(tile);
+      const tiles = loadCategoryTiles(tileDialogTargetCategoryId);
+      tiles.push({ id, name, url, blurb, brazil, createdAt: Date.now(), lastUsedAt: null, useCount: 0 });
+      saveCategoryTiles(tileDialogTargetCategoryId, tiles);
+    } else if (tileDialogMode === 'edit') {
+      const tileEl = tileDialogTargetEl;
+      if (!tileEl) return;
+      const categoryId = tileEl.closest('.category').dataset.categoryId;
+      const tileId = tileEl.dataset.tileId;
+      const tiles = loadCategoryTiles(categoryId);
+      const entry = tiles.find((t) => t.id === tileId);
+      if (entry) {
+        entry.name = name;
+        entry.url = url;
+        entry.blurb = blurb;
+        entry.brazil = brazil;
+        saveCategoryTiles(categoryId, tiles);
+      }
+      tileEl.querySelector('span').textContent = name;
+      updateTileNameWrapClass(tileEl);
+      updateTileInfoIcon(tileEl, blurb);
+      updateTileBrazilBadge(tileEl, brazil);
+      updateTileUrl(tileEl, url);
+    }
+    closeTileDialog();
   });
 
   // Visual Grouping Headers: a divider is a cosmetic entry stored inline in the same per-category
@@ -1803,37 +1848,27 @@
     if (cb) cb();
   });
 
-  const tileRenameOverlay = document.getElementById('tile-rename-overlay');
-  const tileRenameClose = document.getElementById('tile-rename-close');
-  const tileRenameInput = document.getElementById('tile-rename-input');
-  const tileRenameBlurbInput = document.getElementById('tile-rename-blurb');
-  const tileRenameBrazilInput = document.getElementById('tile-rename-brazil');
-  const tileRenameSave = document.getElementById('tile-rename-save');
-  let tileRenameTargetEl = null;
-
-  function closeTileRename() {
-    tileRenameOverlay.hidden = true;
-    tileRenameTargetEl = null;
-  }
-  tileRenameClose.addEventListener('click', closeTileRename);
-  tileRenameOverlay.addEventListener('click', (e) => {
-    if (e.target === tileRenameOverlay) closeTileRename();
-  });
-
-  // Called from the select-action-bar's Rename button (script.js further down) instead of the
-  // now-retired tile-menu popup — same dialog, just a new trigger.
+  // Called from the select-action-bar's Rename button (script.js further down) — opens the
+  // unified tile dialog above in edit mode, pre-filled from the existing tile.
   function openTileRenameFor(tileEl) {
-    tileRenameTargetEl = tileEl;
-    tileRenameInput.value = tileEl.querySelector('span').textContent;
-    tileRenameBlurbInput.value = tileEl.dataset.blurb || '';
-    tileRenameBrazilInput.checked = tileEl.dataset.brazil === 'true';
-    tileRenameOverlay.hidden = false;
-    tileRenameInput.focus();
-    scrollTargetBelowPopup(tileRenameOverlay.querySelector('.help-panel'), tileEl);
+    tileDialogMode = 'edit';
+    tileDialogTargetGrid = null;
+    tileDialogTargetCategoryId = null;
+    tileDialogTargetEl = tileEl;
+    tileDialogTitle.textContent = 'Edit Tile';
+    tileDialogSubmit.textContent = 'Save';
+    tileDialogNameInput.value = tileEl.querySelector('span').textContent;
+    tileDialogUrlInput.value = tileEl.href;
+    tileDialogBlurbInput.value = tileEl.dataset.blurb || '';
+    tileDialogBrazilInput.checked = tileEl.dataset.brazil === 'true';
+    tileDialogOverlay.hidden = false;
+    tileDialogNameInput.focus();
+    scrollTargetBelowPopup(tileDialogOverlay.querySelector('.help-panel'), tileEl);
   }
 
   // Adds/removes/updates the ℹ️ icon on a live tile element to match its current blurb — shared by
-  // Edit Tile's save handler here (the only place a tile's blurb can change after creation).
+  // the tile dialog's submit handler above (the only place a tile's blurb can change after
+  // creation).
   function updateTileInfoIcon(tileEl, blurb) {
     tileEl.dataset.blurb = blurb || '';
     let icon = tileEl.querySelector('.tile-info-icon');
@@ -1851,7 +1886,8 @@
   }
 
   // Adds/removes the 🇧🇷 badge on a live tile element to match its current Brazil-flag status —
-  // shared by Edit Tile's save handler here, the only place this can change after creation.
+  // shared by the tile dialog's submit handler above, the only place this can change after
+  // creation.
   function updateTileBrazilBadge(tileEl, brazil) {
     tileEl.dataset.brazil = brazil ? 'true' : '';
     let badge = tileEl.querySelector('.tile-brazil-badge');
@@ -1868,29 +1904,19 @@
     }
   }
 
-  tileRenameSave.addEventListener('click', () => {
-    const tileEl = tileRenameTargetEl;
-    if (!tileEl) return;
-    const newName = tileRenameInput.value.trim();
-    if (!newName) return;
-    const newBlurb = tileRenameBlurbInput.value.trim() || null;
-    const newBrazil = tileRenameBrazilInput.checked;
-    const categoryId = tileEl.closest('.category').dataset.categoryId;
-    const tileId = tileEl.dataset.tileId;
-    const tiles = loadCategoryTiles(categoryId);
-    const entry = tiles.find((t) => t.id === tileId);
-    if (entry) {
-      entry.name = newName;
-      entry.blurb = newBlurb;
-      entry.brazil = newBrazil;
-      saveCategoryTiles(categoryId, tiles);
-    }
-    tileEl.querySelector('span').textContent = newName;
+  // Updates a live tile element's href and re-derives its favicon for the new domain — the one
+  // field Edit Tile never touched before this dialog consolidation. Always recreates the <img>
+  // (via createTileFaviconImg, shared with buildTileElement) rather than trying to reuse one,
+  // which also gives a tile that had fallen back to .tile-fallback a fresh shot at a favicon if
+  // the edited URL points somewhere new.
+  function updateTileUrl(tileEl, url) {
+    tileEl.href = url;
+    tileEl.classList.remove('tile-fallback');
+    const oldImg = tileEl.querySelector('img');
+    if (oldImg) oldImg.remove();
+    tileEl.insertBefore(createTileFaviconImg(tileEl, url), tileEl.firstChild);
     updateTileNameWrapClass(tileEl);
-    updateTileInfoIcon(tileEl, newBlurb);
-    updateTileBrazilBadge(tileEl, newBrazil);
-    closeTileRename();
-  });
+  }
 
   // Info Blurb Management: tapping a tile's ℹ️ icon reveals its blurb text instead of navigating —
   // reuses the same full-screen .help-overlay pattern as every other popup in the app.

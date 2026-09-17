@@ -1282,21 +1282,15 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 - [x] **The actual 🇧🇷 badge — decided in the planner but never actually rendered anywhere, built now.** `buildTileElement` takes a new `brazil` param and appends a `.tile-brazil-badge` span when true; a new `updateTileBrazilBadge()` (mirroring the existing `updateTileInfoIcon()`) adds/removes it live from Edit Tile's save handler. Bottom-left corner, mirroring the ℹ️ info icon's own bottom-right rule in CSS — the two now visibly coexist on the same tile without colliding, exactly as Planner 1's already-decided visual treatment called for. Also caught and fixed a stale CSS comment while touching this rule: it described the info icon as bottom-left/Brazil as bottom-right-reserved, backwards from both the actual `right/bottom` values already in place and Planner 1's own description — corrected to match reality.
 - [x] **Verified via Playwright:** adding a tile with the checkbox checked renders the badge immediately and persists `brazil: true` to storage; a plain tile gets no badge; editing an existing tile to check the box adds the badge live and persists it; re-opening Edit Tile shows the checkbox still checked; unchecking it removes the badge live; the flag survives a full page reload. Zero page errors. Screenshot-confirmed placement: badge and info icon sit in opposite corners with no visual overlap, checkbox reads cleanly in both dialogs.
 
+## Build Log 67 (completed)
+
+### Add Tile and Edit Tile consolidated into one dialog — Edit Tile gains real URL editing
+
+- [x] **One dialog now serves both, per the user.** `#add-tile-overlay` and `#tile-rename-overlay` (two near-identical `.help-overlay` panels) are now a single `#tile-dialog-overlay`, switched by a `tileDialogMode` ('add'/'edit') flag. `openAddTile`/`openTileRenameFor` stay as the two named entry points the rest of the code already calls (create-menu's "+ Tile", select-action-bar's ✏️ Rename) — both now just configure and open the same dialog + one shared submit handler, instead of each driving its own separate overlay/handler pair. Title and submit-button text switch with mode ("Add Tile"/"Add Tile" vs. "Edit Tile"/"Save").
+- [x] **Edit Tile can change a tile's URL now — genuinely new capability, not just merged plumbing.** Before this, there was no way to fix a broken link or point a tile at a more specific page after creation, full stop. New `updateTileUrl(tileEl, url)` sets the live `<a>`'s `href` and re-derives its favicon for the new domain via a new shared `createTileFaviconImg()` helper (factored out of `buildTileElement`, which now calls it too) — always recreates the `<img>` rather than trying to reuse one, so a tile that had fallen back to `.tile-fallback` gets a fresh shot at a real favicon if the edited URL points somewhere new.
+- [x] **Verified via Playwright:** Add mode shows "Add Tile"/"Add Tile"; a new tile's href/badge/info-icon all render correctly. Edit mode shows "Edit Tile"/"Save" and correctly prefills Name, URL, Blurb, and Brazil from the live tile. Editing URL + Name + unchecking Brazil all apply live to the DOM and persist to storage; the new URL survives a full reload. Re-ran the drag-jitter and horizontal-drag regression suites since `buildTileElement` was touched — both still pass clean. Zero page errors.
+
 ## Build Queue
-
-### Consolidate Add Tile and Edit Tile into one dialog
-
-Per the user, directly: two near-identical dialogs for one concept (a tile's editable fields) is silly when only one field actually differs.
-
-**Current state, confirmed by reading both (`index.html` `#add-tile-overlay` / `#tile-rename-overlay`):**
-- Shared fields: Name, Blurb, 🇧🇷 Brazil (added Build 66) — identical `option-row` markup in both.
-- **The one real field difference the user's referring to: URL.** Add Tile has a URL field; Edit Tile has none at all — there is currently no way to change a tile's URL after creation, full stop.
-- Other differences: `<h2>` text ("Add Tile" vs "Edit Tile"), submit button label ("Add Tile" vs "Save"), and the underlying handler — `addTileSubmit` creates a new id and appends a tile to the grid + storage array; `tileRenameSave` finds an existing entry by id and mutates it in place, updating the live DOM element rather than creating one.
-- Different open-state tracking too: `addTileTargetGrid`/`addTileTargetCategoryId` (add) vs `tileRenameTargetEl` (edit) — would need to unify into one mode flag + target.
-
-**Resolved, per the user: Edit Tile gains URL editing.** Not just a hidden/conditional field — a tile's URL becomes genuinely editable after creation (use case: fixing a broken/changed link, or narrowing it to a more specific page than when it was first added). So the consolidated dialog carries URL in both modes for real, and `tileRenameSave`'s handler needs to actually validate + apply a changed URL (via the same `normalizeTileUrl` Add Tile already uses) and update the live tile element's `href`, not just Name/Blurb/Brazil as it does today.
-
-Not yet authorized to build.
 
 ### Export / Import backup (Two-Instance Mechanism — Per-Device Storage spec)
 
