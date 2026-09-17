@@ -1312,6 +1312,26 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
+### Tile search glow: pulse, 2.5s, Home category color
+
+Per the user — a refinement to the already-shipped Build 69 glow, not a new feature. Current exact code (`styles.css`):
+```css
+@keyframes tile-search-glow {
+  0% { box-shadow: 0 0 0 3px rgba(80, 170, 255, 0.9); }
+  100% { box-shadow: 0 0 0 3px rgba(80, 170, 255, 0); }
+}
+.tile-search-glow {
+  animation: tile-search-glow 1.8s ease-out;
+}
+```
+Two changes: (1) duration 1.8s → 2.5s, (2) color: fixed light blue → Home's own live color, and (3) an actual repeating pulse rather than the current single fade-out.
+
+- [ ] **Color, same live-derivation approach as the boxed-icon plan above:** reference `var(--home-color-bg, var(--home-header-bg))` via `color-mix()` rather than a hardcoded RGB, so the glow always matches whatever Home's color currently is (including after the user changes it), consistent with how the boxed icons are planned to work.
+- [ ] **Actual pulsing, not a single fade:** needs multiple keyframe stops cycling the `box-shadow` opacity up and down within the 2.5s (e.g. bright → dim → bright → dim), not just one 0%→100% fade like today. Exact pulse count/rhythm is a small aesthetic call to make at build time.
+- [ ] No JS changes needed — confirmed the `animationend` listener that removes the class is duration-agnostic (`script.js`, `selectTileSearchResult`), so this is a CSS-only change.
+
+Not yet authorized to build.
+
 ### Typed-confirmation placeholder: "Yes" capitalized
 
 Per the user — purely cosmetic, no behavior change. There's exactly one place this exists: `#tile-confirm-type-input`'s placeholder in `index.html`, `Type "yes" to confirm` — the single shared confirm dialog reused everywhere a typed confirmation is required (Remove Category, Import backup, the delete easter egg). The actual validation stays case-insensitive as-is (`tileConfirmTypeInput.value.trim().toLowerCase() !== 'yes'` in script.js, untouched) — only the displayed placeholder text changes to `Type "Yes" to confirm`.
