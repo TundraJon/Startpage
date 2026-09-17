@@ -316,6 +316,11 @@ main {
   max-width: 900px;
   box-sizing: border-box;
   z-index: 90;
+  /* .category-header (base class) is align-items: stretch — regular categories only look centered
+     because their title lives inside .category-header-main, which sets its own align-items:
+     center. Home's <h2> is a direct child here with no such wrapper, so it was never actually
+     centered at all until this override. */
+  align-items: center;
 }
 
 .category--home .tile-grid {
@@ -327,6 +332,9 @@ main {
 
 .category--home .category-header--home .category-name {
   color: var(--home-color-fg, var(--home-header-fg));
+  /* A touch bigger than every other category's title (.category-name is 1rem) — Home-specific,
+     not a change to the shared rule other categories still use. */
+  font-size: 1.1rem;
 }
 
 .home-header-actions {
@@ -350,6 +358,26 @@ main {
   line-height: 1;
   padding: 6px;
   border-radius: 4px;
+}
+
+/* 🔎 and ▲ get the same "boxed" framing #create-btn already has, per the user, but not its green —
+   that's create-btn's own semantic (create/go) color. A plain fixed frame color would clash once
+   the user picks a different Home color (it's user-pickable, --home-color-bg), so this reuses the
+   same semi-transparent white overlay .home-header-action-btn:hover already uses elsewhere in
+   this file for exactly that reason — it reads as "a few shades lighter" relative to whatever
+   Home's current color actually is, with no color math or JS recompute needed when it changes. */
+#tile-search-btn,
+#collapse-all-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  opacity: 1;
+}
+
+#tile-search-btn:hover,
+#tile-search-btn:focus-visible,
+#collapse-all-btn:hover,
+#collapse-all-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.28);
 }
 
 .home-header-action-btn:hover,
@@ -1072,13 +1100,20 @@ main {
   font-size: 0.9rem;
 }
 
+/* Glow color is Home's own current color (--home-color-bg, user-pickable in Settings), via
+   color-mix() rather than a hardcoded RGB, so it always matches even after the user changes it —
+   no JS recompute needed. When Home's color is "None" (the property is unset entirely, not set to
+   anything), the fallback is a genuine neon blue rather than --home-header-bg's own muted default,
+   per the user — that muted default is Home's header's fallback, not something the glow should
+   inherit. Two pulses across 2.5s (bright at 25%/75%, dim at 0/50/100%) rather than a single fade. */
 @keyframes tile-search-glow {
-  0% { box-shadow: 0 0 0 3px rgba(80, 170, 255, 0.9); }
-  100% { box-shadow: 0 0 0 3px rgba(80, 170, 255, 0); }
+  0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--home-color-bg, #00e5ff) 0%, transparent); }
+  25%, 75% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--home-color-bg, #00e5ff) 90%, transparent); }
+  50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--home-color-bg, #00e5ff) 15%, transparent); }
 }
 
 .tile-search-glow {
-  animation: tile-search-glow 1.8s ease-out;
+  animation: tile-search-glow 2.5s ease-in-out;
 }
 
 .help-overlay {
@@ -1658,15 +1693,10 @@ main {
   display: flex;
 }
 
-.profile-photo-row {
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
 .profile-photo-preview-wrap {
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
   overflow: hidden;
   background: var(--border);
@@ -1686,8 +1716,79 @@ main {
   height: 24px;
 }
 
-.profile-photo-btn {
+/* Settings-only compact layout — label + control on one line instead of a heading above a
+   separate full-width row, per the user. Deliberately new, dedicated classes rather than shrinking
+   .option-row/.options-section/.testing-reset-btn: those are shared by Add Tile, Weather Options,
+   Clock Options, and other .help-overlay dialogs, and none of them asked to get more compact too. */
+#settings-list .options-section {
+  margin-top: 10px;
+}
+
+#settings-list .options-section:first-child {
   margin-top: 0;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.95rem;
+}
+
+.settings-row:last-child {
+  border-bottom: none;
+}
+
+.settings-photo-row {
+  flex-wrap: wrap;
+  border-bottom: none;
+}
+
+.settings-row-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+  flex-shrink: 0;
+}
+
+.settings-row-input {
+  width: 55%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.settings-row-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.settings-inline-btn {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Choose/Remove specifically — a plain colored +/− character, not the grey ➕➖ emoji glyphs,
+   using the same go/stop theme variables other semantically-colored actions in the app already
+   use (including the Home header's own "+" create button, just as a background chip there rather
+   than a colored glyph here). */
+.settings-btn-go {
+  color: var(--action-go-fg);
+  border-color: var(--action-go-fg);
+}
+
+.settings-btn-stop {
+  color: var(--action-stop-fg);
+  border-color: var(--action-stop-fg);
 }
 
 .reorg-header h2 {

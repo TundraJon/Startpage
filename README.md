@@ -1310,65 +1310,29 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 - [x] **Caught a real bug before it ever ran, from the same class as Build 68's:** the search code sits earlier in the file than `categoryTree`'s own `const` declaration — every reference to it is safely inside functions only called from click/input handlers (never evaluated at the declaring `const`'s own line), so this is fine as written, but worth naming since it's exactly the shape of mistake `backupSimpleKeys()` had to fix moments earlier in this same build session.
 - [x] **Verified via Playwright:** button order confirmed (🔎 left of +); empty query shows nothing; a match with no grouping omits the `_` segment while one under a grouping includes it correctly (tested both on the same category); a query matching nothing shows "No matching tiles."; selecting a result closes the popup, opens the right category, and the tile gets the glow class immediately, which is gone again after the animation completes; a Home tile searches and displays correctly. Re-ran the drag-jitter, horizontal-drag, tile-dialog, and backup regression scripts together — all still pass. Zero page errors throughout.
 
+## Build Log 70 (completed)
+
+### Visual polish batch: typed-confirm wording, Home header, tile search glow
+
+- [x] **Typed-confirmation placeholder capitalized.** `#tile-confirm-type-input`'s placeholder (`index.html`) now reads `Type "Yes" to confirm` — the one shared confirm dialog used everywhere a typed confirmation is required. Display only; the actual validation stays case-insensitive, untouched.
+- [x] **Home title — bigger and actually vertically centered, a real bug fixed along the way.** `.category--home .category-header--home .category-name` gets its own `font-size: 1.1rem` (the shared `.category-name` other categories use stays 1rem). Centering was a genuine bug, not just a tweak: `.category-header` (the base class every header shares) is `align-items: stretch`; regular categories only look centered because their title lives inside `.category-header-main`, which sets its own `align-items: center` — Home's `<h2>` is a direct child of `.category-header--home` with no such wrapper, so it was never centered at all. Fixed by adding `align-items: center` to `.category-header--home` itself.
+- [x] **🔎 and ▲ boxed, `+` stays green.** Gave `#tile-search-btn`/`#collapse-all-btn` a visible box — but instead of the `color-mix()` approach originally logged, reused this file's own existing precedent for "a shade lighter than whatever Home's color currently is": the semi-transparent white overlay `.home-header-action-btn:hover` already applies (`rgba(255, 255, 255, 0.15)`), now as the two buttons' permanent resting state (hover intensifies to `0.28`). This adapts correctly regardless of Home's chosen color with no color-math edge cases, which a fixed-percentage `color-mix()` mix could have on a very light user-picked color — a more robust choice than what was originally planned, using a pattern already proven in this exact file.
+- [x] **Tile search glow: 2.5s, pulsing, Home's color.** `@keyframes tile-search-glow` now cycles `box-shadow` opacity through two full pulses (bright at 25%/75%, dim at 0/50/100%) over 2.5s, replacing the old single 1.8s fade. Color is `color-mix(in srgb, var(--home-color-bg, #00e5ff) ...%, transparent)` — Home's own live color when set, or a genuine neon blue (not `--home-header-bg`'s muted default) when Home's color is "None," per the user. No JS changes needed — confirmed live that the `animationend` listener removing the glow class is duration-agnostic.
+- [x] **Verified via Playwright:** Home's title measures 17.6px vs. a regular category's 16px; `align-items: center` confirmed on the live element; search/collapse boxes show the overlay background while create-btn keeps its own green; the glow's `animation-duration` reads 2.5s and `box-shadow` alpha genuinely varies over four samples taken half a second apart (not static); the glow class is confirmed removed only after the full 2.5s, not before. Zero page errors.
+
+## Build Log 71 (completed)
+
+### Settings cleanup: compact layout, boxed green/red photo buttons, 50px preview
+
+- [x] **Site Name / Theme / Organize / Backup / Weather — label and control collapsed onto one line each**, replacing the old `<h3>` heading above a separate full-width row. New Settings-scoped classes (`.settings-row`, `.settings-row-label`, `.settings-row-input`, `.settings-inline-btn`) rather than touching `.option-row`/`.options-section`/`.testing-reset-btn` — those are shared by Add Tile, Weather Options, Clock Options, and other `.help-overlay` dialogs, none of which asked to get more compact too. `#settings-list .options-section` gets its own tighter `margin-top: 10px` (was 18px via the shared rule), scoped the same way. Theme's label is now the shortened "Theme: Auto 7a-day/7p-night," replacing the old, longer wording, per the user.
+- [x] **Profile Photo — one compact row: avatar + green "+ Choose" + red "− Remove."** Keeps its own `<h3>` (a real three-piece subsection), but Choose Photo is no longer a full-width block below the avatar — both buttons sit inline via `.settings-inline-btn`. Colored via new `.settings-btn-go`/`.settings-btn-stop` classes reusing the app's existing `--action-go-fg`/`--action-stop-fg` theme variables (the same pair other go/stop-semantic actions already use) — a plain colored `+`/`−` character, not the grey ➕➖ emoji glyphs. `.profile-photo-preview-wrap` is now 50px (was 40px) — still well within the underlying 64×64 stored thumbnail, no quality loss. The now-unused `.profile-photo-row`/`.profile-photo-btn` rules were removed along with their HTML classes rather than left dead.
+- [x] **Backup's Export/Import keep their 📤/📥 emoji**, matching the emoji-heavy style already used everywhere else in the app — only Choose/Remove needed the colored-glyph treatment, per the user.
+- [x] **No JS changes at all.** Every element kept its existing `id` — this was purely an HTML/CSS restructuring, confirmed by grepping for every `getElementById` this section touches against the new markup before considering it done.
+- [x] **Verified via Playwright and screenshots:** Settings now renders as one compact, scannable list matching the user's mockup almost exactly; Site Name and the Theme checkbox still read from and write to storage correctly after the restructure; the photo preview measures 50px; Choose reads green (`rgb(20, 83, 31)`), and Remove — confirmed visible once a photo is set — reads red (`rgb(107, 20, 20)`). Re-ran the full existing regression suite (drag-jitter, horizontal-drag, tile-dialog consolidation, backup export/import, tile search) together with this round's changes — all still pass. Zero page errors throughout.
+
 ## Build Queue
 
-### Profile photo preview: 40px → 50px
-
-Per the user. `.profile-photo-preview-wrap` (`styles.css`) is currently `width: 40px; height: 40px` — the circular preview shown in Settings. Change both to 50px. Leaves the default-icon-before-a-photo-is-chosen sub-rule (`.profile-photo-preview.profile-photo-default`, currently 24×24px within that circle) untouched unless the user wants it scaled up proportionally too. The underlying stored thumbnail is 64×64 (`PROFILE_PHOTO_TARGET_PX`), so there's still headroom at 50px — no quality loss.
-
-Not yet authorized to build.
-
-### Tile search glow: pulse, 2.5s, Home category color
-
-Per the user — a refinement to the already-shipped Build 69 glow, not a new feature. Current exact code (`styles.css`):
-```css
-@keyframes tile-search-glow {
-  0% { box-shadow: 0 0 0 3px rgba(80, 170, 255, 0.9); }
-  100% { box-shadow: 0 0 0 3px rgba(80, 170, 255, 0); }
-}
-.tile-search-glow {
-  animation: tile-search-glow 1.8s ease-out;
-}
-```
-Two changes: (1) duration 1.8s → 2.5s, (2) color: fixed light blue → Home's own live color, and (3) an actual repeating pulse rather than the current single fade-out.
-
-- [ ] **Color, same live-derivation approach as the boxed-icon plan above:** reference `var(--home-color-bg, ...)` via `color-mix()` rather than a hardcoded RGB, so the glow always matches whatever Home's color currently is (including after the user changes it), consistent with how the boxed icons are planned to work.
-- [ ] **"None" fallback — decided by the user: neon blue, not `--home-header-bg`.** When Home's own color is set to "None" (confirmed real: `pendingHomeBg`/`homeColor.bg` can be `null`, which removes the `--home-color-bg` custom property entirely rather than setting it to anything), `var(--home-color-bg, X)` currently would fall through to `--home-header-bg` (`#1A5276`, a muted dark blue) if written the same way the boxed-icon plan does. The user wants the glow specifically to default to an actual neon blue in that case, not the header's own muted default — so the glow's fallback value needs to be its own bright neon-blue color (e.g. something like `#00e5ff`, exact shade a small call at build time), not `var(--home-header-bg)`. This is scoped to the glow only, not a change to Home's own header background default.
-- [ ] **Actual pulsing, not a single fade:** needs multiple keyframe stops cycling the `box-shadow` opacity up and down within the 2.5s (e.g. bright → dim → bright → dim), not just one 0%→100% fade like today. Exact pulse count/rhythm is a small aesthetic call to make at build time.
-- [ ] No JS changes needed — confirmed the `animationend` listener that removes the class is duration-agnostic (`script.js`, `selectTileSearchResult`), so this is a CSS-only change.
-
-Not yet authorized to build.
-
-### Typed-confirmation placeholder: "Yes" capitalized
-
-Per the user — purely cosmetic, no behavior change. There's exactly one place this exists: `#tile-confirm-type-input`'s placeholder in `index.html`, `Type "yes" to confirm` — the single shared confirm dialog reused everywhere a typed confirmation is required (Remove Category, Import backup, the delete easter egg). The actual validation stays case-insensitive as-is (`tileConfirmTypeInput.value.trim().toLowerCase() !== 'yes'` in script.js, untouched) — only the displayed placeholder text changes to `Type "Yes" to confirm`.
-
-Not yet authorized to build.
-
-### Home category header polish — title size/centering, boxed icons
-
-Per the user. Investigated the actual cause of both issues before logging:
-
-- [ ] **Title font size — Home-specific, not the shared class.** `.category-name` (shared by every category's title, including Home's own `<h2>`) is `font-size: 1rem`. The user wants Home's title *specifically* a touch bigger than regular category titles, so this needs a `.category--home .category-header--home .category-name` override (that selector already exists, currently only setting color) bumping font-size slightly — not a change to the shared `.category-name` rule other categories also use.
-- [ ] **Vertical centering — a real, found bug, not just a tweak.** `.category-header` (the base class every category header shares) is `display: flex; align-items: stretch`. Regular categories get centered anyway because their title lives inside `.category-header-main`, which has its own `align-items: center`. Home's `<h2>` is a *direct* child of `.category-header--home` with no such wrapper — it never gets centered at all, just stretched. Fix: add `align-items: center` to `.category-header--home` itself.
-- [ ] **Boxed icons — 🔎 and ▲ get a box too, `+` stays green (confirmed).** `#create-btn` already has a visible box (`background: var(--action-go-bg); border-radius: 8px`) and keeps it, per the user. `#tile-search-btn` and `#collapse-all-btn` currently share only the plain `.home-header-action-btn` style (transparent, no border, `opacity: 0.75`) — no frame at all.
-  - **Color — decided by the user: a few shades lighter/darker than Home's own header color, not a fixed neutral.** Home's header background is `var(--home-color-bg, var(--home-header-bg))` — user-pickable (`script.js` writes `--home-color-bg` inline whenever they choose one in Settings), so a hardcoded frame color would look wrong or clash once they pick something else. Planned approach: reference that same custom property from the two boxes via CSS `color-mix()` (e.g. `color-mix(in srgb, var(--home-color-bg, var(--home-header-bg)) 85%, white)`, or mixed with black instead) so the frame always derives from whatever Home's color currently is, live, with no JS recompute needed when the user changes it. New technique for this codebase — nothing here uses `color-mix()` or `filter: brightness()` yet. Exact direction (lighter vs. darker) and mix percentage are a small visual call to make at build time, checking both light and dark mode, rather than something to settle in advance.
-
-Not yet authorized to build.
-
-### Settings cleanup — compact layout, way less vertical space
-
-Per the user, with an ASCII mockup of the target layout. Root cause investigated, not just described: every button-only row (Reorganize Categories, Choose Photo, Export My Data, Import My Data) uses `.testing-reset-btn` — `width: 100%; margin-top: 20px` — a full-width block button style shared across the whole app for real primary actions (Add Tile submit, dialog Save, etc.). Combined with every section's `<h3>` label sitting on its own line above its row, that's the entire source of the excess space.
-
-- [ ] **Site Name / Theme:** collapse `<h3>` + row into one line each — the section label lives directly in the row (styled like the current small-caps `<h3>`) instead of a heading above a separate row. Theme's label shortens to "Auto 7a-day/7p-night" — confirmed by the user, replacing the current longer text ("Automatic (day 7am–7pm / night 7pm–7am)").
-- [ ] **Profile Photo:** keeps its own heading line (a real subsection with three pieces — avatar, Choose, Remove), but the row itself becomes one compact inline line: avatar + a small "➕ Choose" button + a small "➖ Remove" button, instead of Choose Photo as a full-width block below the avatar.
-- [ ] **Organize:** "Reorganize Categories" becomes a small inline button next to the label, not full-width.
-- [ ] **Backup:** Export/Import become small inline buttons ("📤 Export" / "📥 Import") next to the label; the existing note paragraph stays below in its current small muted style.
-- [ ] **Weather:** the API key input moves onto the same line as the label; the existing note paragraph stays below.
-- [ ] **Icons:** 📤 Export and 📥 Import stay as emoji, matching the emoji-heavy style already used everywhere else in the app (🔎, 🇧🇷, ☀️🌙, weather icons). Choose/Remove, per the user, should NOT use the grey ➕➖ emoji glyphs — a plain "+"/"−" text character instead, colored via the app's existing `--action-go-fg` (green) / `--action-stop-fg` (red) theme variables, the same pair already used for other go/stop-semantic actions elsewhere (and the same green already used for the Home header's own "+" create button, just as a background chip there rather than a colored glyph).
-- [ ] **Scope — Settings only, new dedicated classes.** `.option-row`, `.options-section`, and `.testing-reset-btn` are shared by Add Tile, Weather Options, Clock Options, and other `.help-overlay` dialogs — this build adds new Settings-specific compact classes rather than shrinking those shared ones, so nothing outside `#settings-view` changes as a side effect. The user's own framing ("let's start with Settings") suggests more of these cleanups may follow for other dialogs later, as separate items.
-
-Not yet authorized to build.
+_Empty — everything above has been built. Log new items here as they come in._
 
 ## Build Planner
 

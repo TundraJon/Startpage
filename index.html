@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home</title>
-<link rel="stylesheet" href="styles.css?v=48">
+<link rel="stylesheet" href="styles.css?v=49">
 </head>
 <body>
 
@@ -346,19 +346,20 @@
   </div>
   <div class="reorg-list" id="settings-list">
     <section class="options-section">
-      <h3>Site Name</h3>
-      <div class="option-row">
-        <span>Homepage Name</span>
-        <input type="text" id="site-name-input" autocomplete="off" spellcheck="false" placeholder="Home" style="width: 55%; min-width: 0;">
+      <div class="settings-row">
+        <span class="settings-row-label">Site Name</span>
+        <input type="text" id="site-name-input" class="settings-row-input" autocomplete="off" spellcheck="false" placeholder="Home">
       </div>
     </section>
     <section class="options-section">
-      <h3>Theme</h3>
-      <label class="option-row"><span>Automatic (day 7am–7pm / night 7pm–7am)</span><input type="checkbox" id="theme-auto-toggle"></label>
+      <label class="settings-row">
+        <span class="settings-row-label">Theme: Auto 7a-day/7p-night</span>
+        <input type="checkbox" id="theme-auto-toggle">
+      </label>
     </section>
     <section class="options-section">
       <h3>Profile Photo</h3>
-      <div class="option-row profile-photo-row">
+      <div class="settings-row settings-photo-row">
         <span class="profile-photo-preview-wrap">
           <img id="profile-photo-preview" class="profile-photo-preview" alt="" hidden>
           <svg id="profile-photo-default-preview" class="profile-photo-preview profile-photo-default" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -366,35 +367,34 @@
             <path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8v1H4v-1z"/>
           </svg>
         </span>
-        <button type="button" class="testing-reset-btn profile-photo-btn" id="profile-photo-choose-btn">Choose Photo</button>
-        <button type="button" class="testing-reset-btn profile-photo-btn" id="profile-photo-remove-btn" hidden>Remove</button>
+        <button type="button" class="settings-inline-btn settings-btn-go" id="profile-photo-choose-btn">+ Choose</button>
+        <button type="button" class="settings-inline-btn settings-btn-stop" id="profile-photo-remove-btn" hidden>− Remove</button>
         <input type="file" id="profile-photo-input" accept="image/*" hidden>
       </div>
     </section>
     <section class="options-section">
-      <h3>Organize</h3>
-      <button type="button" class="testing-reset-btn" id="open-reorg-btn">Reorganize Categories</button>
-    </section>
-    <section class="options-section">
-      <h3>Weather</h3>
-      <p class="testing-note">Your WeatherAPI.com key is stored only in this browser (never leaves your device, never committed to the site's source).</p>
-      <div class="option-row">
-        <span>WeatherAPI Key</span>
-        <input type="password" id="weatherapi-key-input" autocomplete="off" spellcheck="false" placeholder="paste key here" style="width: 55%; min-width: 0;">
+      <div class="settings-row">
+        <span class="settings-row-label">Organize</span>
+        <button type="button" class="settings-inline-btn" id="open-reorg-btn">Reorganize Categories</button>
       </div>
     </section>
     <section class="options-section">
-      <h3>Backup</h3>
+      <div class="settings-row">
+        <span class="settings-row-label">Backup</span>
+        <span class="settings-row-actions">
+          <button type="button" class="settings-inline-btn" id="backup-export-btn">📤 Export</button>
+          <button type="button" class="settings-inline-btn" id="backup-import-btn">📥 Import</button>
+        </span>
+      </div>
       <p class="testing-note">Everything here lives only in this browser — clearing site data or switching devices loses it for good. Export a backup file periodically and keep it somewhere safe (cloud storage, email to yourself).</p>
-      <div class="option-row">
-        <span>Export</span>
-        <button type="button" class="testing-reset-btn" id="backup-export-btn">Export My Data</button>
-      </div>
-      <div class="option-row">
-        <span>Import</span>
-        <button type="button" class="testing-reset-btn" id="backup-import-btn">Import My Data</button>
-      </div>
       <input type="file" id="backup-import-input" accept="application/json" hidden>
+    </section>
+    <section class="options-section">
+      <div class="settings-row">
+        <span class="settings-row-label">WeatherAPI Key</span>
+        <input type="password" id="weatherapi-key-input" class="settings-row-input" autocomplete="off" spellcheck="false" placeholder="paste key here">
+      </div>
+      <p class="testing-note">Your WeatherAPI.com key is stored only in this browser (never leaves your device, never committed to the site's source).</p>
     </section>
   </div>
 </div>
@@ -599,7 +599,7 @@
     <button class="help-close" id="tile-confirm-close" aria-label="Close">&times;</button>
     <p id="tile-confirm-text"></p>
     <p id="tile-confirm-counts" hidden></p>
-    <input type="text" id="tile-confirm-type-input" autocomplete="off" placeholder='Type &quot;yes&quot; to confirm' hidden style="width: 100%; box-sizing: border-box; margin-bottom: 8px;">
+    <input type="text" id="tile-confirm-type-input" autocomplete="off" placeholder='Type &quot;Yes&quot; to confirm' hidden style="width: 100%; box-sizing: border-box; margin-bottom: 8px;">
     <button type="button" class="testing-reset-btn" id="tile-confirm-yes">Confirm</button>
     <button type="button" class="testing-reset-btn" id="tile-confirm-no">Cancel</button>
   </div>
