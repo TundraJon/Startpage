@@ -1337,5 +1337,4 @@ Usage data (`createdAt`/`lastUsedAt`/`useCount` per tile) already exists and is 
 ### Planner 3. Search across all tiles
 
 - [ ] Auto-navigate + scroll-into-view + glowing highlight. Nothing like this exists — the only search bar in the app is the external web-search form (`#search-form`, submits to Google/Bing). Needs: an index over every category's stored tiles (DOM-driven or storage-key-driven, same open question Planner 2's "Reports" idea has), a results UI showing title + category path, and on selecting a result: computing that tile's category chain and calling `openCategoryPath` on it, then `scrollIntoView` plus a new CSS pulse-glow animation (light blue border, ~1.5–2s fade) — no existing animation to reuse, would be new.
-- [ ] **Open, not yet decided:** whether category range-select/batch-select (dropped when the Reorg Tree Tool replaced it) is wanted back in some form — not raised again since that tradeoff was made, worth confirming is still accepted rather than assuming so indefinitely.
 
