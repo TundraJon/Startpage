@@ -1312,6 +1312,12 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
+### Typed-confirmation placeholder: "Yes" capitalized
+
+Per the user — purely cosmetic, no behavior change. There's exactly one place this exists: `#tile-confirm-type-input`'s placeholder in `index.html`, `Type "yes" to confirm` — the single shared confirm dialog reused everywhere a typed confirmation is required (Remove Category, Import backup, the delete easter egg). The actual validation stays case-insensitive as-is (`tileConfirmTypeInput.value.trim().toLowerCase() !== 'yes'` in script.js, untouched) — only the displayed placeholder text changes to `Type "Yes" to confirm`.
+
+Not yet authorized to build.
+
 ### Home category header polish — title size/centering, boxed icons
 
 Per the user. Investigated the actual cause of both issues before logging:
