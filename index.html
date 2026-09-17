@@ -382,6 +382,19 @@
         <input type="password" id="weatherapi-key-input" autocomplete="off" spellcheck="false" placeholder="paste key here" style="width: 55%; min-width: 0;">
       </div>
     </section>
+    <section class="options-section">
+      <h3>Backup</h3>
+      <p class="testing-note">Everything here lives only in this browser — clearing site data or switching devices loses it for good. Export a backup file periodically and keep it somewhere safe (cloud storage, email to yourself).</p>
+      <div class="option-row">
+        <span>Export</span>
+        <button type="button" class="testing-reset-btn" id="backup-export-btn">Export My Data</button>
+      </div>
+      <div class="option-row">
+        <span>Import</span>
+        <button type="button" class="testing-reset-btn" id="backup-import-btn">Import My Data</button>
+      </div>
+      <input type="file" id="backup-import-input" accept="application/json" hidden>
+    </section>
   </div>
 </div>
 
@@ -633,6 +646,6 @@
   </div>
 </div>
 
-<script src="script.js?v=53"></script>
+<script src="script.js?v=54"></script>
 </body>
 </html>

@@ -1290,27 +1290,16 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 - [x] **Edit Tile can change a tile's URL now — genuinely new capability, not just merged plumbing.** Before this, there was no way to fix a broken link or point a tile at a more specific page after creation, full stop. New `updateTileUrl(tileEl, url)` sets the live `<a>`'s `href` and re-derives its favicon for the new domain via a new shared `createTileFaviconImg()` helper (factored out of `buildTileElement`, which now calls it too) — always recreates the `<img>` rather than trying to reuse one, so a tile that had fallen back to `.tile-fallback` gets a fresh shot at a real favicon if the edited URL points somewhere new.
 - [x] **Verified via Playwright:** Add mode shows "Add Tile"/"Add Tile"; a new tile's href/badge/info-icon all render correctly. Edit mode shows "Edit Tile"/"Save" and correctly prefills Name, URL, Blurb, and Brazil from the live tile. Editing URL + Name + unchecking Brazil all apply live to the DOM and persist to storage; the new URL survives a full reload. Re-ran the drag-jitter and horizontal-drag regression suites since `buildTileElement` was touched — both still pass clean. Zero page errors.
 
+## Build Log 68 (completed)
+
+### Export / Import backup (Two-Instance Mechanism — Per-Device Storage spec, Section 6)
+
+- [x] **Export:** new "Backup" section at the bottom of Settings, right after Weather (as planned). "Export My Data" serializes the category tree, every category's tiles, site name, theme + auto-mode, WeatherAPI key, profile photo, search engine, Home colors, and clock/weather widget settings into one JSON file and triggers a browser download — no account or server involved. Deliberately excluded: the internal `*Migrated` bookkeeping flags (not user data, and re-applying them to an imported tree that already has real content would be wrong), `category-open-path` (just "what was scrolled to last," not customization), and the weather widget's live-condition cache/alert-state (ephemeral, re-fetched on next load regardless).
+- [x] **Import:** "Import My Data" opens a file picker; the selected file is parsed and sanity-checked (must be JSON with `app: "startpage-backup"` and a `data` object) — anything else shows a warning via the existing generic confirm dialog and imports nothing. A valid file goes through the same dialog as a real Yes/No confirmation, gated behind typing "yes" (the same `requireTypedYes` friction tier Remove Category uses for a non-empty subtree, matching the spec's own comparison) with the exact warning text the spec specified. On confirm: every relevant existing key is cleared first, then every key from the backup is written — a genuine full replacement, not a merge, so a tile deleted before the backup was made doesn't linger after importing it — then the page reloads to re-render everything from the new stored state, the simplest correct way to re-init every independent subsystem (categories, tiles, theme, clock, weather, profile photo) at once.
+- [x] **Caught and fixed a real bug during verification, before it ever ran for real:** `BACKUP_SIMPLE_KEYS` was originally a top-level `const` array referencing `CLOCK_SETTINGS_KEY`/`WEATHER_SETTINGS_KEY`, both declared much later in the file — a Temporal Dead Zone violation, since an array literal evaluates its elements immediately at its own declaration point, not lazily. Fixed by making it a function (`backupSimpleKeys()`) called only from click handlers that fire long after the whole script has finished evaluating, which is safe regardless of declaration order.
+- [x] **Verified via Playwright:** export produces the correct JSON envelope and content (confirmed by intercepting the Blob passed to `URL.createObjectURL`, since headless-Chromium's real download flow was unreliable in this sandbox — the export button was still exercised for real, a `download` event did fire). An invalid file is correctly rejected with the warning, nothing imported. A valid (modified) backup correctly shows the confirm dialog with Confirm disabled until "yes" is typed, and on confirming, both `siteName` and a category's tiles are fully replaced — the pre-import tile is confirmed gone, not merged. Zero page errors.
+
 ## Build Queue
-
-### Export / Import backup (Two-Instance Mechanism — Per-Device Storage spec)
-
-User shared the "Two-Instance Mechanism — Per-Device Storage: Full Implementation Spec" document. Reconciled against the current implementation first, per that document's own precedence rule (built behavior wins on conflict).
-
-**Already built, matches the spec, no conflicts — nothing to do:**
-- Per-device localStorage (not accounts) — how everything already works (`categoryTree`, `category-tiles-*`, `clockSettings`, `weatherSettings`, `homeColor`, etc.)
-- First-load seed initialization — `CATEGORY_SEED_DATA` + `CATEGORY_TREE_MIGRATED_FLAG` seeds once, never re-seeds after
-- Immediate persistence on every edit, with the Reorg Tree tool's working-copy-until-Save as the one deliberate exception — exactly matches the spec's own carve-out
-- Widget preferences (clock mode/scheme/12-24hr, weather toggles + unit default) already persist with this shape
-- Profile photo (spec Section 3.4) — already built in Build 63/64 using the spec's own *recommended* approach: compressed to a 64×64 thumbnail, stored as a base64 JPEG string, not a full blob
-- Storage tech — already localStorage everywhere, the spec's default recommendation; no sign of hitting size limits
-
-**Not built at all — the one real gap (spec Section 6, confirmed requirement there):** Export / Import backup. Grepped the whole codebase for export/import/download/backup — zero hits.
-
-- [ ] **Export:** a Settings option ("Export My Data" or similar) that serializes the full current state — content tree, all tile data, all personalization/widget settings, profile photo — to JSON and triggers a browser file download. No account/server involved.
-- [ ] **Import:** a corresponding Settings option that opens a file picker for a previously-exported JSON file, does a basic structural sanity check (reject/warn on something that clearly isn't a valid export rather than silently applying it), shows a confirm/cancel warning that importing replaces all current data before proceeding, then on confirm replaces the stored state and re-renders.
-- [ ] Placement: bottom of Settings, near the other data-ish controls (Weather API Key already lives at the very bottom per Build 63 — Export/Import should sit near there, exact ordering an implementer call at build time).
-
-Not yet authorized to build.
 
 ### Tile search
 

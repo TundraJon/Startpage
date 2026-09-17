@@ -1918,6 +1918,100 @@
     updateTileNameWrapClass(tileEl);
   }
 
+  // Export/Import backup (Two-Instance Mechanism — Per-Device Storage spec, Section 6): the only
+  // real gap that spec found — everything else it asked for (per-device localStorage, first-load
+  // seed, immediate persistence, widget preferences, the profile photo's own thumbnail handling)
+  // was already built. localStorage has no built-in sync or cloud backup, so this is the sole
+  // mitigation for "cleared site data / new device / new browser loses everything."
+  //
+  // What's exported: every real piece of user content and customization — the category tree, one
+  // key per category's tiles (`category-tiles-<id>`, the live grid data), site name, theme +
+  // auto-mode, the WeatherAPI key, profile photo, search engine choice, Home colors, and clock/
+  // weather widget settings. Deliberately excluded: the two `*Migrated`/`category-tiles-migrated-
+  // <id>` flag keys (internal one-time-seed bookkeeping, not user data — re-deriving them on
+  // import would be wrong anyway, since an imported categoryTree already has real content, not an
+  // empty tree needing the seed), `category-open-path` (just "what was scrolled to last," not
+  // customization, regenerates on its own), and the weather widget's own live-condition cache/
+  // alert-state keys (ephemeral, re-fetched from the API on next load regardless).
+  const BACKUP_APP_ID = 'startpage-backup';
+  // A function, not a top-level const array: CLOCK_SETTINGS_KEY and WEATHER_SETTINGS_KEY are
+  // declared much further down the file, and an array literal evaluates its elements immediately
+  // at the const's own declaration point — referencing them here directly would hit the
+  // Temporal Dead Zone. Called lazily, only from click handlers that fire long after the whole
+  // script (and every const in it) has finished evaluating, this is safe regardless of where in
+  // the file it's defined.
+  function backupSimpleKeys() {
+    return [
+      SITE_NAME_STORAGE, 'theme', THEME_AUTO_KEY, WEATHERAPI_KEY_STORAGE,
+      PROFILE_PHOTO_KEY, 'searchEngine', CATEGORY_TREE_KEY, HOME_COLOR_KEY,
+      CLOCK_SETTINGS_KEY, WEATHER_SETTINGS_KEY,
+    ];
+  }
+
+  function collectBackupData() {
+    const data = {};
+    backupSimpleKeys().forEach((key) => {
+      const value = localStorage.getItem(key);
+      if (value !== null) data[key] = value;
+    });
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith(TILE_STORAGE_PREFIX) && !key.startsWith(TILE_MIGRATION_FLAG_PREFIX)) {
+        data[key] = localStorage.getItem(key);
+      }
+    });
+    return data;
+  }
+
+  document.getElementById('backup-export-btn').addEventListener('click', () => {
+    const payload = { app: BACKUP_APP_ID, version: 1, exportedAt: new Date().toISOString(), data: collectBackupData() };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'startpage-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  const backupImportInput = document.getElementById('backup-import-input');
+  document.getElementById('backup-import-btn').addEventListener('click', () => backupImportInput.click());
+
+  backupImportInput.addEventListener('change', () => {
+    const file = backupImportInput.files[0];
+    backupImportInput.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let payload;
+      try {
+        payload = JSON.parse(reader.result);
+      } catch (e) {
+        payload = null;
+      }
+      const data = payload && payload.app === BACKUP_APP_ID ? payload.data : null;
+      if (!data || typeof data !== 'object') {
+        openTileConfirm("That file doesn't look like a valid Startpage backup — nothing was imported.", null);
+        return;
+      }
+      openTileConfirm(
+        'Importing will replace all current customization with the contents of this backup. Continue?',
+        () => {
+          Object.keys(localStorage).forEach((key) => {
+            if (backupSimpleKeys().includes(key) || (key.startsWith(TILE_STORAGE_PREFIX) && !key.startsWith(TILE_MIGRATION_FLAG_PREFIX))) {
+              localStorage.removeItem(key);
+            }
+          });
+          Object.keys(data).forEach((key) => localStorage.setItem(key, data[key]));
+          location.reload();
+        },
+        { requireTypedYes: true }
+      );
+    };
+    reader.readAsText(file);
+  });
+
   // Info Blurb Management: tapping a tile's ℹ️ icon reveals its blurb text instead of navigating —
   // reuses the same full-screen .help-overlay pattern as every other popup in the app.
   const tileBlurbOverlay = document.getElementById('tile-blurb-overlay');
