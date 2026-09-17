@@ -1312,6 +1312,16 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
+### Home category header polish — title size/centering, boxed icons
+
+Per the user. Investigated the actual cause of both issues before logging:
+
+- [ ] **Title font size — Home-specific, not the shared class.** `.category-name` (shared by every category's title, including Home's own `<h2>`) is `font-size: 1rem`. The user wants Home's title *specifically* a touch bigger than regular category titles, so this needs a `.category--home .category-header--home .category-name` override (that selector already exists, currently only setting color) bumping font-size slightly — not a change to the shared `.category-name` rule other categories also use.
+- [ ] **Vertical centering — a real, found bug, not just a tweak.** `.category-header` (the base class every category header shares) is `display: flex; align-items: stretch`. Regular categories get centered anyway because their title lives inside `.category-header-main`, which has its own `align-items: center`. Home's `<h2>` is a *direct* child of `.category-header--home` with no such wrapper — it never gets centered at all, just stretched. Fix: add `align-items: center` to `.category-header--home` itself.
+- [ ] **Boxed icons — 🔎 and ▲ get the same framing `+` already has.** `#create-btn` already has a visible box (`background: var(--action-go-bg); border-radius: 8px`); `#tile-search-btn` and `#collapse-all-btn` currently share only the plain `.home-header-action-btn` style (transparent, no border, `opacity: 0.75`) — no frame at all. Planned approach: give search and collapse-all a neutral boxed look (border and/or subtle background, same `border-radius`/padding shape as `#create-btn`) so all three read as one consistent set of boxed icon buttons — while `#create-btn` keeps its own distinct green fill, since "+" carries a real semantic (create/go) the other two don't share. The user's own sketch (`[ 🔎 ]  [ + ]  [🔺]`) shows uniform brackets, not per-icon colors, so a shared neutral frame plus create-btn's existing color is the read here.
+
+Not yet authorized to build.
+
 ### Settings cleanup — compact layout, way less vertical space
 
 Per the user, with an ASCII mockup of the target layout. Root cause investigated, not just described: every button-only row (Reorganize Categories, Choose Photo, Export My Data, Import My Data) uses `.testing-reset-btn` — `width: 100%; margin-top: 20px` — a full-width block button style shared across the whole app for real primary actions (Add Tile submit, dialog Save, etc.). Combined with every section's `<h3>` label sitting on its own line above its row, that's the entire source of the excess space.
