@@ -1036,6 +1036,51 @@ main {
 .uv-badge.uv-veryhigh { color: #d0342c; }
 .uv-badge.uv-extreme { color: #9b30c9; }
 
+/* Tile search: live autocomplete dropdown rows, and the glow a selected result gets once it's
+   scrolled into view — new, since nothing in the app animated a tile's own border before this. */
+#tile-search-results {
+  margin-top: 8px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.tile-search-result {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 10px 2px;
+  font-size: 0.9rem;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.tile-search-result:last-child {
+  border-bottom: none;
+}
+
+.tile-search-result-tile {
+  font-weight: 600;
+}
+
+.tile-search-empty {
+  padding: 10px 2px;
+  color: var(--fg);
+  opacity: 0.6;
+  font-size: 0.9rem;
+}
+
+@keyframes tile-search-glow {
+  0% { box-shadow: 0 0 0 3px rgba(80, 170, 255, 0.9); }
+  100% { box-shadow: 0 0 0 3px rgba(80, 170, 255, 0); }
+}
+
+.tile-search-glow {
+  animation: tile-search-glow 1.8s ease-out;
+}
+
 .help-overlay {
   position: fixed;
   inset: 0;

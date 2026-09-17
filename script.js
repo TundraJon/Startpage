@@ -318,6 +318,109 @@
     renderOpenPath();
   }
 
+  // Tile search: a 🔎 popup with a live autocomplete dropdown, kept deliberately separate from
+  // the external web-search form (#search-form) so there's never a chance of one interfering with
+  // the other. DOM-driven, not storage-driven: every .tile element already exists in the DOM
+  // regardless of collapse state (wireTileGrids renders every category's tiles eagerly at load),
+  // so indexing document.querySelectorAll('.tile') directly can never surface an orphaned tile
+  // left behind under a since-deleted category the way scanning localStorage keys could.
+  const tileSearchOverlay = document.getElementById('tile-search-overlay');
+  const tileSearchClose = document.getElementById('tile-search-close');
+  const tileSearchInput = document.getElementById('tile-search-input');
+  const tileSearchResults = document.getElementById('tile-search-results');
+  let tileSearchIndex = [];
+
+  // The grouping (Visual Grouping Header) a tile sits under, if any — found by walking backward
+  // through its own siblings in the same flat .tile-grid until hitting a .tile-divider, or
+  // running out of siblings (no grouping).
+  function tileGroupingName(tileEl) {
+    let el = tileEl.previousElementSibling;
+    while (el) {
+      if (el.classList.contains('tile-divider')) {
+        const label = el.querySelector('.tile-divider-label');
+        return label ? label.textContent : null;
+      }
+      el = el.previousElementSibling;
+    }
+    return null;
+  }
+
+  // Rebuilt fresh every time the popup opens (not cached) — trivial cost for a personal
+  // homepage's tile count, and guarantees a result is never stale after an add/rename/delete/
+  // reorder made since the last time it was open. Display format decided by the user: `>` between
+  // real category-chain levels, `_` before a grouping name, `~` before the tile name itself.
+  function buildTileSearchIndex() {
+    return Array.from(document.querySelectorAll('.tile')).map((tileEl) => {
+      const categoryId = tileEl.closest('.category').dataset.categoryId;
+      const chainNames = categoryId === 'home'
+        ? ['Home']
+        : categoryAncestorChain(categoryId).map((id) => (categoryTree[id] ? categoryTree[id].name : id));
+      const grouping = tileGroupingName(tileEl);
+      const tileName = tileEl.querySelector('span').textContent;
+      let display = chainNames.join(' > ');
+      if (grouping) display += ' _ ' + grouping;
+      display += ' ~ ' + tileName;
+      return { tileEl, categoryId, display, searchText: display.toLowerCase() };
+    });
+  }
+
+  function renderTileSearchResults(query) {
+    const q = query.trim().toLowerCase();
+    tileSearchResults.innerHTML = '';
+    if (!q) return;
+    const matches = tileSearchIndex.filter((entry) => entry.searchText.includes(q)).slice(0, 25);
+    if (matches.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'tile-search-empty';
+      empty.textContent = 'No matching tiles.';
+      tileSearchResults.appendChild(empty);
+      return;
+    }
+    matches.forEach((entry) => {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'tile-search-result';
+      row.textContent = entry.display;
+      row.addEventListener('click', () => selectTileSearchResult(entry));
+      tileSearchResults.appendChild(row);
+    });
+  }
+
+  function closeTileSearch() {
+    tileSearchOverlay.hidden = true;
+  }
+
+  // Navigate to the result's category (skipped for a Home tile — Home is always visible, not
+  // part of the openPath system at all), then scroll to and glow the tile itself once the browser
+  // has had a frame to lay out the now-visible content (same requestAnimationFrame pattern
+  // scrollTargetBelowPopup uses elsewhere, for the same reason).
+  function selectTileSearchResult(entry) {
+    closeTileSearch();
+    if (entry.categoryId !== 'home') openCategoryPath(entry.categoryId);
+    requestAnimationFrame(() => {
+      entry.tileEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      entry.tileEl.classList.remove('tile-search-glow');
+      void entry.tileEl.offsetWidth; // force reflow so re-adding the class restarts the animation
+      entry.tileEl.classList.add('tile-search-glow');
+      entry.tileEl.addEventListener('animationend', () => entry.tileEl.classList.remove('tile-search-glow'), { once: true });
+    });
+  }
+
+  function openTileSearch() {
+    tileSearchIndex = buildTileSearchIndex();
+    tileSearchInput.value = '';
+    tileSearchResults.innerHTML = '';
+    tileSearchOverlay.hidden = false;
+    tileSearchInput.focus();
+  }
+
+  document.getElementById('tile-search-btn').addEventListener('click', openTileSearch);
+  tileSearchClose.addEventListener('click', closeTileSearch);
+  tileSearchOverlay.addEventListener('click', (e) => {
+    if (e.target === tileSearchOverlay) closeTileSearch();
+  });
+  tileSearchInput.addEventListener('input', () => renderTileSearchResults(tileSearchInput.value));
+
   // Every category on the current path has its own collapse button now, outdented to match its
   // own indent depth. Tapping a non-leaf ancestor's button truncates the path back to just before
   // it, closing it and everything open beneath it in one tap. Tapping the leaf's button keeps the
