@@ -1354,6 +1354,24 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
+### Bug: WeatherAPI Key paragraph lands at the bottom of Settings, huge blank gap above it
+
+Per the user: the WeatherAPI paragraph should sit immediately below the WeatherAPI Key field, but it's rendering at the very bottom of the screen after a large blank space. Root-caused, not just described:
+
+- **The bug:** `index.html`'s WeatherAPI Key section (inside `#settings-list`) has a stray `</div>` right after `#weatherapi-key-input`, with no matching opening `<div>` — a leftover from Build 73's HTML restructuring that didn't get fully cleaned up:
+  ```html
+  <section class="options-section">
+    <span class="settings-label">WeatherAPI Key:</span>
+    <input type="text" id="weatherapi-key-input" ...>
+    </div>
+    <p class="testing-note">Your WeatherAPI.com key...</p>
+  </section>
+  ```
+- **Why it produces this exact symptom:** an unmatched closing tag makes the browser's HTML parser walk up and close the nearest actual open ancestor — here, that's `#settings-list` itself (`<div class="reorg-list" id="settings-list">`, opened well above, wraps every settings section). So this stray `</div>` closes `#settings-list` early, right after the input. Everything textually after it (the paragraph, the section's own `</section>`, and `#settings-view`'s closing `</div>`) gets reparented outside `#settings-list` by the parser's recovery — landing after it in the DOM instead of inside it, which is exactly "way at the bottom, after a big gap."
+- **Fix:** delete the stray `</div>` — no matching change needed anywhere else, nothing was actually relying on that tag.
+
+Not yet authorized to build.
+
 ## Build Planner
 
 _Backlog of active items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start. Resolved/built/dropped/superseded items are not kept here — see Build Log entries for that history._
