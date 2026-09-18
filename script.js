@@ -4241,7 +4241,17 @@
   // synchronous call at load time already needs getEffectiveConditionSkins() — declaring it
   // later caused a temporal-dead-zone crash that silently prevented the initial fetch from
   // ever running.
-  const weatherLiveConditions = new Set();
+  //
+  // Seeded immediately from the placeholder weatherState's own conditionCode (Blizzard, per
+  // Build 47) rather than starting empty — this used to only ever get populated inside
+  // applyLiveWeatherData(), which never runs at all without a WeatherAPI key set (loadLiveWeather
+  // returns immediately with no fetch attempt). That left the sky rendering plain clear/sunny for
+  // every session that hasn't configured a key yet, even though the temperature/condition text
+  // right next to it correctly read "-20°/Blizzard" the whole time — two independent rendering
+  // paths silently disagreeing. mapConditionCode/animKeysFor are hoisted function declarations
+  // and WX_CONDITIONS is already initialized above, so calling them here (before their own
+  // textual declarations further down) is safe.
+  const weatherLiveConditions = new Set(animKeysFor(mapConditionCode(weatherState.conditionCode)));
   function getEffectiveConditionSkins() {
     return weatherTestState.conditionSkins.size > 0 ? weatherTestState.conditionSkins : weatherLiveConditions;
   }

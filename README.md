@@ -1416,29 +1416,20 @@ The big one — first-run choice between Full and Lite starter content, the user
 - [x] **Verified via Playwright, extensively:** fresh load seeds Full (41 categories, Home's 4 real tiles) and shows the picker; choosing Full hides it and persists `starterPackDecided`; a later load never shows it again; choosing Lite wipes and reloads into exactly the Junk Drawer/6-tile/empty-subcategory structure; Reset's dialog requires exact-case "RESET" (confirmed lowercase "reset" and "yes" both correctly leave Confirm disabled), the backup nudge fires a real download without closing the dialog, and confirming wipes back to a fresh Full-seeded state with the picker showing again. Deep-content spot checks: 3-level nesting (Games > RPG > Battle Maps) renders with its Free/Paid dividers, Brazil badges and info blurbs render correctly, an intentionally-empty category (Groveland's Deals & Discounts) renders with zero tiles and no crash. Full existing regression suite (drag reorder, backup export/import, tile dialog add/edit, tile search, tile-wrap fix, Settings layout, Help Overlay accuracy) re-run and updated where it depended on the old disposable placeholder categories (five scripts needed a synthetic `categoryTree` entry injected alongside their synthetic tile data, since those ids no longer exist in real seed data) — all green, zero page errors across every run.
 - [x] Cache-bust bumped: `styles.css?v=54→55`, `script.js?v=59→60`, new `starter-content.js?v=1`.
 
+## Build Log 80 (completed)
+
+### "Light" → "Lite" rename; fixed pre-load weather sky/text mismatch
+
+Both items from the Build Queue, built and verified together.
+
+- [x] **"Light" → "Lite" rename (`index.html`)** — all 4 occurrences corrected: the picker's `#starter-pack-lite-btn` option title, Help Overlay section 2, Help Overlay section 13's Reset bullet, and Settings' Reset section note. Confirmed via Playwright, live: the picker button, both Help sections, and the Settings note all render "Lite"/"Full/Lite" with zero remaining "Light" anywhere.
+- [x] **Fixed the pre-load weather sky/text mismatch (`script.js`)** — root cause was two independent rendering paths: the temp/condition text reads the placeholder `weatherState` directly (correctly "Blizzard"/-20°F per Build 47), but the sky animation reads `weatherLiveConditions`, a `Set()` that previously only got populated inside `applyLiveWeatherData()` — which never runs without a WeatherAPI key, since `loadLiveWeather()` returns immediately for every key-less visitor. Fixed by seeding `weatherLiveConditions` from `weatherState.conditionCode` at declaration time, via the same `animKeysFor(mapConditionCode(...))` call the live-fetch path already uses.
+- [x] **Verified via Playwright:** fresh load with no key now shows a correctly overcast/snowy sky (10 drifting clouds, 33,396 non-transparent pixels drawn on the precipitation canvas) matching the "-20°F/Blizzard" text next to it — confirmed both in raw pixel data and visually via screenshot. The stars canvas is correctly empty (sky isn't clear). Full existing regression suite (drag reorder, backup export/import, tile dialog add/edit, tile search, tile-wrap fix, Settings layout, Help Overlay accuracy, first-run Full/Lite picker + Reset flow) re-run clean, zero page errors.
+- [x] Cache-bust bumped: `script.js?v=60→61`.
+
 ## Build Queue
 
-### Rename "Light" → "Lite" throughout the Full/Lite picker feature
-
-Per the user: "Light Start" should read "Lite Start" — matches the internal naming already used everywhere in the actual code (`STARTER_PACK_KEY` value `'lite'`, `window.STARTER_CONTENT.lite`, this whole feature's own Build Log entry calling it "Lite" throughout); only the user-facing copy in `index.html` drifted to "Light." Four occurrences found, all in `index.html`:
-
-- `#starter-pack-lite-btn`'s option title: "Light Start" → "Lite Start"
-- Help Overlay section 2: "...or a small **Light Start** (just a handful of example links)" → "**Lite Start**"
-- Help Overlay section 13's Reset bullet: "the Full/Light choice from section 2" → "the Full/Lite choice"
-- Settings' Reset section note: "the Full/Light setup choice" → "the Full/Lite setup choice"
-
-Not yet authorized to build.
-
-### Bug: pre-load weather placeholder says Blizzard/-20°F but the sky animation shows clear/sunny
-
-Per the user: on first load, before a real WeatherAPI key is set, the widget correctly shows -20°F and "Blizzard" text (McMurdo Station, Antarctica), Live Condition Skin is on, but the actual background animation looks plain sunny instead of a blizzard. Root-caused, not just described:
-
-- **Two independent rendering paths read from two different sources.** The temperature/condition text (`renderWeatherTemps()`/`renderWeatherExtras()`) reads directly from the static placeholder object `weatherState` (`script.js`) — correctly `conditionCode: 1117` ("Blizzard"), `tempF: -20`, etc., per Build 47. The sky/background animation instead reads `getEffectiveConditionSkins()`, which returns `weatherLiveConditions` — a `Set()` that starts **empty** and is only ever populated inside `applyLiveWeatherData(data)`, itself only called after a real WeatherAPI fetch actually succeeds.
-- **`loadLiveWeather()` never even attempts a fetch without a key** — `if (!key) { weatherDebugState.outcome = 'no-key'; ...; return; }` fires immediately for every visitor who hasn't pasted a key into Settings yet, which is every brand-new visitor by definition. So `weatherLiveConditions` never gets populated, `renderWeatherSkin()`'s own initial synchronous call at load (confirmed still present, `script.js`) renders against an empty condition set, and the sky falls back to its default clear/sunny look — completely disconnected from the "Blizzard" the text right next to it is already showing.
-- **Not new to this session** — this placeholder default (Build 47) and the live-fetch-only initialization of `weatherLiveConditions` both predate Build 79. It's just far more likely to actually be seen now: Build 79 is the first time this app has shipped to real first-time visitors who land on exactly this pre-key state, rather than a sandbox mostly used by someone who already has a key configured.
-- **Fix direction:** seed `weatherLiveConditions` from `weatherState.conditionCode` once at load — the same `animKeysFor(mapConditionCode(weatherState.conditionCode))` call `applyLiveWeatherData()` already uses to populate it after a real fetch — so the very first paint (and any session that never gets a key) shows a sky consistent with its own placeholder condition instead of silently defaulting to clear.
-
-Not yet authorized to build.
+_Empty — no items awaiting authorization._
 
 ## Build Planner
 
