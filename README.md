@@ -1393,6 +1393,15 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 - [x] **Verified via Playwright:** section 12 now mentions Sign Up, Dashboard, and weatherapi.com; the 5-step list renders with the correct `padding-left` (20px, not the browser's 40px default); no raw `api.weatherapi.com/v1` test URL present (intentionally reworded out). Full existing regression suite (drag reorder, backup export/import, tile dialog add/edit, tile search, tile-wrap fix, Settings layout) re-run clean — zero page errors.
 - [x] Cache-bust bumped: `styles.css?v=53→54`.
 
+## Build Log 78 (completed)
+
+### Help Overlay: Close button added to the bottom, so you don't have to scroll back to the top × to exit
+
+- [x] **New `#help-close-bottom` button** (`index.html`), reusing the existing `.testing-reset-btn` style (same full-width bordered button already used for "Add Tile"/"Save"/etc. elsewhere in the app — no new CSS needed) — placed right after section 16, inside `.help-panel`.
+- [x] **Wired in `script.js`** alongside the existing top `#help-close`: same `helpOverlay.hidden = true` behavior, both buttons independently close the guide.
+- [x] **Verified via Playwright:** the bottom button renders correctly at the end of the scrolled content; clicking it closes the overlay; the original top × still works too, unaffected. Full existing regression suite re-run clean — zero page errors.
+- [x] Cache-bust bumped: `script.js?v=57→58`.
+
 ## Build Queue
 
 ## Build Planner

@@ -206,8 +206,10 @@
   const helpBtn = document.getElementById('help-btn');
   const helpOverlay = document.getElementById('help-overlay');
   const helpClose = document.getElementById('help-close');
+  const helpCloseBottom = document.getElementById('help-close-bottom');
   helpBtn.addEventListener('click', () => { helpOverlay.hidden = false; });
   helpClose.addEventListener('click', () => { helpOverlay.hidden = true; });
+  helpCloseBottom.addEventListener('click', () => { helpOverlay.hidden = true; });
   helpOverlay.addEventListener('click', (e) => {
     if (e.target === helpOverlay) helpOverlay.hidden = true;
   });
