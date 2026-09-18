@@ -1418,6 +1418,17 @@ The big one — first-run choice between Full and Lite starter content, the user
 
 ## Build Queue
 
+### Rename "Light" → "Lite" throughout the Full/Lite picker feature
+
+Per the user: "Light Start" should read "Lite Start" — matches the internal naming already used everywhere in the actual code (`STARTER_PACK_KEY` value `'lite'`, `window.STARTER_CONTENT.lite`, this whole feature's own Build Log entry calling it "Lite" throughout); only the user-facing copy in `index.html` drifted to "Light." Four occurrences found, all in `index.html`:
+
+- `#starter-pack-lite-btn`'s option title: "Light Start" → "Lite Start"
+- Help Overlay section 2: "...or a small **Light Start** (just a handful of example links)" → "**Lite Start**"
+- Help Overlay section 13's Reset bullet: "the Full/Light choice from section 2" → "the Full/Lite choice"
+- Settings' Reset section note: "the Full/Light setup choice" → "the Full/Lite setup choice"
+
+Not yet authorized to build.
+
 ## Build Planner
 
 _Backlog of active items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start. Resolved/built/dropped/superseded items are not kept here — see Build Log entries for that history._
