@@ -1363,6 +1363,17 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
+### Implement the real Help Overlay content, from the user's supplied "v3" spec doc
+
+The user supplied `help-overlay-content-spec.md` (16 numbered sections + linked table of contents, written against `startpage-feature-inventory.md`, Build 74) to replace `#help-overlay`'s current "coming soon" placeholder (`index.html`, `#help-overlay`'s single `<p>`). Checked against the real, current build before logging — mostly accurate, two things to fix while implementing rather than transcribing verbatim:
+
+- **Section 4 (Home)'s button order is backwards from the real page.** It describes them as "+, then 🔎, then ▲" — the real on-screen left-to-right order (`index.html`: `#tile-search-btn`, `#create-btn`, `#collapse-all-btn`) is **🔎, then +, then ▲**. Reorder the prose to match, or drop the implied left-to-right ordering and just describe what each does.
+- **Section 9 (Reorganizing Categories) has an internal contradiction and a real gap.** "No buttons shown here, just category names" is immediately followed by "drag the little ☰ handle" — worth rewording so it doesn't contradict itself (there's a ☰ handle and expand/collapse arrows per row, just no tile buttons). More importantly, it never mentions that a category row must be **tapped to select it** before Properties / Remove Category / Category Up-Down actually do anything — only entering the tool via a category's own long-press auto-preselects that one category; picking a different one, or acting after creating a new one, needs an explicit tap first. Worth a short added line so the instructions are actually followable.
+- Everything else checked out: Settings' 5 items and their order (Site Name, Theme, Profile Photo, Backup, WeatherAPI Key) match exactly; Colors' auto-lighter-shade-subcategory behavior matches; Organize Mode's long-press-to-select / separate-drag-to-reorder / Cut+Paste-cross-category flow matches, with no invented "hover-to-expand" mechanic; no "Merge Into" action (correctly dropped); the WeatherAPI key setup callout in the Weather section is present and prominent; the Testing Panel and the tile-delete easter egg are both correctly absent throughout.
+- **Implementation, once built:** replace `#help-overlay`'s single placeholder `<p>` with the full 16-section content, plus a linked table of contents (in-page anchor links, `.help-overlay` already scrolls internally). New content only, no existing behavior changes.
+
+Not yet authorized to build.
+
 ## Build Planner
 
 _Backlog of active items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start. Resolved/built/dropped/superseded items are not kept here — see Build Log entries for that history._
