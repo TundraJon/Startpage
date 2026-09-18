@@ -1373,10 +1373,12 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
-### Help Overlay content (Build 75): five inaccuracies found on a full re-audit against the current code
+### Help Overlay content (Build 75): six inaccuracies found across two audit passes against the current code
 
-Per the user: after Build 75 shipped, they spotted that section 6 describes a per-category "+" that was removed weeks ago (Build 49). That prompted a full line-by-line re-audit of all 16 sections against the current code, not just a re-read of the earlier review — found four more. Final corrected copy for each, ready to drop in:
+Per the user: after Build 75 shipped, they spotted that section 6 describes a per-category "+" that was removed weeks ago (Build 49). That prompted a full line-by-line re-audit of all 16 sections against the current code, not just a re-read of the earlier review — found four more. A follow-up question caught a sixth that the first audit pass itself missed (see section 3, below) — logging it as a correction to that audit, not a new report. Final corrected copy for each, ready to drop in:
 
+- **Section 3 — missed by the first audit pass. Long-pressing the sun/moon button does nothing; it never opens anything.** Confirmed via `script.js`: `#theme-toggle` has exactly one listener, a plain `click` — no `attachLongPress` anywhere on it. This *was* true once (a "Theme Options" long-press popup, Build Log 9), but was deliberately removed very early in the project, per the user's own "No, it will be removed" at the time — Auto mode moved into the real Settings view under Theme instead, which is where it's lived ever since (confirmed current in Build 74/75's Settings). Corrected bullet:
+  > "**The sun/moon button** switches between light mode and dark mode. For **Auto** — switches automatically, light in the morning (7am) and dark in the evening (7pm), based on your own clock — turn it on in **Settings**, under **Theme** (section 13). Tapping the sun/moon button yourself always turns Auto off and takes over manually."
 - **Section 6 — the actual bug reported.** There is no per-category "+" — it was removed in Build 49. There is exactly **one** "+", in Home's header, and tapping it opens a small menu (confirmed in `index.html`: 🔗 **+ Tile**, 📁 **+ Category**, 🔣 **+ Grouping**) that acts on `currentLocationId()` — whichever category is currently open, or Home if nothing is. Corrected first bullet:
   > "Open whichever category you want the new tile in, then tap Home's **+** button and choose **+ Tile**. This opens a box where you type the site's **name**, its **web address**, and — if you want — a short **note** (a blurb) and a checkbox for **🇧🇷 Brazil**, if it's something Brazilian. (If nothing's open, it adds to Home instead.)"
 - **Section 4 — Home Settings bullet was incomplete.** Checked `openHomeSettings()` directly: long-pressing Home's title bar opens a dialog with **three** sections (Sort Tiles, Groupings, and Home's own background/text color), not just sorting. Corrected bullet:
@@ -1390,7 +1392,7 @@ Per the user: after Build 75 shipped, they spotted that section 6 describes a pe
 - **Section 9 — overstated what ➕ Category does.** Checked Build 56/59's own description: ➕ Category always adds a **top-level** category regardless of selection; only ➕ Subcategory nests under the selected row. Corrected toolbar bullet:
   > "With a category picked, use the toolbar: 🔧 Properties (edit its name, color, sort order, and groupings), ➕ Category (always adds a new top-level category) or ➕ Subcategory (adds one nested under whichever row is picked), 🗑️ Remove Category, or ▲/▼ to move it up or down among its siblings."
 
-Everything else re-checked clean against the current code: sections 1, 2, 3, 5, 8, 11, 12, 13, 14, 15, 16 all still accurate, no further changes needed.
+Everything else re-checked clean against the current code: sections 1, 2, 5, 8, 11, 12, 13, 14, 15, 16 all still accurate, no further changes needed.
 
 Not yet authorized to build.
 
