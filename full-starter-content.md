@@ -157,7 +157,7 @@ Amazon Music, Pandora, Spotify, iHeartRadio, TuneIn Radio, SoundCloud, YouTube M
 **Local Info/Listings:** Visit Orlando, Orlando Weekly, Time Out, AllEvents.in
 
 **Restaurants:**
-- **Breakfast** 🇧🇷 *(all confirmed Brazilian)*: First Watch, Rokka's, Amor em Pedaços Bakery, Eskina, Sodie Doces, Seabra Supermarket
+- **Breakfast:** First Watch, Rokka's 🇧🇷, Amor em Pedaços Bakery 🇧🇷, Eskina 🇧🇷, Sodie Doces 🇧🇷, Seabra Supermarket 🇧🇷 *(First Watch is not Brazilian — confirmed with the user, excluded from the flag despite the earlier "all confirmed Brazilian" heading text)*
 - **Coffee Shops:** Stardust Video and Coffee, Mecatos Bakery & Café (Metrowest), Le Café de Paris, Holy Grain Coffee Shop, Achilles Art Café
 - **Dinner (main, ICON Park dining folded in):** Hawkers Asian Street Food, Tacos Don Andres, Sixty Vines, The Whiskey, Teak Neighborhood Grill, Mia's Italian Kitchen, DOMU, Voodoo Bayou, Eddie V's Prime Seafood, Ocean Prime, Christinis Ristorante Italiano, The H Orlando, Morton's The Steakhouse, Bocas Grill, Cooper's Hawk, Rocco's Tacos, King's Point Ice Cream & Burger 🇧🇷, La Granja, 14 Bis Pizzeria 🇧🇷, Pie-Fection Pizzeria & Bistro, Yard House, Ole Red Orlando, Blue Martini
 - **Brazilian Steakhouses** 🇧🇷: Fogo de Chão, Texas de Brazil, Boi Brazil Churrascaria, Café Mineiro Brazilian Steakhouse
@@ -215,12 +215,14 @@ Amazon Music, Pandora, Spotify, iHeartRadio, TuneIn Radio, SoundCloud, YouTube M
   - **IATA Travel Centre** — entry/visa/passport requirements for a specific destination — check this for "what documents do I need to get in"
 - Itineraries/Trip Planning: Lonely Planet, Rick Steves, Wanderlog
 - Currency/Practical: XE Currency Converter
-- **Brazil** 🇧🇷: LATAM Airlines, Azul, GOL, Copa Airlines, Delta *(cross-listed)*, United *(cross-listed)*, FlightsFrom.com
+- **Brazil** *(flights to/from Brazil — only Azul and GOL are themselves Brazilian and get the 🇧🇷 tile flag; LATAM/Copa/Delta/United/FlightsFrom.com sit here for topic relevance only, no flag)*: LATAM Airlines, Azul 🇧🇷, GOL 🇧🇷, Copa Airlines, Delta *(cross-listed)*, United *(cross-listed)*, FlightsFrom.com
 
 ---
 
 ## 🇧🇷 FULL BRAZIL-FLAGGED ITEM LIST (for badge implementation)
 Rokka's Market/Rokka's, Seabra Supermarket, Amor em Pedaços Bakery, Sodie Doces, Eskina, 14 Bis Pizzeria, King's Point Ice Cream & Burger, Fogo de Chão, Texas de Brazil, Boi Brazil Churrascaria, Café Mineiro Brazilian Steakhouse, Leo's Barbecue (Clermont), Azul (airline), GOL (airline), Globoplay
+
+*(This list is the authoritative one — 15 items, confirmed with the user. First Watch is deliberately excluded, per the correction above; the Travel section's 7-item "Brazil" heading is a topic label, not a flag-all — only Azul and GOL from it are actually Brazilian.)*
 
 ---
 
