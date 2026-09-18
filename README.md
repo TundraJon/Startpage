@@ -1353,6 +1353,13 @@ Per the user, real bug report ("Boardgame Geek" wraps to 2 lines and gets cut of
 
 Per the user. `.tile-search-glow`'s `animation` duration in `styles.css`, bumped again from Build 72's 3s. Pulse keyframe percentages stay the same, same reasoning as the 2.5s→3s change — they're relative to duration, not absolute time.
 
+### Chrome "save password?" prompt on refresh — root-caused
+
+Per the user: about half the time, refreshing the page prompts Chrome's "save password to Google Password Manager?" — never seen that from a page reload before. Root cause found: `#weatherapi-key-input` (`index.html`) is the only `type="password"` field on the page. Chrome deliberately ignores `autocomplete="off"` specifically for password-type inputs (long-standing behavior, since it treats that attribute as untrustworthy for anything credential-shaped) — any `type="password"` field with a value is a save-prompt candidate regardless of what `autocomplete` says. The ~50% intermittency fits too: Chrome's save-prompt heuristic depends on navigation/timing signals, not a deterministic trigger.
+
+- [ ] **Fix: stop using `type="password"` for this field.** It's not a login credential (this app's own copy already says the key "never leaves your device"), just something worth visually masking — so switch to `type="text"` and mask purely via CSS: `-webkit-text-security: disc;`. Same dots-instead-of-characters look, but Chrome's password manager never classifies the field as a password at all, so the prompt stops.
+- [ ] **Caveat to confirm with the user before/at build time:** `-webkit-text-security` is Chrome/Safari-only (WebKit/Blink) — Firefox doesn't support it, so on Firefox the key would render as plain text unless a JS-based masking fallback is added too (more moving parts — cursor-position handling on every keystroke). Given this app's mobile-first, Chrome/Safari-leaning history, defaulting to the CSS-only fix unless Firefox support turns out to matter.
+
 Not yet authorized to build.
 
 ## Build Planner
