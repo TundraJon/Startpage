@@ -1386,6 +1386,23 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
+### Help Overlay: add a short "getting your free WeatherAPI key" note to the end of section 12
+
+Per the user: sections 12 and 13 both reference the WeatherAPI key and point at each other, but neither one explains how to actually go get one from the website. Requested a short note at the end, same 8-year-old-simple reading level as the rest of the guide.
+
+- **Verification attempt:** tried to fetch `weatherapi.com`'s sign-up page directly to confirm exact current button/field wording before writing this, so the note wouldn't itself become another stale/inaccurate claim later. This sandbox's network policy blocks outbound requests to that domain (same restriction already noted back in Build 14's live-WeatherAPI integration work) — couldn't confirm it. Written instead at a level that stays true even if WeatherAPI's own site wording shifts slightly (general "find Sign Up, then find your key on your account page," not exact button text asserted as fact).
+- **Placement:** appended to the end of section 12 (The Weather Card), not as a new numbered section — avoids renumbering sections 13-16 and the table of contents, and sits right where the key requirement is first introduced. Flagged to the user in case they pictured it elsewhere (e.g. its own numbered section, or the very end of the whole guide).
+- Proposed final copy, to add as a new paragraph + numbered list at the end of `#help-sec-12`, after the existing bulleted list:
+  > "**One more thing — getting your own free WeatherAPI key:** it only takes a couple of minutes.
+  > 1. On a computer or phone, open a web browser and go to weatherapi.com.
+  > 2. Find the **Sign Up** button and make a free account — just an email address and a password.
+  > 3. Once you're signed in, WeatherAPI shows you your own API key right there on your account page.
+  > 4. Copy that key, come back here, open **Settings**, and paste it into the **WeatherAPI Key** box (section 13).
+  >
+  > Websites change their buttons around sometimes, so if it looks a little different when you get there, just look for the words **Sign Up** and **API Key** — that's really all you're looking for."
+
+Not yet authorized to build.
+
 ## Build Planner
 
 _Backlog of active items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start. Resolved/built/dropped/superseded items are not kept here — see Build Log entries for that history._
