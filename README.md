@@ -1372,6 +1372,12 @@ Per the user: the WeatherAPI paragraph should sit immediately below the WeatherA
 
 Not yet authorized to build.
 
+### Settings: more breathing room between topics — one blank line's worth
+
+Per the user: the settings topics (Site Name, Theme, Profile Photo, Backup, WeatherAPI Key) look jammed together, with no visual blank line between them. Root cause: `#settings-list .options-section { margin-top: 10px; }` (`styles.css`) — 10px is well under a full line-height at the page's default font size, so the gap reads as a small nudge, not a blank line. Fix: bump that margin-top to roughly one blank line's worth of space (in the neighborhood of 20–24px, to be confirmed visually at build time rather than guessed here).
+
+Not yet authorized to build.
+
 ## Build Planner
 
 _Backlog of active items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start. Resolved/built/dropped/superseded items are not kept here — see Build Log entries for that history._
