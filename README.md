@@ -1341,7 +1341,19 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
-_Empty — everything above has been built. Log new items here as they come in._
+### Tile name font-size bug: measured while hidden, never re-measured
+
+Per the user, real bug report ("Boardgame Geek" wraps to 2 lines and gets cut off, but adding/removing 2 characters via Edit Tile fixes it — until the category is closed and reopened later, when it reverts). Root-caused, not just described:
+
+- **The mechanism:** `.tile span` is `font-size: 0.6rem` with `-webkit-line-clamp: 2` (clips to 2 lines); `.tile span.tile-name-wrap` drops to `font-size: 0.475rem`. `updateTileNameWrapClass(tileEl)` (`script.js`) decides which by comparing `span.scrollHeight` against `1.4×` the single-line height, and toggles the class accordingly.
+- **The bug:** this only ever runs from `wireTileGrids` (once, for every tile, at initial page load) and from the Add/Edit Tile dialog's submit handler. `wireTileGrids` runs while most categories are still collapsed (`hidden`) — and `scrollHeight` on anything inside a `display: none` subtree always reads `0` in Chromium, so the wrap check silently fails for every tile in every category that isn't the one restored open from `CATEGORY_OPEN_PATH_KEY`. Those tiles get stuck at the bigger 0.6rem font whether they actually wrap or not, and nothing ever re-measures them afterward — collapsing/expanding a category just toggles `hidden`, it doesn't re-run this check. The *only* thing that ever re-measures a given tile correctly is editing its name while its category happens to be open (visible) at the time, which is exactly why that fixed it temporarily, and exactly why a later reload (this category no longer the one restored open) brought the bug back.
+- **Proposed fix:** re-run `updateTileNameWrapClass` for the relevant tiles whenever a category actually becomes visible, not just once at load. `renderOpenPath()` (`script.js`) is the single place that toggles every category's `hidden` state — the natural hook. Simplest robust approach: re-measure every currently-visible `.tile` each time `renderOpenPath` runs (cheap for a personal homepage's tile count, same "rebuild trivial cost" reasoning already used for the tile search index), rather than trying to track precisely which categories just transitioned from hidden to visible.
+
+### Tile search glow: 3s → 3.5s
+
+Per the user. `.tile-search-glow`'s `animation` duration in `styles.css`, bumped again from Build 72's 3s. Pulse keyframe percentages stay the same, same reasoning as the 2.5s→3s change — they're relative to duration, not absolute time.
+
+Not yet authorized to build.
 
 ## Build Planner
 
