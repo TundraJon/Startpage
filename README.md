@@ -1373,6 +1373,27 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
+### Help Overlay content (Build 75): five inaccuracies found on a full re-audit against the current code
+
+Per the user: after Build 75 shipped, they spotted that section 6 describes a per-category "+" that was removed weeks ago (Build 49). That prompted a full line-by-line re-audit of all 16 sections against the current code, not just a re-read of the earlier review — found four more. Final corrected copy for each, ready to drop in:
+
+- **Section 6 — the actual bug reported.** There is no per-category "+" — it was removed in Build 49. There is exactly **one** "+", in Home's header, and tapping it opens a small menu (confirmed in `index.html`: 🔗 **+ Tile**, 📁 **+ Category**, 🔣 **+ Grouping**) that acts on `currentLocationId()` — whichever category is currently open, or Home if nothing is. Corrected first bullet:
+  > "Open whichever category you want the new tile in, then tap Home's **+** button and choose **+ Tile**. This opens a box where you type the site's **name**, its **web address**, and — if you want — a short **note** (a blurb) and a checkbox for **🇧🇷 Brazil**, if it's something Brazilian. (If nothing's open, it adds to Home instead.)"
+- **Section 4 — Home Settings bullet was incomplete.** Checked `openHomeSettings()` directly: long-pressing Home's title bar opens a dialog with **three** sections (Sort Tiles, Groupings, and Home's own background/text color), not just sorting. Corrected bullet:
+  > "Long-pressing Home's title bar opens Home Settings — sort Home's own buttons into a different order, manage Home's grouping labels, or pick Home's own background/text color, all in one place."
+  Also tightening the "+" bullet in the same section so it doesn't imply "+" is a single direct action (it opens the menu described above):
+  > "Home has its own small row of three buttons at the top: a magnifying glass 🔎 to search your tiles (section 10), a **+** that opens a small menu for adding a new tile, category, or grouping label (more in sections 6, 7, and 9), and an up-arrow **▲** that instantly closes every open category on the page and scrolls you back to the top."
+- **Section 7 — missing the + menu as an entry point.** It only mentioned "that category's edit screen," leaving out Home's own "+ Grouping" option. Corrected last sentence:
+  > "Add one from Home's **+** menu (**+ Grouping**) or from inside that category's edit screen (see section 9), where you can also rename, delete, or reorder them."
+- **Section 10 — example used the wrong symbols.** Checked `script.js`'s real formatter (`tileGroupingName`/the search-result builder): categories join with `>`, a grouping is prefixed with `_`, the tile name with `~` — not arrows throughout. Corrected example, same sentence otherwise:
+  > "...each one shows exactly where it lives (like "Games > RPG _ Battle Maps ~ Roll20")."
+- **Section 9 — overstated what ➕ Category does.** Checked Build 56/59's own description: ➕ Category always adds a **top-level** category regardless of selection; only ➕ Subcategory nests under the selected row. Corrected toolbar bullet:
+  > "With a category picked, use the toolbar: 🔧 Properties (edit its name, color, sort order, and groupings), ➕ Category (always adds a new top-level category) or ➕ Subcategory (adds one nested under whichever row is picked), 🗑️ Remove Category, or ▲/▼ to move it up or down among its siblings."
+
+Everything else re-checked clean against the current code: sections 1, 2, 3, 5, 8, 11, 12, 13, 14, 15, 16 all still accurate, no further changes needed.
+
+Not yet authorized to build.
+
 ## Build Planner
 
 _Backlog of active items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start. Resolved/built/dropped/superseded items are not kept here — see Build Log entries for that history._
