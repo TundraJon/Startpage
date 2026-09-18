@@ -1341,6 +1341,21 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
+### Settings layout revision — drop Organize, stack label-above-control
+
+User supplied a mockup PDF (rendered and reviewed, not just described). Revises the Build 71 "one line per item" layout to label-above-control instead, and removes one section outright.
+
+- [ ] **"Organize" / "Reorganize Categories" removed from Settings entirely.** Per the user: "it just doesn't make sense there." Confirmed this strands nothing — `document.getElementById('open-reorg-btn')` (Settings' own trigger) is not the only way in: every category header already opens the Reorg Tree Tool directly via long-press (`attachLongPress(mainBtn, () => openReorgTool(id), ...)`, `script.js`). Settings' button was a redundant second entry point, not the only one.
+- [ ] **Every remaining section: label on its own line, control(s) on the line below** — reverting the Build 71 single-line-per-item pattern back to a stacked one, per the mockup. Labels read bold, sentence-case (`Site Name:`, `Theme:`, `Backup:`, `WeatherAPI Key:`), not the current tiny uppercase small-caps `.settings-row-label` style — a real typographic change, not just a rewrap.
+- [ ] **Site Name:** label line, input below (was: same line).
+- [ ] **Theme:** checkbox now comes *before* the label text (was: after) — mockup shows `✅ Auto: 7a-☀️ 7p-🌙`. Label wording also changes from "Auto 7a-day/7p-night" to using sun/moon emoji: `Auto: 7a-☀️ 7p-🌙`.
+- [ ] **Profile Photo:** unchanged structurally — already heading + one row (avatar + Choose/Remove) below it, matches the mockup as-is.
+- [ ] **Backup:** label line, then `[📤 Export] [📥 Import]` on the line below (was: same line as label). Note paragraph unchanged.
+- [ ] **WeatherAPI Key:** label line, then the input below (was: same line as label). Note paragraph unchanged.
+- [ ] **Not yet resolved — needs a design pass, not just a markup tweak:** the mockup's label style (bold, sentence-case, roughly body-text size) doesn't map onto any existing class in this codebase as-is; Build 71's `.settings-row-label`/`.settings-row` classes would need real changes (not just reordering markup) to match, and Theme's checkbox-before-label swap changes the `<label>` wrapper's child order too. Worth a fresh look at the mockup image at build time rather than working purely from this description.
+
+Not yet authorized to build.
+
 ### Tile name font-size bug: measured while hidden, never re-measured
 
 Per the user, real bug report ("Boardgame Geek" wraps to 2 lines and gets cut off, but adding/removing 2 characters via Edit Tile fixes it — until the category is closed and reopened later, when it reverts). Root-caused, not just described:
