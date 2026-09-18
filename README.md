@@ -1332,7 +1332,15 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 ## Build Queue
 
-_Empty — everything above has been built. Log new items here as they come in._
+### Three more small polish items from Build 70/71
+
+Per the user, all direct/unambiguous — logged with measured current values rather than assumed ones.
+
+- [ ] **Profile photo preview: 50px → 60px.** `.profile-photo-preview-wrap` (`styles.css`), bumped again from Build 71's 50px. Still well within the underlying 64×64 stored thumbnail — no quality loss even at 60px.
+- [ ] **Home header: 🔎 and ▲ match `+`'s width, plus 3px more gap.** Measured live: `#create-btn` renders at 38.95px wide, `#tile-search-btn` at 27.98px, `#collapse-all-btn` at 24.67px — all three already share the same height (29.6px) from Build 70's boxing, only width differs. Plan: give `#tile-search-btn`/`#collapse-all-btn` an explicit width matching `#create-btn`'s (~39px, or read live again at build time in case anything shifts it), with `justify-content: center` so each glyph centers within the now-wider box regardless of its own size. `.home-header-actions`'s `gap` goes from the current `2px` to `5px` (2px + the requested 3px more).
+- [ ] **Tile search glow: 2.5s → 3s.** `.tile-search-glow`'s `animation` duration in `styles.css`, from Build 70. The pulse keyframe percentages (`25%, 75%` bright / `50%` dim) don't need to change — they're already relative to the animation's own duration, so stretching to 3s just stretches the same two-pulse shape proportionally, not a redesign.
+
+Not yet authorized to build.
 
 ## Build Planner
 
