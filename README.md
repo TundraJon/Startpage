@@ -1361,28 +1361,17 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 - [x] **Verified via Playwright:** all 5 Settings sections (Site Name, Theme, Profile Photo, Backup, WeatherAPI Key) confirmed as direct children of `#settings-list` (was silently broken to 4-ish before the fix); the WeatherAPI paragraph now sits inside its own section right after the field; measured a clean, even 22px gap between every adjacent topic. Full existing regression suite re-run clean (drag reorder, backup export/import, tile dialog add/edit, tile search, tile-wrap fix) — no page errors anywhere.
 - [x] Cache-bust bumped: `styles.css?v=51→52`.
 
+## Build Log 75 (completed)
+
+### Real Help Overlay content shipped — 16 sections + linked table of contents, replacing the "coming soon" placeholder
+
+- [x] **`#help-overlay` (`index.html`) rebuilt from a single placeholder `<p>` into the full walkthrough**, using the user's supplied `help-overlay-content-spec.md` with the two corrections finalized last round: section 4's button order matches the real page (🔎, then +, then ▲), and section 9 (Reorganizing Categories) is rewritten to explain tapping a row to select it before the toolbar acts, without the original's self-contradiction. A `<nav class="help-toc">` up top links to all 16 `<section id="help-sec-N">` anchors below it.
+- [x] **New scoped CSS** (`styles.css`, right before `.help-close`) for the TOC box and section spacing/typography — `.help-toc`, `.help-section` (border-between pattern mirroring `#settings-list .options-section`'s own first-child exception), headings, paragraphs, and lists. Nothing shared/existing touched.
+- [x] **Real bug found and fixed, not part of the spec:** `#help-btn`'s click handler (`script.js`) was still calling a leftover `showComingSoon(title, message)` helper — a generic "not built yet" placeholder writer that overwrites `helpOverlay.querySelector('h2')`/`querySelector('p')`'s text on every click. `querySelector('p')` always matches the *first* `<p>` in the overlay, which is now section 1's real paragraph — so every time Help was opened, section 1's actual content was getting silently clobbered back to the old hardcoded placeholder text, while every other section rendered correctly. `showComingSoon` had exactly one caller (confirmed via grep before removing); fixed by wiring `#help-btn` straight to `helpOverlay.hidden = false` and deleting the now-fully-dead `showComingSoon` function entirely.
+- [x] **Verified via Playwright:** all 16 sections and all 16 TOC links present; clicking a TOC link scrolls the (already-scrollable) panel to land the right section at the top; section 1 reads the real welcome text (not the old placeholder) on every open, confirmed after the `showComingSoon` fix; section 4's text has 🔎 appearing before + as corrected; section 9 mentions "Tap any row to pick it" and the real toolbar button set; zero mentions anywhere in the overlay of the Testing Panel, the tile-delete easter egg, or "Merge Into" (all three correctly absent, matching the spec's own checklist); the panel scrolls cleanly start-to-finish (screenshot-checked top and last section); close button still works. Full existing regression suite (drag reorder, backup export/import, tile dialog add/edit, tile search, tile-wrap fix, Settings layout) re-run clean since `script.js` was touched — zero page errors anywhere.
+- [x] Cache-bust bumped: `styles.css?v=52→53`, `script.js?v=56→57`.
+
 ## Build Queue
-
-### Implement the real Help Overlay content, from the user's supplied "v3" spec doc
-
-The user supplied `help-overlay-content-spec.md` (16 numbered sections + linked table of contents, written against `startpage-feature-inventory.md`, Build 74) to replace `#help-overlay`'s current "coming soon" placeholder (`index.html`, `#help-overlay`'s single `<p>`). Checked against the real, current build before logging. Per the user: the real, built app is always the source of truth over the spec doc when the two disagree — the two corrections below are final copy to use as-is, not open questions.
-
-- **Section 4 (Home) — button order corrected to match the real page.** `index.html`'s actual left-to-right order is `#tile-search-btn`, `#create-btn`, `#collapse-all-btn` (🔎, then +, then ▲) — the spec doc had it backwards ("+, then 🔎, then ▲"). Final replacement sentence for that bullet:
-  > "Home has its own small row of three buttons at the top: a magnifying glass 🔎 to search your tiles (section 10), a **+** to add something new, and an up-arrow **▲** that instantly closes every open category on the page and scrolls you back to the top."
-- **Section 9 (Reorganizing Categories) — rewritten to match and detail the real build.** The spec's version contradicted itself ("no buttons shown here, just category names," immediately followed by "drag the little ☰ handle") and never mentioned that a category row has to be tapped to select it before the toolbar buttons do anything. Final replacement for the whole section body (heading unchanged):
-  > "For bigger changes — like moving a whole category somewhere else, or changing what's nested under what — long-press any category's title bar. This opens a full screen showing every category on the page as a simple, indented list, with the category you long-pressed already picked out for you. From here you can:
-  > - Tap any row to pick it (tap it again to un-pick it) — this is how you tell the toolbar buttons below which category to work on.
-  > - Drag the little ☰ handle on a row to reorder it, or drag it sideways to nest it under a different category.
-  > - Tap the ▼/▶ arrow on a row to show or hide what's nested under it.
-  > - With a category picked, use the toolbar: 🔧 Properties (edit its name, color, sort order, and groupings), ➕ Category or ➕ Subcategory (add a new one, either alongside it or nested under it), 🗑️ Remove Category, or ▲/▼ to move it up or down among its siblings.
-  > - Nothing you do here actually changes your page until you tap **Save**. Tap **Cancel** anytime to leave with nothing changed.
-  >
-  > Home always sits at the very top of this list, greyed out — it can't be picked, moved, renamed, or nested under anything, since everything else is really nested under it anyway."
-  Toolbar button labels/order verified directly against `index.html`: 🔧 Properties, ➕ Category, ➕ Subcategory, 🗑️ Remove Category, then ▲ Category Up / ▼ Category Down below the list.
-- Everything else in the spec checked out as-is, no changes needed: Settings' 5 items and their order (Site Name, Theme, Profile Photo, Backup, WeatherAPI Key) match exactly; Colors' auto-lighter-shade-subcategory behavior matches; Organize Mode's long-press-to-select / separate-drag-to-reorder / Cut+Paste-cross-category flow matches, with no invented "hover-to-expand" mechanic; no "Merge Into" action (correctly dropped); the WeatherAPI key setup callout in the Weather section is present and prominent; the Testing Panel and the tile-delete easter egg are both correctly absent throughout.
-- **Implementation, once built:** replace `#help-overlay`'s single placeholder `<p>` with the full 16-section content (using the two corrected sections above in place of the spec doc's originals), plus a linked table of contents (in-page anchor links, `.help-overlay` already scrolls internally). New content only, no existing behavior changes.
-
-Not yet authorized to build.
 
 ## Build Planner
 

@@ -1177,6 +1177,68 @@ main {
   border-radius: 12px 12px 0 0;
 }
 
+/* Help Overlay content (Build 75) — a linked table of contents plus 16 stacked sections inside
+   the already-scrollable .help-panel. Border-between-sections mirrors the same
+   last-child/first-child pattern already used for Settings' own list (#settings-list
+   .options-section) rather than introducing a new spacing convention. */
+.help-toc {
+  margin: 0 0 20px;
+  padding: 10px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.help-toc ol {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 0.85rem;
+  line-height: 1.7;
+}
+
+.help-toc a {
+  color: var(--fg);
+}
+
+.help-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.help-section:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.help-section h3 {
+  font-size: 1rem;
+  margin: 0 0 8px;
+}
+
+.help-section p {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.help-section ul {
+  margin: 0 0 8px;
+  padding-left: 20px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.help-section li {
+  margin-bottom: 4px;
+}
+
+.help-section p:last-child,
+.help-section ul:last-child {
+  margin-bottom: 0;
+}
+
 .help-close {
   position: absolute;
   top: 10px;

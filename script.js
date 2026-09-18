@@ -206,17 +206,11 @@
   const helpBtn = document.getElementById('help-btn');
   const helpOverlay = document.getElementById('help-overlay');
   const helpClose = document.getElementById('help-close');
-  helpBtn.addEventListener('click', () => { showComingSoon('Quick tour', "This help walkthrough is coming soon — it'll walk you through adding categories, tiles, and personalizing your homepage."); });
+  helpBtn.addEventListener('click', () => { helpOverlay.hidden = false; });
   helpClose.addEventListener('click', () => { helpOverlay.hidden = true; });
   helpOverlay.addEventListener('click', (e) => {
     if (e.target === helpOverlay) helpOverlay.hidden = true;
   });
-
-  function showComingSoon(title, message) {
-    helpOverlay.querySelector('h2').textContent = title;
-    helpOverlay.querySelector('p').textContent = message;
-    helpOverlay.hidden = false;
-  }
 
   document.getElementById('profile-btn').addEventListener('click', openSettings);
 
