@@ -1390,16 +1390,16 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 
 Per the user: sections 12 and 13 both reference the WeatherAPI key and point at each other, but neither one explains how to actually go get one from the website. Requested a short note at the end, same 8-year-old-simple reading level as the rest of the guide.
 
-- **Verification attempt:** tried to fetch `weatherapi.com`'s sign-up page directly to confirm exact current button/field wording before writing this, so the note wouldn't itself become another stale/inaccurate claim later. This sandbox's network policy blocks outbound requests to that domain (same restriction already noted back in Build 14's live-WeatherAPI integration work) — couldn't confirm it. Written instead at a level that stays true even if WeatherAPI's own site wording shifts slightly (general "find Sign Up, then find your key on your account page," not exact button text asserted as fact).
-- **Placement:** appended to the end of section 12 (The Weather Card), not as a new numbered section — avoids renumbering sections 13-16 and the table of contents, and sits right where the key requirement is first introduced. Flagged to the user in case they pictured it elsewhere (e.g. its own numbered section, or the very end of the whole guide).
-- Proposed final copy, to add as a new paragraph + numbered list at the end of `#help-sec-12`, after the existing bulleted list:
-  > "**One more thing — getting your own free WeatherAPI key:** it only takes a couple of minutes.
-  > 1. On a computer or phone, open a web browser and go to weatherapi.com.
-  > 2. Find the **Sign Up** button and make a free account — just an email address and a password.
-  > 3. Once you're signed in, WeatherAPI shows you your own API key right there on your account page.
-  > 4. Copy that key, come back here, open **Settings**, and paste it into the **WeatherAPI Key** box (section 13).
-  >
-  > Websites change their buttons around sometimes, so if it looks a little different when you get there, just look for the words **Sign Up** and **API Key** — that's really all you're looking for."
+- **Verification:** my own attempt to fetch `weatherapi.com` directly was blocked by this sandbox's network policy (same restriction already noted back in Build 14's live-WeatherAPI integration work). The user supplied their own verified, more precise steps in response — real sign-up field names, the email-verification step, and exactly where the key shows up (top of the Dashboard) — which is what the copy below is built from, not a guess.
+- **Placement:** appended to the end of section 12 (The Weather Card), not as a new numbered section — avoids renumbering sections 13-16 and the table of contents, and sits right where the key requirement is first introduced. Flagged to the user in case they pictured it elsewhere; unconfirmed either way.
+- **One adaptation from the user's supplied steps:** their 4th step (test the key by pasting a raw API URL into a browser tab and checking for a JSON response) is accurate but not really an 8-year-old-level task — reworded it to tie back into the app itself instead ("you'll know it worked once the weather card shows real weather"), so the reading level stays consistent with the rest of the guide.
+- Proposed final copy, to add as a new paragraph + list at the end of `#help-sec-12`, after the existing bulleted list:
+  > "**One more thing — getting your own free WeatherAPI key:** it only takes about two minutes.
+  > 1. Go to weatherapi.com and click **Sign Up** in the top right corner.
+  > 2. Fill in your name, email, and a password (a company name is optional — skip it if you don't have one), then agree to the terms and submit.
+  > 3. Check your email for a message from WeatherAPI.com and click the link inside to confirm it's really you.
+  > 4. Log back in — you'll land on your **Dashboard**, and your API key is right there at the top of the page. Copy it.
+  > 5. Come back here, open **Settings**, and paste it into the **WeatherAPI Key** box (section 13). Give it a few minutes, and the weather card will start showing real weather — that's how you'll know it worked."
 
 Not yet authorized to build.
 
