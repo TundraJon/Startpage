@@ -1384,24 +1384,16 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 - [x] **Verified via Playwright:** all 7 corrected sections read the exact approved copy live in the DOM; zero page errors on load or on opening Help. Full existing regression suite (drag reorder, backup export/import, tile dialog add/edit, tile search, tile-wrap fix, Settings layout) re-run clean.
 - [x] No cache-bust needed — `index.html` only, no `script.js`/`styles.css` changes this round.
 
+## Build Log 77 (completed)
+
+### Help Overlay: "getting your own free WeatherAPI key" note added to the end of section 12
+
+- [x] **Copy added to `#help-sec-12`** (`index.html`), right after the existing bulleted list — a bold lead-in paragraph plus a 5-step `<ol>` covering sign-up (name/email/password, optional company, terms), email verification, finding the key on the Dashboard, and pasting it into Settings. Built from the user's own verified sign-up steps rather than a guess, with one adaptation: the raw API/JSON test step was reworded into an in-app confirmation ("the weather card will start showing real weather") to match the guide's 8-year-old reading level.
+- [x] **CSS extended, not duplicated:** `.help-section ul`/`.help-section li`/last-child rules (`styles.css`) widened to also cover `ol`, since this is the guide's first numbered list — same 20px `padding-left`/spacing as every other list in the overlay, not a new one-off rule.
+- [x] **Verified via Playwright:** section 12 now mentions Sign Up, Dashboard, and weatherapi.com; the 5-step list renders with the correct `padding-left` (20px, not the browser's 40px default); no raw `api.weatherapi.com/v1` test URL present (intentionally reworded out). Full existing regression suite (drag reorder, backup export/import, tile dialog add/edit, tile search, tile-wrap fix, Settings layout) re-run clean — zero page errors.
+- [x] Cache-bust bumped: `styles.css?v=53→54`.
+
 ## Build Queue
-
-### Help Overlay: add a short "getting your free WeatherAPI key" note to the end of section 12
-
-Per the user: sections 12 and 13 both reference the WeatherAPI key and point at each other, but neither one explains how to actually go get one from the website. Requested a short note at the end, same 8-year-old-simple reading level as the rest of the guide.
-
-- **Verification:** my own attempt to fetch `weatherapi.com` directly was blocked by this sandbox's network policy (same restriction already noted back in Build 14's live-WeatherAPI integration work). The user supplied their own verified, more precise steps in response — real sign-up field names, the email-verification step, and exactly where the key shows up (top of the Dashboard) — which is what the copy below is built from, not a guess.
-- **Placement:** appended to the end of section 12 (The Weather Card), not as a new numbered section — avoids renumbering sections 13-16 and the table of contents, and sits right where the key requirement is first introduced. Flagged to the user in case they pictured it elsewhere; unconfirmed either way.
-- **One adaptation from the user's supplied steps:** their 4th step (test the key by pasting a raw API URL into a browser tab and checking for a JSON response) is accurate but not really an 8-year-old-level task — reworded it to tie back into the app itself instead ("you'll know it worked once the weather card shows real weather"), so the reading level stays consistent with the rest of the guide.
-- Proposed final copy, to add as a new paragraph + list at the end of `#help-sec-12`, after the existing bulleted list:
-  > "**One more thing — getting your own free WeatherAPI key:** it only takes about two minutes.
-  > 1. Go to weatherapi.com and click **Sign Up** in the top right corner.
-  > 2. Fill in your name, email, and a password (a company name is optional — skip it if you don't have one), then agree to the terms and submit.
-  > 3. Check your email for a message from WeatherAPI.com and click the link inside to confirm it's really you.
-  > 4. Log back in — you'll land on your **Dashboard**, and your API key is right there at the top of the page. Copy it.
-  > 5. Come back here, open **Settings**, and paste it into the **WeatherAPI Key** box (section 13). Give it a few minutes, and the weather card will start showing real weather — that's how you'll know it worked."
-
-Not yet authorized to build.
 
 ## Build Planner
 

@@ -1223,7 +1223,8 @@ main {
   line-height: 1.5;
 }
 
-.help-section ul {
+.help-section ul,
+.help-section ol {
   margin: 0 0 8px;
   padding-left: 20px;
   font-size: 0.9rem;
@@ -1235,7 +1236,8 @@ main {
 }
 
 .help-section p:last-child,
-.help-section ul:last-child {
+.help-section ul:last-child,
+.help-section ol:last-child {
   margin-bottom: 0;
 }
 
