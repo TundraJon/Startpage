@@ -1252,6 +1252,49 @@ main {
   color: var(--fg);
 }
 
+/* First-run Full/Lite picker (Build 79) — two big, self-describing option cards rather than
+   plain buttons, since each needs a title plus a real sentence of explanation, not just a label. */
+.starter-pack-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.starter-pack-option:hover,
+.starter-pack-option:focus-visible {
+  border-color: var(--fg-muted);
+}
+
+.starter-pack-option-title {
+  display: block;
+  font-weight: 700;
+  font-size: 1rem;
+  margin-bottom: 4px;
+}
+
+.starter-pack-option-badge {
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--action-go-fg);
+  margin-left: 6px;
+}
+
+.starter-pack-option-desc {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+  line-height: 1.4;
+}
+
 .options-section {
   margin-top: 18px;
 }
@@ -1874,6 +1917,23 @@ div.settings-value-row {
 .settings-btn-stop {
   color: var(--action-stop-fg);
   border-color: var(--action-stop-fg);
+}
+
+/* Reset to Factory Defaults — deliberately a step up from .settings-btn-stop's muted
+   maroon-on-light-pink (used for routine deletes/Remove). Reset wipes the whole page, not one
+   item, so it reads as solid, vivid red rather than the app's usual soft destructive-action
+   treatment — the color itself is the first warning, before anyone reads the label. */
+.settings-btn-danger {
+  background: #c0392b;
+  border-color: #c0392b;
+  color: #fff;
+  font-weight: 600;
+}
+
+.settings-btn-danger:hover,
+.settings-btn-danger:focus-visible {
+  background: #a5281a;
+  border-color: #a5281a;
 }
 
 .reorg-header h2 {

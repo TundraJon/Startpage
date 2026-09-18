@@ -492,25 +492,25 @@
   const CATEGORY_TREE_KEY = 'categoryTree';
   const CATEGORY_TREE_MIGRATED_FLAG = 'categoryTreeMigrated';
 
-  // One-time seed: the hierarchy that used to be hand-authored directly in index.html, captured
-  // here so upgrading doesn't lose anyone's existing categories or their stripe colors. Every
-  // category (not just top-level) keeps its own stripeColor in the data model, matching how they
-  // actually render today — only the future color-*picker UI* is scoped to top-level categories,
-  // not the underlying data.
-  const CATEGORY_SEED_DATA = {
-    'news': { name: 'News', parentId: null, order: 0, stripeColor: '#3B82C4' },
-    'shopping': { name: 'Shopping', parentId: null, order: 1, stripeColor: '#2E8B57' },
-    'entertainment': { name: 'Entertainment', parentId: null, order: 2, stripeColor: '#8E44AD' },
-    'test-a': { name: 'Sample Category A', parentId: null, order: 3, stripeColor: '#E74C3C' },
-    'test-b': { name: 'Sample Category B', parentId: null, order: 4, stripeColor: '#16A085' },
-    'test-b-sub1': { name: 'Sample Sub 1', parentId: 'test-b', order: 0, stripeColor: '#1ABC9C' },
-    'test-b-sub2': { name: 'Sample Sub 2', parentId: 'test-b', order: 1, stripeColor: '#48C9B0' },
-    'test-c': { name: 'Sample Category C', parentId: null, order: 5, stripeColor: '#F39C12' },
-    'test-c-suba': { name: 'Sample Sub A', parentId: 'test-c', order: 0, stripeColor: '#F5B041' },
-    'test-c-suba-1': { name: 'Sample Sub A-1', parentId: 'test-c-suba', order: 0, stripeColor: '#F8C471' },
-    'test-d': { name: 'Sample Category D', parentId: null, order: 6, stripeColor: '#9B59B6' },
-    'test-e': { name: 'Sample Category E', parentId: null, order: 7, stripeColor: '#7F8C8D' },
-  };
+  // One-time seed: the real starter category tree (Build 79), sourced from starter-content.js
+  // (window.STARTER_CONTENT, loaded before this script via its own <script> tag so seeding stays
+  // fully synchronous — no fetch(), no async gap between page load and first paint).
+  //
+  // STARTER_PACK_KEY picks which pack seeds this device — defaults to 'full' whether or not the
+  // first-run picker (wired further down, near the very end of this file) has actually run yet,
+  // so a first-ever synchronous load always seeds Full immediately, same instant behavior as
+  // before this build. STARTER_PACK_DECIDED_KEY tracks whether the picker itself has actually
+  // been answered — separate from which pack is active, since "decided" only flips true once,
+  // while "which pack" can change via Reset re-asking the question from scratch. If the picker
+  // ends up choosing Lite, wipeSeedAndUserData() + a reload re-runs this exact same seeding path
+  // with STARTER_PACK_KEY already set to 'lite' — deliberately not an in-place rebuild, so both
+  // the Lite choice and Reset to Factory Defaults share one real "fresh load" code path instead
+  // of two separately-tested ones.
+  const STARTER_PACK_KEY = 'starterPack';
+  const STARTER_PACK_DECIDED_KEY = 'starterPackDecided';
+  const STARTER_PACKS = window.STARTER_CONTENT || { full: { categories: {}, tiles: {} }, lite: { categories: {}, tiles: {} } };
+  const chosenStarterPack = (localStorage.getItem(STARTER_PACK_KEY) === 'lite' && STARTER_PACKS.lite) ? 'lite' : 'full';
+  const CATEGORY_SEED_DATA = STARTER_PACKS[chosenStarterPack].categories;
 
   function saveCategoryTree(tree) {
     localStorage.setItem(CATEGORY_TREE_KEY, JSON.stringify(tree));
@@ -701,82 +701,7 @@
   // --- Tile Grid: "+" add-tile mechanic, persisted tiles, and Phase 2 Part 1 tile actions ---
   const TILE_STORAGE_PREFIX = 'category-tiles-';
 
-  const TILE_SEED_DATA = {
-    home: [
-      { id: 'seed-home-1', name: 'Gmail', url: 'https://mail.google.com' },
-      { id: 'seed-home-2', name: 'Translate', url: 'https://translate.google.com' },
-      { id: 'seed-home-3', name: 'Maps', url: 'https://maps.google.com' },
-      { id: 'seed-home-4', name: 'USPS', url: 'https://informeddelivery.usps.com' },
-      { id: 'seed-home-5', name: 'Calendar', url: 'https://calendar.google.com' },
-    ],
-    news: [
-      { id: 'seed-news-1', name: 'Google News', url: 'https://news.google.com' },
-      { id: 'seed-news-2', name: 'Sentinel', url: 'https://www.orlandosentinel.com' },
-      { id: 'seed-news-3', name: 'NWS', url: 'https://www.weather.gov' },
-      { id: 'seed-news-4', name: 'r/florida', url: 'https://www.reddit.com/r/florida' },
-      { id: 'seed-news-5', name: 'AP News', url: 'https://apnews.com' },
-    ],
-    shopping: [
-      { id: 'seed-shopping-1', name: 'Amazon', url: 'https://www.amazon.com' },
-      { id: 'seed-shopping-2', name: 'Target', url: 'https://www.target.com' },
-      { id: 'seed-shopping-3', name: 'Walmart', url: 'https://www.walmart.com' },
-      { id: 'seed-shopping-4', name: 'Home Depot', url: 'https://www.homedepot.com' },
-      { id: 'seed-shopping-5', name: 'Costco', url: 'https://www.costco.com' },
-    ],
-    entertainment: [
-      { id: 'seed-entertainment-1', name: 'YouTube', url: 'https://www.youtube.com' },
-      { id: 'seed-entertainment-2', name: 'Netflix', url: 'https://www.netflix.com' },
-      { id: 'seed-entertainment-3', name: 'Spotify', url: 'https://www.spotify.com' },
-      { id: 'seed-entertainment-4', name: 'Disney+', url: 'https://www.disneyplus.com' },
-      { id: 'seed-entertainment-5', name: 'Hulu', url: 'https://www.hulu.com' },
-    ],
-    // --- Placeholder test content (disposable): nested categories/subcategories for building and
-    // testing the Tile Grid, Accordion, and Move Entry systems. Remove once real content replaces it.
-    'test-a': [
-      { id: 'seed-test-a-1', name: 'Google', url: 'https://google.com' },
-      { id: 'seed-test-a-2', name: 'Wikipedia', url: 'https://wikipedia.org' },
-      { id: 'seed-test-a-3', name: 'GitHub', url: 'https://github.com' },
-    ],
-    'test-b-sub1': [
-      { id: 'seed-test-b-sub1-1', name: 'YouTube', url: 'https://youtube.com' },
-      { id: 'seed-test-b-sub1-2', name: 'Reddit', url: 'https://reddit.com' },
-      { id: 'seed-test-b-sub1-3', name: 'Amazon', url: 'https://amazon.com' },
-      { id: 'seed-test-b-sub1-4', name: 'Netflix', url: 'https://netflix.com' },
-    ],
-    'test-b-sub2': [
-      { id: 'seed-test-b-sub2-1', name: 'Spotify', url: 'https://spotify.com' },
-      { id: 'seed-test-b-sub2-2', name: 'Apple', url: 'https://apple.com' },
-    ],
-    'test-c-suba': [
-      { id: 'seed-test-c-suba-1', name: 'Microsoft', url: 'https://microsoft.com' },
-      { id: 'seed-test-c-suba-2', name: 'Yahoo', url: 'https://yahoo.com' },
-    ],
-    'test-c-suba-1': [
-      { id: 'seed-test-c-suba-1-1', name: 'Twitch', url: 'https://twitch.tv' },
-      { id: 'seed-test-c-suba-1-2', name: 'Discord', url: 'https://discord.com' },
-      { id: 'seed-test-c-suba-1-3', name: 'Steam', url: 'https://store.steampowered.com' },
-      { id: 'seed-test-c-suba-1-4', name: 'LinkedIn', url: 'https://linkedin.com' },
-      { id: 'seed-test-c-suba-1-5', name: 'Pinterest', url: 'https://pinterest.com' },
-      { id: 'seed-test-c-suba-1-6', name: 'eBay', url: 'https://ebay.com' },
-    ],
-    'test-d': [
-      { id: 'seed-test-d-1', name: 'Bing', url: 'https://bing.com' },
-      { id: 'seed-test-d-2', name: 'DuckDuckGo', url: 'https://duckduckgo.com' },
-      { id: 'seed-test-d-3', name: 'Firefox', url: 'https://mozilla.org' },
-      { id: 'seed-test-d-4', name: 'Chrome', url: 'https://google.com/chrome' },
-      { id: 'seed-test-d-5', name: 'Edge', url: 'https://microsoft.com/edge' },
-      { id: 'seed-test-d-6', name: 'Wikipedia', url: 'https://wikipedia.org' },
-      { id: 'seed-test-d-7', name: 'Archive.org', url: 'https://archive.org' },
-      { id: 'seed-test-d-8', name: 'Wayback Machine', url: 'https://web.archive.org' },
-      { id: 'seed-test-d-9', name: 'W3Schools', url: 'https://w3schools.com' },
-      { id: 'seed-test-d-10', name: 'MDN Web Docs', url: 'https://developer.mozilla.org' },
-      { id: 'seed-test-d-11', name: 'Stack Overflow', url: 'https://stackoverflow.com' },
-      { id: 'seed-test-d-12', name: 'CodePen', url: 'https://codepen.io' },
-    ],
-    'test-e': [
-      { id: 'seed-test-e-1', name: 'Fallback Test', url: 'https://thisdoesnotexistasarealsite12345.com' },
-    ],
-  };
+  const TILE_SEED_DATA = STARTER_PACKS[chosenStarterPack].tiles;
 
   function newTileId() {
     return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2);
@@ -1908,11 +1833,13 @@
   const tileConfirmClose = document.getElementById('tile-confirm-close');
   const tileConfirmText = document.getElementById('tile-confirm-text');
   const tileConfirmCounts = document.getElementById('tile-confirm-counts');
+  const tileConfirmBackupBtn = document.getElementById('tile-confirm-backup-btn');
   const tileConfirmTypeInput = document.getElementById('tile-confirm-type-input');
   const tileConfirmYes = document.getElementById('tile-confirm-yes');
   const tileConfirmNo = document.getElementById('tile-confirm-no');
   let tileConfirmOnYes = null;
   let tileConfirmRequireTypedYes = false;
+  let tileConfirmRequireTypedReset = false;
 
   // opts.counts: impact-summary text shown near the bottom of the dialog (e.g. Remove Category's
   // tile/subcategory/combined total) — informational, shown independent of the friction tier
@@ -1920,6 +1847,10 @@
   // of it being immediately clickable — used for Remove Category once there's at least one tile
   // anywhere in the subtree; omitted (falsy) elsewhere, which is every other use of this dialog
   // today (plain tile delete, the delete easter egg, an empty-subtree category delete).
+  // opts.requireTypedReset: Reset to Factory Defaults' own stronger tier (Build 79) — typing
+  // "RESET", case-sensitive/all-uppercase, not "yes" — deliberately distinct so routine-delete
+  // muscle memory can't trigger a full wipe. opts.showBackupNudge: shows a one-tap Export button
+  // right in the dialog, reusing exportBackup() rather than a separate mechanism.
   function openTileConfirm(text, onYes, opts) {
     opts = opts || {};
     tileConfirmText.textContent = text;
@@ -1930,12 +1861,16 @@
     } else {
       tileConfirmCounts.hidden = true;
     }
+    tileConfirmBackupBtn.hidden = !opts.showBackupNudge;
     tileConfirmRequireTypedYes = !!opts.requireTypedYes;
+    tileConfirmRequireTypedReset = !!opts.requireTypedReset;
+    const requiresTyping = tileConfirmRequireTypedYes || tileConfirmRequireTypedReset;
     tileConfirmTypeInput.value = '';
-    tileConfirmTypeInput.hidden = !tileConfirmRequireTypedYes;
-    tileConfirmYes.disabled = tileConfirmRequireTypedYes;
+    tileConfirmTypeInput.hidden = !requiresTyping;
+    tileConfirmTypeInput.placeholder = tileConfirmRequireTypedReset ? 'Type "RESET" to confirm' : 'Type "Yes" to confirm';
+    tileConfirmYes.disabled = requiresTyping;
     tileConfirmOverlay.hidden = false;
-    if (tileConfirmRequireTypedYes) tileConfirmTypeInput.focus();
+    if (requiresTyping) tileConfirmTypeInput.focus();
     scrollTargetBelowPopup(tileConfirmOverlay.querySelector('.help-panel'), opts.targetEl);
   }
   function closeTileConfirm() {
@@ -1947,9 +1882,13 @@
   tileConfirmOverlay.addEventListener('click', (e) => {
     if (e.target === tileConfirmOverlay) closeTileConfirm();
   });
+  tileConfirmBackupBtn.addEventListener('click', exportBackup);
   tileConfirmTypeInput.addEventListener('input', () => {
-    if (!tileConfirmRequireTypedYes) return;
-    tileConfirmYes.disabled = tileConfirmTypeInput.value.trim().toLowerCase() !== 'yes';
+    if (tileConfirmRequireTypedReset) {
+      tileConfirmYes.disabled = tileConfirmTypeInput.value.trim() !== 'RESET';
+    } else if (tileConfirmRequireTypedYes) {
+      tileConfirmYes.disabled = tileConfirmTypeInput.value.trim().toLowerCase() !== 'yes';
+    }
   });
   tileConfirmYes.addEventListener('click', () => {
     const cb = tileConfirmOnYes;
@@ -2071,7 +2010,9 @@
     return data;
   }
 
-  document.getElementById('backup-export-btn').addEventListener('click', () => {
+  // Named (not an inline handler) so the Reset confirm dialog's backup nudge (Build 79) can also
+  // call it directly, one tap, same export path — not a second export mechanism.
+  function exportBackup() {
     const payload = { app: BACKUP_APP_ID, version: 1, exportedAt: new Date().toISOString(), data: collectBackupData() };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -2082,7 +2023,8 @@
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-  });
+  }
+  document.getElementById('backup-export-btn').addEventListener('click', exportBackup);
 
   const backupImportInput = document.getElementById('backup-import-input');
   document.getElementById('backup-import-btn').addEventListener('click', () => backupImportInput.click());
@@ -2119,6 +2061,57 @@
       );
     };
     reader.readAsText(file);
+  });
+
+  // Reset to Factory Defaults (Build 79) — wipes categories/tiles/theme/colors/photo/weather key
+  // (the same set Backup Export already covers) plus the seed-migration flags themselves, then
+  // reloads: a genuinely fresh load re-seeds Full by default and, since STARTER_PACK_DECIDED_KEY
+  // is gone too, shows the first-run picker again — "go back to the beginning and ask them to
+  // make a choice," per the user, deliberately not trying to remember or restore whichever pack
+  // was active before. Shared by both this button and the first-run picker's own Lite choice
+  // further down, which needs the same full wipe before reloading into the Lite pack.
+  function wipeSeedAndUserData() {
+    Object.keys(localStorage).forEach((key) => {
+      if (
+        backupSimpleKeys().includes(key) ||
+        (key.startsWith(TILE_STORAGE_PREFIX) && !key.startsWith(TILE_MIGRATION_FLAG_PREFIX)) ||
+        key.startsWith(TILE_MIGRATION_FLAG_PREFIX) ||
+        key === CATEGORY_TREE_MIGRATED_FLAG
+      ) {
+        localStorage.removeItem(key);
+      }
+    });
+  }
+
+  document.getElementById('reset-factory-btn').addEventListener('click', () => {
+    openTileConfirm(
+      'This will erase everything on this page — every category, tile, color, and setting — and start over from the very beginning, including the setup choice. This cannot be undone.',
+      () => {
+        localStorage.removeItem(STARTER_PACK_KEY);
+        localStorage.removeItem(STARTER_PACK_DECIDED_KEY);
+        wipeSeedAndUserData();
+        location.reload();
+      },
+      { requireTypedReset: true, showBackupNudge: true }
+    );
+  });
+
+  // First-run Full/Lite picker (Build 79). Full is already the synchronous seed default (see
+  // CATEGORY_SEED_DATA/TILE_SEED_DATA above) — showing the picker only after the normal page
+  // render finishes, rather than blocking initial paint on an async choice, means no restructuring
+  // of this file's otherwise fully synchronous init order. Choosing Full just confirms what's
+  // already there; choosing Lite wipes it and reloads into the Lite pack via the exact same
+  // fresh-load seeding path Reset above also uses — not a separate in-place rebuild.
+  const starterPackOverlay = document.getElementById('starter-pack-overlay');
+  document.getElementById('starter-pack-full-btn').addEventListener('click', () => {
+    localStorage.setItem(STARTER_PACK_DECIDED_KEY, 'true');
+    starterPackOverlay.hidden = true;
+  });
+  document.getElementById('starter-pack-lite-btn').addEventListener('click', () => {
+    localStorage.setItem(STARTER_PACK_KEY, 'lite');
+    localStorage.setItem(STARTER_PACK_DECIDED_KEY, 'true');
+    wipeSeedAndUserData();
+    location.reload();
   });
 
   // Info Blurb Management: tapping a tile's ℹ️ icon reveals its blurb text instead of navigating —
@@ -5417,4 +5410,12 @@
   applyClockDisplayMode();
   updateClock();
   scheduleNextClockTick();
+
+  // Shown last, after the whole page has already rendered — a first-ever load has already seeded
+  // and painted the Full pack by this point (see STARTER_PACK_KEY above), so choosing Full here is
+  // just confirming what's already on screen; choosing Lite wipes it and reloads. Never shows
+  // again once decided (see starter-pack-full-btn/starter-pack-lite-btn's own handlers above).
+  if (localStorage.getItem(STARTER_PACK_DECIDED_KEY) !== 'true') {
+    starterPackOverlay.hidden = false;
+  }
 })();
