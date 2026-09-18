@@ -1352,31 +1352,16 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 - [x] **Verified via Playwright:** zero page errors on load and on opening Settings; Site Name/Theme/Backup/WeatherAPI Key all read and write correctly; Choose sits a fixed 8px right of the avatar; tile search glow's `animation-duration` reads `3.5s`; the tile-wrap bug's repro (a long tile name in a category collapsed at page load) now correctly gains `tile-name-wrap` at 7.6px font-size after opening; `#weatherapi-key-input` confirmed `type="text"` with `-webkit-text-security: disc` applied. Full existing regression suite re-run clean (drag reorder, drag-jitter, horizontal drag, tile dialog add/edit, backup export/import, tile search) — no page errors anywhere.
 - [x] Cache-bust bumped: `styles.css?v=50→51`, `script.js?v=55→56`.
 
+## Build Log 74 (completed)
+
+### Fix stray `</div>` breaking Settings layout, widen gap between topics
+
+- [x] **WeatherAPI Key paragraph landing at the bottom of Settings — fixed.** Removed the stray `</div>` in `index.html`'s WeatherAPI Key section that had no matching opening tag. It was closing `#settings-list` early (the browser's unmatched-closing-tag recovery walks up to the nearest actual open ancestor), reparenting the paragraph, that section's own `</section>`, and `#settings-view`'s closing `</div>` outside `#settings-list` — which is exactly why the paragraph rendered at the very bottom of the screen after a large gap. No other change needed; nothing relied on that tag.
+- [x] **Settings: wider gap between topics.** `#settings-list .options-section` margin-top: `10px` → `22px` — roughly one blank line's worth at the page's default font size, per the user ("jammed together, no blank line in between").
+- [x] **Verified via Playwright:** all 5 Settings sections (Site Name, Theme, Profile Photo, Backup, WeatherAPI Key) confirmed as direct children of `#settings-list` (was silently broken to 4-ish before the fix); the WeatherAPI paragraph now sits inside its own section right after the field; measured a clean, even 22px gap between every adjacent topic. Full existing regression suite re-run clean (drag reorder, backup export/import, tile dialog add/edit, tile search, tile-wrap fix) — no page errors anywhere.
+- [x] Cache-bust bumped: `styles.css?v=51→52`.
+
 ## Build Queue
-
-### Bug: WeatherAPI Key paragraph lands at the bottom of Settings, huge blank gap above it
-
-Per the user: the WeatherAPI paragraph should sit immediately below the WeatherAPI Key field, but it's rendering at the very bottom of the screen after a large blank space. Root-caused, not just described:
-
-- **The bug:** `index.html`'s WeatherAPI Key section (inside `#settings-list`) has a stray `</div>` right after `#weatherapi-key-input`, with no matching opening `<div>` — a leftover from Build 73's HTML restructuring that didn't get fully cleaned up:
-  ```html
-  <section class="options-section">
-    <span class="settings-label">WeatherAPI Key:</span>
-    <input type="text" id="weatherapi-key-input" ...>
-    </div>
-    <p class="testing-note">Your WeatherAPI.com key...</p>
-  </section>
-  ```
-- **Why it produces this exact symptom:** an unmatched closing tag makes the browser's HTML parser walk up and close the nearest actual open ancestor — here, that's `#settings-list` itself (`<div class="reorg-list" id="settings-list">`, opened well above, wraps every settings section). So this stray `</div>` closes `#settings-list` early, right after the input. Everything textually after it (the paragraph, the section's own `</section>`, and `#settings-view`'s closing `</div>`) gets reparented outside `#settings-list` by the parser's recovery — landing after it in the DOM instead of inside it, which is exactly "way at the bottom, after a big gap."
-- **Fix:** delete the stray `</div>` — no matching change needed anywhere else, nothing was actually relying on that tag.
-
-Not yet authorized to build.
-
-### Settings: more breathing room between topics — one blank line's worth
-
-Per the user: the settings topics (Site Name, Theme, Profile Photo, Backup, WeatherAPI Key) look jammed together, with no visual blank line between them. Root cause: `#settings-list .options-section { margin-top: 10px; }` (`styles.css`) — 10px is well under a full line-height at the page's default font size, so the gap reads as a small nudge, not a blank line. Fix: bump that margin-top to roughly one blank line's worth of space (in the neighborhood of 20–24px, to be confirmed visually at build time rather than guessed here).
-
-Not yet authorized to build.
 
 ## Build Planner
 

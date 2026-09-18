@@ -1723,12 +1723,12 @@ main {
   height: 24px;
 }
 
-/* Settings-only compact layout — label + control on one line instead of a heading above a
-   separate full-width row, per the user. Deliberately new, dedicated classes rather than shrinking
-   .option-row/.options-section/.testing-reset-btn: those are shared by Add Tile, Weather Options,
-   Clock Options, and other .help-overlay dialogs, and none of them asked to get more compact too. */
+/* Settings-only spacing between topics — one blank line's worth, not the tighter gap shared
+   dialogs use. Deliberately scoped to #settings-list rather than changing .options-section itself:
+   that class is shared by Add Tile, Weather Options, Clock Options, and other .help-overlay
+   dialogs, and none of them asked for more breathing room too. */
 #settings-list .options-section {
-  margin-top: 10px;
+  margin-top: 22px;
 }
 
 #settings-list .options-section:first-child {
