@@ -1339,45 +1339,20 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 - [x] **Tile search glow: 3s.** `.tile-search-glow`'s animation duration, `2.5s` → `3s` — the pulse keyframe percentages didn't need to change, since they're already relative to the animation's own duration.
 - [x] **Verified via Playwright:** photo wrap measures 60px; all three header buttons measure ~39px wide with a 5px gap between them (screenshot-confirmed visually even); the glow's `animation-duration` reads `3s`, is confirmed still active at ~2.7s and gone by ~3.3s. Zero page errors.
 
+## Build Log 73 (completed)
+
+### Settings layout revision, tile name font-size fix, glow 3.5s, Chrome save-password fix
+
+- [x] **Settings: dropped "Organize" / "Reorganize Categories" entirely.** Confirmed nothing stranded before removing it — every category header already opens the Reorg Tree Tool directly via long-press (`attachLongPress(mainBtn, () => openReorgTool(id), ...)`, `script.js`), so Settings' button was a redundant second entry point. Removed its section from `index.html` and the now-dead `#open-reorg-btn` click listener from `script.js` (would otherwise throw on load, since the element it targeted no longer exists).
+- [x] **Settings: label-above-control layout, per the user's mockup.** New `.settings-label` (bold, sentence-case) and `.settings-value-row` classes replace Build 71's single-line `.settings-row`/`.settings-row-label`. Site Name, Backup, and WeatherAPI Key all stack their control below the label now; Theme's checkbox moved before its label text, wording now reads `Auto: 7a-☀️ 7p-🌙`. Every section keeps the same left-aligned starting position under its label ("tab stops"), since they're now just stacked block elements rather than differently-shaped single-line rows.
+- [x] **Profile Photo row jump bug fixed.** `.settings-photo-row` no longer inherits `justify-content: space-between` from the old `.settings-row` — Choose now sits immediately next to the avatar via `flex-start` + a normal `gap`, and the Remove button (new `.settings-btn-remove` class) gets its own extra left margin to land deliberately further right, regardless of whether Remove is even visible.
+- [x] **Tile name font-size bug fixed.** `renderOpenPath()` (`script.js`) now re-measures every currently-visible `.tile` (`offsetParent !== null` check) after each expand/collapse pass, not just once at initial page load — a tile whose category happened to be collapsed at load no longer gets stuck at the wrong (too-large) font size forever.
+- [x] **Tile search glow: 3.5s.** `.tile-search-glow`'s animation duration, `3s` → `3.5s`.
+- [x] **Chrome "save password?" prompt fixed.** `#weatherapi-key-input` switched from `type="password"` to `type="text"` with `-webkit-text-security: disc` for the same dots-instead-of-characters masking, without Chrome ever classifying the field as a password worth offering to save.
+- [x] **Verified via Playwright:** zero page errors on load and on opening Settings; Site Name/Theme/Backup/WeatherAPI Key all read and write correctly; Choose sits a fixed 8px right of the avatar; tile search glow's `animation-duration` reads `3.5s`; the tile-wrap bug's repro (a long tile name in a category collapsed at page load) now correctly gains `tile-name-wrap` at 7.6px font-size after opening; `#weatherapi-key-input` confirmed `type="text"` with `-webkit-text-security: disc` applied. Full existing regression suite re-run clean (drag reorder, drag-jitter, horizontal drag, tile dialog add/edit, backup export/import, tile search) — no page errors anywhere.
+- [x] Cache-bust bumped: `styles.css?v=50→51`, `script.js?v=55→56`.
+
 ## Build Queue
-
-### Settings layout revision — drop Organize, stack label-above-control
-
-User supplied a mockup PDF (rendered and reviewed, not just described). Revises the Build 71 "one line per item" layout to label-above-control instead, and removes one section outright.
-
-- [ ] **"Organize" / "Reorganize Categories" removed from Settings entirely.** Per the user: "it just doesn't make sense there." Confirmed this strands nothing — `document.getElementById('open-reorg-btn')` (Settings' own trigger) is not the only way in: every category header already opens the Reorg Tree Tool directly via long-press (`attachLongPress(mainBtn, () => openReorgTool(id), ...)`, `script.js`). Settings' button was a redundant second entry point, not the only one.
-- [ ] **Every remaining section: label on its own line, control(s) on the line below** — reverting the Build 71 single-line-per-item pattern back to a stacked one, per the mockup. Labels read bold, sentence-case (`Site Name:`, `Theme:`, `Backup:`, `WeatherAPI Key:`), not the current tiny uppercase small-caps `.settings-row-label` style — a real typographic change, not just a rewrap.
-- [ ] **Site Name:** label line, input below (was: same line).
-- [ ] **Theme:** checkbox now comes *before* the label text (was: after) — mockup shows `✅ Auto: 7a-☀️ 7p-🌙`. Label wording also changes from "Auto 7a-day/7p-night" to using sun/moon emoji: `Auto: 7a-☀️ 7p-🌙`.
-- [ ] **Profile Photo:** unchanged structurally — already heading + one row (avatar + Choose/Remove) below it, matches the mockup as-is.
-- [ ] **Backup:** label line, then `[📤 Export] [📥 Import]` on the line below (was: same line as label). Note paragraph unchanged.
-- [ ] **WeatherAPI Key:** label line, then the input below (was: same line as label). Note paragraph unchanged.
-- [ ] **Label style — needs real class changes, not just markup reordering.** The mockup's labels (bold, sentence-case, roughly body-text size) don't map onto any existing class as-is; Build 71's `.settings-row-label`/`.settings-row` need real changes to match, and Theme's checkbox-before-label swap changes the `<label>` wrapper's child order too.
-- [ ] **Consistent alignment across sections — "tab stops," per the user, not everything randomly placed.** The mockup is illustrative of the general shape, not a pixel-exact spec ("not the definitive word on exactly how it has to be") — so this is a real design call to make well, not transcribe literally: give every section's control(s) a consistent left starting position under its label (e.g. a small uniform indent), rather than whatever each row's own content happens to produce.
-- [ ] **Profile Photo row — a real bug found, not just a style call.** Currently `.settings-photo-row` (a `.settings-row`) inherits `justify-content: space-between` across whatever buttons happen to be visible — with Remove hidden (no photo set yet), Choose gets pushed to the far right edge away from the avatar; once a photo is set and Remove appears, the pair re-distributes and everything visibly jumps. Per the user: Choose should always sit immediately next to the avatar regardless of Remove's visibility, and Remove should sit deliberately further right of Choose (not equal-gap, a wider gap specifically before Remove — likely so it doesn't read as visually equal-weight to a plain "choose a photo" action). Fix direction: `justify-content: flex-start` with a normal `gap` for avatar→Choose adjacency, plus extra left margin on Remove specifically to push it further right, instead of `space-between`'s content-count-dependent distribution.
-
-Not yet authorized to build.
-
-### Tile name font-size bug: measured while hidden, never re-measured
-
-Per the user, real bug report ("Boardgame Geek" wraps to 2 lines and gets cut off, but adding/removing 2 characters via Edit Tile fixes it — until the category is closed and reopened later, when it reverts). Root-caused, not just described:
-
-- **The mechanism:** `.tile span` is `font-size: 0.6rem` with `-webkit-line-clamp: 2` (clips to 2 lines); `.tile span.tile-name-wrap` drops to `font-size: 0.475rem`. `updateTileNameWrapClass(tileEl)` (`script.js`) decides which by comparing `span.scrollHeight` against `1.4×` the single-line height, and toggles the class accordingly.
-- **The bug:** this only ever runs from `wireTileGrids` (once, for every tile, at initial page load) and from the Add/Edit Tile dialog's submit handler. `wireTileGrids` runs while most categories are still collapsed (`hidden`) — and `scrollHeight` on anything inside a `display: none` subtree always reads `0` in Chromium, so the wrap check silently fails for every tile in every category that isn't the one restored open from `CATEGORY_OPEN_PATH_KEY`. Those tiles get stuck at the bigger 0.6rem font whether they actually wrap or not, and nothing ever re-measures them afterward — collapsing/expanding a category just toggles `hidden`, it doesn't re-run this check. The *only* thing that ever re-measures a given tile correctly is editing its name while its category happens to be open (visible) at the time, which is exactly why that fixed it temporarily, and exactly why a later reload (this category no longer the one restored open) brought the bug back.
-- **Proposed fix:** re-run `updateTileNameWrapClass` for the relevant tiles whenever a category actually becomes visible, not just once at load. `renderOpenPath()` (`script.js`) is the single place that toggles every category's `hidden` state — the natural hook. Simplest robust approach: re-measure every currently-visible `.tile` each time `renderOpenPath` runs (cheap for a personal homepage's tile count, same "rebuild trivial cost" reasoning already used for the tile search index), rather than trying to track precisely which categories just transitioned from hidden to visible.
-
-### Tile search glow: 3s → 3.5s
-
-Per the user. `.tile-search-glow`'s `animation` duration in `styles.css`, bumped again from Build 72's 3s. Pulse keyframe percentages stay the same, same reasoning as the 2.5s→3s change — they're relative to duration, not absolute time.
-
-### Chrome "save password?" prompt on refresh — root-caused
-
-Per the user: about half the time, refreshing the page prompts Chrome's "save password to Google Password Manager?" — never seen that from a page reload before. Root cause found: `#weatherapi-key-input` (`index.html`) is the only `type="password"` field on the page. Chrome deliberately ignores `autocomplete="off"` specifically for password-type inputs (long-standing behavior, since it treats that attribute as untrustworthy for anything credential-shaped) — any `type="password"` field with a value is a save-prompt candidate regardless of what `autocomplete` says. The ~50% intermittency fits too: Chrome's save-prompt heuristic depends on navigation/timing signals, not a deterministic trigger.
-
-- [ ] **Fix: stop using `type="password"` for this field.** It's not a login credential (this app's own copy already says the key "never leaves your device"), just something worth visually masking — so switch to `type="text"` and mask purely via CSS: `-webkit-text-security: disc;`. Same dots-instead-of-characters look, but Chrome's password manager never classifies the field as a password at all, so the prompt stops.
-- [x] **Firefox caveat resolved — not a concern, per the user.** `-webkit-text-security` is Chrome/Safari-only (WebKit/Blink); the user doesn't use Firefox, and Brave (their closest alternative) is Chromium-based, so it's covered too. No JS-based masking fallback needed — the plain CSS fix is sufficient.
-
-Not yet authorized to build.
 
 ## Build Planner
 

@@ -1120,7 +1120,7 @@ main {
 }
 
 .tile-search-glow {
-  animation: tile-search-glow 3s ease-in-out;
+  animation: tile-search-glow 3.5s ease-in-out;
 }
 
 .help-overlay {
@@ -1735,42 +1735,56 @@ main {
   margin-top: 0;
 }
 
-.settings-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.95rem;
+/* Settings label-above-control layout, per the user's mockup: a bold sentence-case label on its
+   own line, the control stacked below it, rather than the old side-by-side row. */
+.settings-label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 6px;
 }
 
-.settings-row:last-child {
-  border-bottom: none;
+/* .settings-value-row sits on the control itself (an <input>, or a <label>/<div> wrapping several
+   controls) — the tag distinguishes the two, since a bare text input doesn't need flex-row
+   children but a checkbox+text label or a row of buttons does. */
+label.settings-value-row,
+div.settings-value-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .settings-photo-row {
   flex-wrap: wrap;
-  border-bottom: none;
 }
 
-.settings-row-label {
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--fg-muted);
-  flex-shrink: 0;
+/* Choose must always sit immediately next to the avatar (flex-start + gap, not the old
+   space-between, which shoved Choose to wherever the leftover space happened to be depending on
+   whether Remove was showing — the "jumping" bug). Remove gets its own extra left margin instead,
+   to land deliberately further right without depending on space-between's content-count math. */
+.settings-btn-remove {
+  margin-left: 8px;
+}
+
+#settings-list input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--home-header-bg);
 }
 
 .settings-row-input {
-  width: 55%;
+  width: 100%;
   min-width: 0;
   box-sizing: border-box;
 }
 
-.settings-row-actions {
-  display: flex;
-  gap: 8px;
+/* type="text" + this, not type="password" — Chrome ignores autocomplete="off" specifically on
+   password-type inputs when deciding whether to offer to save it to the password manager, which
+   is exactly what was happening here on every reload. This isn't a login credential, just an API
+   key worth visually masking, so -webkit-text-security gives the same dots-instead-of-characters
+   look without Chrome ever classifying the field as a password at all. */
+.weatherapi-key-input {
+  -webkit-text-security: disc;
 }
 
 .settings-inline-btn {

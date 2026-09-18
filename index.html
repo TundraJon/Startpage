@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home</title>
-<link rel="stylesheet" href="styles.css?v=50">
+<link rel="stylesheet" href="styles.css?v=51">
 </head>
 <body>
 
@@ -346,20 +346,19 @@
   </div>
   <div class="reorg-list" id="settings-list">
     <section class="options-section">
-      <div class="settings-row">
-        <span class="settings-row-label">Site Name</span>
-        <input type="text" id="site-name-input" class="settings-row-input" autocomplete="off" spellcheck="false" placeholder="Home">
-      </div>
+      <span class="settings-label">Site Name:</span>
+      <input type="text" id="site-name-input" class="settings-row-input settings-value-row" autocomplete="off" spellcheck="false" placeholder="Home">
     </section>
     <section class="options-section">
-      <label class="settings-row">
-        <span class="settings-row-label">Theme: Auto 7a-day/7p-night</span>
+      <span class="settings-label">Theme:</span>
+      <label class="settings-value-row">
         <input type="checkbox" id="theme-auto-toggle">
+        <span>Auto: 7a-☀️ 7p-🌙</span>
       </label>
     </section>
     <section class="options-section">
-      <h3>Profile Photo</h3>
-      <div class="settings-row settings-photo-row">
+      <span class="settings-label">Profile Photo:</span>
+      <div class="settings-value-row settings-photo-row">
         <span class="profile-photo-preview-wrap">
           <img id="profile-photo-preview" class="profile-photo-preview" alt="" hidden>
           <svg id="profile-photo-default-preview" class="profile-photo-preview profile-photo-default" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -368,31 +367,22 @@
           </svg>
         </span>
         <button type="button" class="settings-inline-btn settings-btn-go" id="profile-photo-choose-btn">+ Choose</button>
-        <button type="button" class="settings-inline-btn settings-btn-stop" id="profile-photo-remove-btn" hidden>− Remove</button>
+        <button type="button" class="settings-inline-btn settings-btn-stop settings-btn-remove" id="profile-photo-remove-btn" hidden>− Remove</button>
         <input type="file" id="profile-photo-input" accept="image/*" hidden>
       </div>
     </section>
     <section class="options-section">
-      <div class="settings-row">
-        <span class="settings-row-label">Organize</span>
-        <button type="button" class="settings-inline-btn" id="open-reorg-btn">Reorganize Categories</button>
-      </div>
-    </section>
-    <section class="options-section">
-      <div class="settings-row">
-        <span class="settings-row-label">Backup</span>
-        <span class="settings-row-actions">
-          <button type="button" class="settings-inline-btn" id="backup-export-btn">📤 Export</button>
-          <button type="button" class="settings-inline-btn" id="backup-import-btn">📥 Import</button>
-        </span>
+      <span class="settings-label">Backup:</span>
+      <div class="settings-value-row">
+        <button type="button" class="settings-inline-btn" id="backup-export-btn">📤 Export</button>
+        <button type="button" class="settings-inline-btn" id="backup-import-btn">📥 Import</button>
       </div>
       <p class="testing-note">Everything here lives only in this browser — clearing site data or switching devices loses it for good. Export a backup file periodically and keep it somewhere safe (cloud storage, email to yourself).</p>
       <input type="file" id="backup-import-input" accept="application/json" hidden>
     </section>
     <section class="options-section">
-      <div class="settings-row">
-        <span class="settings-row-label">WeatherAPI Key</span>
-        <input type="password" id="weatherapi-key-input" class="settings-row-input" autocomplete="off" spellcheck="false" placeholder="paste key here">
+      <span class="settings-label">WeatherAPI Key:</span>
+      <input type="text" id="weatherapi-key-input" class="settings-row-input weatherapi-key-input settings-value-row" autocomplete="off" spellcheck="false" placeholder="paste key here">
       </div>
       <p class="testing-note">Your WeatherAPI.com key is stored only in this browser (never leaves your device, never committed to the site's source).</p>
     </section>
@@ -656,6 +646,6 @@
   </div>
 </div>
 
-<script src="script.js?v=55"></script>
+<script src="script.js?v=56"></script>
 </body>
 </html>

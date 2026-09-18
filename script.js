@@ -306,6 +306,16 @@
       // (redundant with tapping the header to open) is gone — not just the deepest leaf.
       entry.collapseBtn.hidden = !onPath;
     });
+    // Re-measure name-wrap for every tile that's actually visible now that this pass has settled
+    // — collapsing/expanding a category never used to re-run this at all, so a tile whose category
+    // happened to be hidden the one time wireTileGrids measured it at page load (scrollHeight
+    // always reads 0 inside a display:none subtree) stayed wrong forever, only ever fixed by
+    // editing its name while its category happened to be open. offsetParent !== null is the check
+    // (not e.g. walking openPath) so a tile inside a still-collapsed nested subcategory of an
+    // otherwise-open parent correctly gets skipped too, not just top-level hidden categories.
+    document.querySelectorAll('.tile').forEach((tileEl) => {
+      if (tileEl.offsetParent !== null) updateTileNameWrapClass(tileEl);
+    });
     localStorage.setItem(CATEGORY_OPEN_PATH_KEY, JSON.stringify(openPath));
     // No-op until select mode's destination-picking UI is defined further down (hoisted function
     // declaration) — keeps the "current destination" status text in sync with navigation.
@@ -2723,7 +2733,6 @@
     reorgCollapsedIds = null;
   }
 
-  document.getElementById('open-reorg-btn').addEventListener('click', openReorgTool);
   reorgCancelBtn.addEventListener('click', closeReorgTool);
   reorgSaveBtn.addEventListener('click', () => {
     // A category removed via Remove Category during this session only ever left reorgWorkingTree
