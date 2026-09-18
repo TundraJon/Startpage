@@ -1429,6 +1429,17 @@ Per the user: "Light Start" should read "Lite Start" — matches the internal na
 
 Not yet authorized to build.
 
+### Bug: pre-load weather placeholder says Blizzard/-20°F but the sky animation shows clear/sunny
+
+Per the user: on first load, before a real WeatherAPI key is set, the widget correctly shows -20°F and "Blizzard" text (McMurdo Station, Antarctica), Live Condition Skin is on, but the actual background animation looks plain sunny instead of a blizzard. Root-caused, not just described:
+
+- **Two independent rendering paths read from two different sources.** The temperature/condition text (`renderWeatherTemps()`/`renderWeatherExtras()`) reads directly from the static placeholder object `weatherState` (`script.js`) — correctly `conditionCode: 1117` ("Blizzard"), `tempF: -20`, etc., per Build 47. The sky/background animation instead reads `getEffectiveConditionSkins()`, which returns `weatherLiveConditions` — a `Set()` that starts **empty** and is only ever populated inside `applyLiveWeatherData(data)`, itself only called after a real WeatherAPI fetch actually succeeds.
+- **`loadLiveWeather()` never even attempts a fetch without a key** — `if (!key) { weatherDebugState.outcome = 'no-key'; ...; return; }` fires immediately for every visitor who hasn't pasted a key into Settings yet, which is every brand-new visitor by definition. So `weatherLiveConditions` never gets populated, `renderWeatherSkin()`'s own initial synchronous call at load (confirmed still present, `script.js`) renders against an empty condition set, and the sky falls back to its default clear/sunny look — completely disconnected from the "Blizzard" the text right next to it is already showing.
+- **Not new to this session** — this placeholder default (Build 47) and the live-fetch-only initialization of `weatherLiveConditions` both predate Build 79. It's just far more likely to actually be seen now: Build 79 is the first time this app has shipped to real first-time visitors who land on exactly this pre-key state, rather than a sandbox mostly used by someone who already has a key configured.
+- **Fix direction:** seed `weatherLiveConditions` from `weatherState.conditionCode` once at load — the same `animKeysFor(mapConditionCode(weatherState.conditionCode))` call `applyLiveWeatherData()` already uses to populate it after a real fetch — so the very first paint (and any session that never gets a key) shows a sky consistent with its own placeholder condition instead of silently defaulting to clear.
+
+Not yet authorized to build.
+
 ## Build Planner
 
 _Backlog of active items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start. Resolved/built/dropped/superseded items are not kept here — see Build Log entries for that history._
