@@ -1330,17 +1330,18 @@ All of it landed exactly as speced in the Build Queue (range-select, Select All/
 - [x] **No JS changes at all.** Every element kept its existing `id` — this was purely an HTML/CSS restructuring, confirmed by grepping for every `getElementById` this section touches against the new markup before considering it done.
 - [x] **Verified via Playwright and screenshots:** Settings now renders as one compact, scannable list matching the user's mockup almost exactly; Site Name and the Theme checkbox still read from and write to storage correctly after the restructure; the photo preview measures 50px; Choose reads green (`rgb(20, 83, 31)`), and Remove — confirmed visible once a photo is set — reads red (`rgb(107, 20, 20)`). Re-ran the full existing regression suite (drag-jitter, horizontal-drag, tile-dialog consolidation, backup export/import, tile search) together with this round's changes — all still pass. Zero page errors throughout.
 
+## Build Log 72 (completed)
+
+### Three more small polish items: 60px photo, matched-width home buttons, 3s glow
+
+- [x] **Profile photo preview: 60px.** `.profile-photo-preview-wrap` bumped from Build 71's 50px. Confirmed 60px live in Settings; still well within the underlying 64×64 stored thumbnail.
+- [x] **Home header buttons matched width + wider gap.** `#tile-search-btn`/`#collapse-all-btn` now `width: 39px` (matching `#create-btn`'s own rendered width) with `display: flex; justify-content: center; align-items: center` so each glyph centers within the wider box rather than growing to fill it. `.home-header-actions` gap: `2px` → `5px`. Measured live after the change: all three buttons render at 38.95–39px, effectively identical.
+- [x] **Tile search glow: 3s.** `.tile-search-glow`'s animation duration, `2.5s` → `3s` — the pulse keyframe percentages didn't need to change, since they're already relative to the animation's own duration.
+- [x] **Verified via Playwright:** photo wrap measures 60px; all three header buttons measure ~39px wide with a 5px gap between them (screenshot-confirmed visually even); the glow's `animation-duration` reads `3s`, is confirmed still active at ~2.7s and gone by ~3.3s. Zero page errors.
+
 ## Build Queue
 
-### Three more small polish items from Build 70/71
-
-Per the user, all direct/unambiguous — logged with measured current values rather than assumed ones.
-
-- [ ] **Profile photo preview: 50px → 60px.** `.profile-photo-preview-wrap` (`styles.css`), bumped again from Build 71's 50px. Still well within the underlying 64×64 stored thumbnail — no quality loss even at 60px.
-- [ ] **Home header: 🔎 and ▲ match `+`'s width, plus 3px more gap.** Measured live: `#create-btn` renders at 38.95px wide, `#tile-search-btn` at 27.98px, `#collapse-all-btn` at 24.67px — all three already share the same height (29.6px) from Build 70's boxing, only width differs. Plan: give `#tile-search-btn`/`#collapse-all-btn` an explicit width matching `#create-btn`'s (~39px, or read live again at build time in case anything shifts it), with `justify-content: center` so each glyph centers within the now-wider box regardless of its own size. `.home-header-actions`'s `gap` goes from the current `2px` to `5px` (2px + the requested 3px more).
-- [ ] **Tile search glow: 2.5s → 3s.** `.tile-search-glow`'s `animation` duration in `styles.css`, from Build 70. The pulse keyframe percentages (`25%, 75%` bright / `50%` dim) don't need to change — they're already relative to the animation's own duration, so stretching to 3s just stretches the same two-pulse shape proportionally, not a redesign.
-
-Not yet authorized to build.
+_Empty — everything above has been built. Log new items here as they come in._
 
 ## Build Planner
 

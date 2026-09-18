@@ -339,7 +339,7 @@ main {
 
 .home-header-actions {
   display: flex;
-  gap: 2px;
+  gap: 5px;
   /* .category-header lost justify-content: space-between in Build 42's restructuring; regular
      category headers still push their collapse button to the right edge by coincidence
      (.category-header-main's flex: 1 fills the row regardless), but Home's plain <h2> + this div
@@ -371,6 +371,13 @@ main {
   background: rgba(255, 255, 255, 0.15);
   border-radius: 8px;
   opacity: 1;
+  /* Matches #create-btn's own rendered width (measured live: ~39px) so all three read as a
+     consistent set of same-size boxes, per the user — the glyphs themselves stay their own size,
+     centered within the wider box, rather than growing to fill it. */
+  width: 39px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #tile-search-btn:hover,
@@ -1113,7 +1120,7 @@ main {
 }
 
 .tile-search-glow {
-  animation: tile-search-glow 2.5s ease-in-out;
+  animation: tile-search-glow 3s ease-in-out;
 }
 
 .help-overlay {
@@ -1695,8 +1702,8 @@ main {
 
 .profile-photo-preview-wrap {
   flex-shrink: 0;
-  width: 50px;
-  height: 50px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   overflow: hidden;
   background: var(--border);
