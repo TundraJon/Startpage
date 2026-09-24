@@ -1427,6 +1427,19 @@ Both items from the Build Queue, built and verified together.
 - [x] **Verified via Playwright:** fresh load with no key now shows a correctly overcast/snowy sky (10 drifting clouds, 33,396 non-transparent pixels drawn on the precipitation canvas) matching the "-20°F/Blizzard" text next to it — confirmed both in raw pixel data and visually via screenshot. The stars canvas is correctly empty (sky isn't clear). Full existing regression suite (drag reorder, backup export/import, tile dialog add/edit, tile search, tile-wrap fix, Settings layout, Help Overlay accuracy, first-run Full/Lite picker + Reset flow) re-run clean, zero page errors.
 - [x] Cache-bust bumped: `script.js?v=60→61`.
 
+## Build Log 81 (completed)
+
+### Glow pulse count, NOAA link fix, AI category restructure, 8-item broken-link batch
+
+All four items from the Build Queue, built and verified together.
+
+- [x] **Tile search result glow: 2 → 4 pulses, same 3.5s duration** (`styles.css`) — rewrote `@keyframes tile-search-glow` from 2 bright peaks (25%/75%) to 4 (12.5%/37.5%/62.5%/87.5%, dim at 0/25/50/75/100%), duration and JS removal logic (`animationend` listener) untouched.
+- [x] **Broken link fixed: Weather > NOAA Aurora Forecast** (`starter-content.js`) — `wxc-aurora`'s URL moved from the stale `swpc.noaa.gov` subdomain to `spaceweather.gov`.
+- [x] **AI category restructure** (`starter-content.js`) — `ai-chatbots` category renamed "AI Chatbots" → "Artificial Intelligence (AI)" (id unchanged). Tiles reorganized into 3 grouping-divider sections: "AI Knowledge Bots" (ChatGPT, Google Gemini, Claude, Grok, DeepSeek, Perplexity, unchanged), "AI Co-pilots" (Microsoft Copilot, pulled out of the knowledge-bots group), "AI Agents" (new tile: Muse.ai, `https://muse.ai`, with the user's own blurb about it being an autonomous browser-driving AI agent).
+- [x] **Batch of 8 broken-link fixes** (`starter-content.js`): Crackle removed (shut down), replaced with The Roku Channel; WhatsApp URL changed to the marketing domain (`whatsapp.com`, intentional — that's where its favicon lives); The Guild's URL updated to its YouTube channel; Avalon Hill's URL updated to its own domain (name unchanged); Walmart Photo's URL updated; Costco Photo Center removed (shut down, no replacement); The Orlando Eye renamed "The Wheel at ICON Park" with its URL updated to match the real-world rebrand.
+- [x] **Verified via Playwright:** all 4 keyframe percentages present in the live stylesheet; every new/changed tile's href confirmed correct live (NOAA Aurora, Roku Channel, WhatsApp, The Guild, Avalon Hill, Walmart Photo, The Wheel at ICON Park); Crackle and Costco Photo Center confirmed removed; AI category confirmed renamed with all 8 tiles present in the correct grouped order (6 knowledge bots, Copilot, Muse.ai) and correct hrefs, including Muse.ai's blurb. Full existing regression suite (drag reorder, backup export/import, tile dialog add/edit, tile search, tile-wrap fix, Settings layout, Help Overlay accuracy, first-run Full/Lite picker + Reset flow) re-run clean, zero page errors throughout.
+- [x] Cache-bust bumped: `styles.css?v=55→56`, `starter-content.js?v=1→2`. `script.js` untouched this build, stays at `?v=61`.
+
 ## Build Queue
 
 _Empty — no items awaiting authorization._

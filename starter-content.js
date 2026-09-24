@@ -110,7 +110,7 @@
     t('wxc-ventusky', 'Ventusky', 'https://www.ventusky.com'),
     t('wxc-noaa', 'NOAA', 'https://www.noaa.gov'),
     t('wxc-spaceweather', 'Space Weather', 'https://spaceweather.com'),
-    t('wxc-aurora', 'NOAA Aurora Forecast', 'https://www.swpc.noaa.gov/products/aurora-30-minute-forecast'),
+    t('wxc-aurora', 'NOAA Aurora Forecast', 'https://www.spaceweather.gov/products/aurora-30-minute-forecast'),
     t('wxc-ecmwf', 'ECMWF', 'https://www.ecmwf.int'),
     t('wxc-timeanddate2', 'Time and Date', 'https://www.timeanddate.com'),
   ];
@@ -124,7 +124,7 @@
     t('str-youtube', 'YouTube', 'https://www.youtube.com'),
     t('str-tubi', 'Tubi', 'https://tubitv.com'),
     t('str-plex', 'Plex', 'https://www.plex.tv'),
-    t('str-crackle', 'Crackle', 'https://www.crackle.com'),
+    t('str-rokuchannel', 'The Roku Channel', 'https://therokuchannel.roku.com/'),
     tf('str-globoplay', 'Globoplay', 'https://globoplay.globo.com'),
     t('str-plutotv', 'Pluto TV', 'https://pluto.tv'),
   ];
@@ -140,7 +140,7 @@
     t('soc-linkedin', 'LinkedIn', 'https://www.linkedin.com'),
     t('soc-tiktok', 'TikTok', 'https://www.tiktok.com'),
     t('soc-snapchat', 'Snapchat', 'https://www.snapchat.com'),
-    t('soc-whatsapp', 'WhatsApp', 'https://web.whatsapp.com'),
+    t('soc-whatsapp', 'WhatsApp', 'https://whatsapp.com/'),
     t('soc-meetup', 'Meetup', 'https://www.meetup.com'),
     t('soc-ancestry', 'Ancestry', 'https://www.ancestry.com'),
     t('soc-discord', 'Discord', 'https://discord.com'),
@@ -179,11 +179,11 @@
     t('rpg-kickstarter', 'Kickstarter', 'https://www.kickstarter.com'),
     t('rpg-criticalrole', 'Critical Role', 'https://critrole.com'),
     t('rpg-dimension20', 'Dimension 20', 'https://www.dropout.tv/dimension-20'),
-    t('rpg-theguild', 'The Guild', 'https://www.theguildshow.com'),
+    t('rpg-theguild', 'The Guild', 'https://youtube.com/@theguild'),
     t('rpg-mongoose', 'Mongoose Publishing', 'https://www.mongoosepublishing.com'),
     t('rpg-fantasyflight', 'Fantasy Flight Games', 'https://www.fantasyflightgames.com'),
     t('rpg-asmodee', 'Asmodee', 'https://www.asmodee.com'),
-    t('rpg-avalonhill', 'Hasbro/Avalon Hill', 'https://avalonhill.hasbro.com'),
+    t('rpg-avalonhill', 'Hasbro/Avalon Hill', 'https://www.avalonhill.com/en-us'),
     t('rpg-paizo', 'Paizo', 'https://paizo.com'),
     t('rpg-wotc', 'Wizards of the Coast', 'https://www.wizards.com'),
     t('rpg-tycoongames', 'Tycoon Games', 'https://www.tycoongames.com'),
@@ -443,16 +443,20 @@
     tb('esim-androidguide', 'Android eSIM Setup Guide', 'https://support.google.com/pixelphone/answer/9448523', 'General Android eSIM setup instructions (varies somewhat by manufacturer).'),
   ];
 
-  // ---- AI Chatbots ----
-  addCat('ai-chatbots', 'AI Chatbots', null);
+  // ---- Artificial Intelligence (AI) ----
+  addCat('ai-chatbots', 'Artificial Intelligence (AI)', null);
   full.tiles['ai-chatbots'] = [
+    div('ai-div-knowledge', 'AI Knowledge Bots'),
     tb('ai-chatgpt', 'ChatGPT', 'https://chatgpt.com', 'Most versatile all-rounder — strong at writing, brainstorming, broad general knowledge, huge plugin/GPT ecosystem.'),
     tb('ai-gemini', 'Google Gemini', 'https://gemini.google.com', 'Deep integration with Google services (Docs, Gmail, Sheets) — strong at multimodal tasks (images, video).'),
     tb('ai-claude', 'Claude', 'https://claude.ai', 'Excels at programming/coding, plus longer, nuanced writing and analysis — often praised for careful reasoning and thoughtful responses on sensitive topics.'),
     tb('ai-grok', 'Grok', 'https://grok.com', 'Real-time access to X (Twitter) data — more casual/irreverent tone, good for current events/trending topics.'),
     tb('ai-deepseek', 'DeepSeek', 'https://www.deepseek.com', 'Excels at math, coding, and technical reasoning — free and open-source.'),
     tb('ai-perplexity', 'Perplexity', 'https://www.perplexity.ai', 'Built specifically as an AI-powered search engine — best for research with cited sources.'),
+    div('ai-div-copilots', 'AI Co-pilots'),
     tb('ai-copilot', 'Microsoft Copilot', 'https://copilot.microsoft.com', 'Deep integration with Microsoft 365 (Word, Excel, Outlook) — good for office/work-document tasks.'),
+    div('ai-div-agents', 'AI Agents'),
+    tb('ai-museai', 'Muse.ai', 'https://muse.ai', 'Muse is an autonomous personal AI agent designed to run errands, book travel, and manage files in the background by controlling its own virtual web browser on your behalf.'),
   ];
 
   // ---- Video Calling ----
@@ -503,8 +507,7 @@
     t('photop-snapfish', 'Snapfish', 'https://www.snapfish.com'),
     t('photop-walgreens', 'Walgreens Photo', 'https://photo.walgreens.com'),
     t('photop-cvs', 'CVS Photo', 'https://www.cvs.com/photo'),
-    t('photop-walmart', 'Walmart Photo', 'https://www.walmartphoto.com'),
-    t('photop-costco', 'Costco Photo Center', 'https://www.costcophotocenter.com'),
+    t('photop-walmart', 'Walmart Photo', 'https://photos3.walmart.com/'),
   ];
 
   // ---- Fashion & Clothing ----
@@ -606,7 +609,7 @@
     t('orl-funspot', 'Fun Spot', 'https://fun-spot.com'),
     t('orl-medievaltimes', 'Medieval Times', 'https://www.medievaltimes.com/orlando'),
     t('orl-footgolf', "FootGolf at Disney's Oak Trail", 'https://www.footgolforlando.com'),
-    t('orl-orlandoeye', 'The Orlando Eye', 'https://www.icondrivenorlando.com'),
+    t('orl-orlandoeye', 'The Wheel at ICON Park', 'https://iconparkorlando.com/'),
     t('orl-bluemangroup', 'Blue Man Group', 'https://www.blueman.com/orlando'),
     t('orl-icebar', 'ICEBAR Orlando', 'https://icebarorlando.com'),
     div('orl-div-minigolf', 'Mini Golf'),
