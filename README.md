@@ -1440,6 +1440,20 @@ All four items from the Build Queue, built and verified together.
 - [x] **Verified via Playwright:** all 4 keyframe percentages present in the live stylesheet; every new/changed tile's href confirmed correct live (NOAA Aurora, Roku Channel, WhatsApp, The Guild, Avalon Hill, Walmart Photo, The Wheel at ICON Park); Crackle and Costco Photo Center confirmed removed; AI category confirmed renamed with all 8 tiles present in the correct grouped order (6 knowledge bots, Copilot, Muse.ai) and correct hrefs, including Muse.ai's blurb. Full existing regression suite (drag reorder, backup export/import, tile dialog add/edit, tile search, tile-wrap fix, Settings layout, Help Overlay accuracy, first-run Full/Lite picker + Reset flow) re-run clean, zero page errors throughout.
 - [x] Cache-bust bumped: `styles.css?v=55→56`, `starter-content.js?v=1→2`. `script.js` untouched this build, stays at `?v=61`.
 
+## Build Log 82 (completed)
+
+### New feature: "Copy to Home" action
+
+The item from the Build Queue, built and verified.
+
+- [x] **New 🏠 button in `#select-action-bar`** (`index.html`), `id="select-action-copyhome"`, `aria-label="Copy to Home"`, placed after 🗑️ Delete and before 🆑 Clear.
+- [x] **New `confirmCopySelected()`** (`script.js`), modeled on `confirmMoveSelected()` but the source is never touched: reads the selected tiles, builds a fresh copy of each (same name/url/blurb/brazil, new id via `newTileId()`, reset usage stats), appends the copies to Home's storage and — if Home's grid is currently rendered — builds and appends new DOM elements for them via `buildTileElement(...)`.
+- [x] **No destination-picking step** — unlike Cut→Paste, the destination is always Home, so one tap copies immediately.
+- [x] **Disabled when 0 tiles selected or the currently-open category is already Home** — copying a Home tile to Home is a no-op.
+- [x] **"Copied to Home" confirmation** — `selectActionStatus` shows it briefly before the bar auto-closes (700ms), so the action gives feedback even when Home isn't the category currently in view.
+- [x] **Verified via Playwright:** copying a tile from Weather leaves the original untouched in Weather (confirmed via both DOM and storage) and adds a new, independent copy to Home with a different id but identical name/url; the confirmation message renders and the bar auto-closes; the button is correctly disabled when selecting a tile already inside Home. Full existing regression suite (drag reorder, backup export/import, tile dialog add/edit, tile search, tile-wrap fix, Settings layout, Help Overlay accuracy, first-run Full/Lite picker + Reset flow) re-run clean, zero page errors.
+- [x] Cache-bust bumped: `script.js?v=61→62`.
+
 ## Build Queue
 
 _Empty — no items awaiting authorization._

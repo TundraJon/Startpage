@@ -263,6 +263,7 @@
   const selectActionRenameBtn = document.getElementById('select-action-rename');
   const selectActionPasteBtn = document.getElementById('select-action-paste');
   const selectActionDeleteBtn = document.getElementById('select-action-delete');
+  const selectActionCopyHomeBtn = document.getElementById('select-action-copyhome');
   const selectActionClearBtn = document.getElementById('select-action-clear');
 
   // Ancestor chain (root -> id) for a category, walked via the live DOM rather than stored state,
@@ -3123,6 +3124,35 @@
     exitSelectMode();
   }
 
+  // "Copy to Home" — quick access from another category while the tile stays exactly where it
+  // is, per the user: two fully independent tiles on purpose, not a linked/synced reference.
+  // Deliberately not routed through Cut+Paste's destination-picking flow since the destination is
+  // always Home; one tap copies immediately. Modeled on confirmMoveSelected above, but the source
+  // is never touched, and each copy gets its own fresh id/usage stats rather than reusing the
+  // original tile's own DOM element (which has to stay right where it is).
+  function confirmCopySelected() {
+    if (!selectMode || selectMode.kind !== 'tile' || selectedCount() === 0) return;
+    if (selectMode.categoryId === 'home') return;
+    const sourceTiles = loadCategoryTiles(selectMode.categoryId);
+    const selected = sourceTiles.filter((t) => selectMode.selectedIds.has(t.id));
+    const copies = selected.map((t) => Object.assign({}, t, {
+      id: newTileId(),
+      createdAt: Date.now(),
+      lastUsedAt: null,
+      useCount: 0,
+    }));
+    saveCategoryTiles('home', loadCategoryTiles('home').concat(copies));
+    const destGrid = categoryGrids.get('home');
+    if (destGrid) {
+      copies.forEach((t) => destGrid.appendChild(buildTileElement(t.id, t.name, t.url, t.blurb, t.brazil)));
+    }
+    // Nothing in the currently-open category visually changes (the copy lands in Home, which may
+    // not even be open), so a brief status flash confirms the tap actually did something before
+    // the bar closes — same status line updateSelectActionBar() otherwise uses for selection count.
+    selectActionStatus.textContent = 'Copied to Home';
+    setTimeout(exitSelectMode, 700);
+  }
+
   function deleteSelected() {
     if (!selectMode || selectMode.kind !== 'tile') return;
     const grid = selectMode.grid;
@@ -3161,6 +3191,9 @@
     selectActionRenameBtn.disabled = n !== 1 || pickingDestination;
     selectActionCutBtn.disabled = n === 0 || pickingDestination;
     selectActionDeleteBtn.disabled = n === 0 || pickingDestination;
+    // Copying Home tiles to Home is a no-op nobody asked for -- disabled whenever the open
+    // category select mode is running against is Home itself.
+    selectActionCopyHomeBtn.disabled = n === 0 || pickingDestination || selectMode.categoryId === 'home';
 
     if (!pickingDestination) {
       selectActionStatus.textContent = n + ' selected';
@@ -3200,6 +3233,10 @@
   selectActionPasteBtn.addEventListener('click', () => {
     if (!selectMode || !pickingDestination) return;
     confirmMoveSelected();
+  });
+
+  selectActionCopyHomeBtn.addEventListener('click', () => {
+    confirmCopySelected();
   });
 
   selectActionRenameBtn.addEventListener('click', () => {
