@@ -219,6 +219,10 @@ main {
   align-items: stretch;
   background: var(--surface);
   border-top: 3px solid var(--stripe-color, transparent);
+  /* Lets scrollIntoView (script.js, openCategoryPath) land a just-opened category below the fixed
+     .pinned-header + .category-header--home stack instead of underneath it — both heights are
+     kept live via ResizeObserver already, same pattern used for Home's own padding-top. */
+  scroll-margin-top: calc(var(--pinned-header-height, 0px) + var(--home-header-height, 0px));
 }
 
 .category-header-main {

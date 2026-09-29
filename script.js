@@ -323,6 +323,11 @@
     openPath = categoryAncestorChain(id);
     leafLinksCollapsed = false;
     renderOpenPath();
+    // Slides the just-opened category up so its own header lands right under Home instead of
+    // wherever it happened to sit on the page, per the user — .category-header's scroll-margin-top
+    // (styles.css) accounts for the fixed pinned-header + Home-header stack above it.
+    const entry = categoryToggles.get(id);
+    if (entry) entry.header.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // Tile search: a 🔎 popup with a live autocomplete dropdown, kept deliberately separate from
@@ -639,7 +644,7 @@
       // sibling) — the collapse button outdents by the same depth, in the opposite direction.
       header.style.setProperty('--depth', String(depth));
 
-      categoryToggles.set(id, { section, contentEl, ownGridEl, mainBtn, collapseBtn });
+      categoryToggles.set(id, { section, contentEl, ownGridEl, mainBtn, collapseBtn, header });
 
       // Long-press opens the Reorg Tree Tool directly, with this category pre-selected and
       // scrolled into view — category select mode (and its bottom action bar) is gone, per the
@@ -3258,7 +3263,12 @@
       ? selectMode.grid.querySelector('[data-tile-id="' + CSS.escape(Array.from(selectMode.selectedIds)[0]) + '"]')
       : null;
     const label = n === 1 ? 'the ' + targetEl.querySelector('span').textContent + ' tile' : n + ' tiles';
-    openTileConfirm('Are you sure you want to remove ' + label + '?', () => {
+    // Select mode only ever operates within one category's grid at a time, so every selected tile
+    // (single or batch) is always from this same category -- no ambiguity to handle.
+    const categoryName = selectMode.categoryId === 'home'
+      ? homeNameEl.textContent
+      : (categoryTree[selectMode.categoryId] ? categoryTree[selectMode.categoryId].name : selectMode.categoryId);
+    openTileConfirm('Are you sure you want to remove ' + label + ' from ' + categoryName + '?', () => {
       // Intentional, permanent easter egg — a 10% chance of a second "really sure?" prompt.
       // Never document or hint at this in user-facing help text.
       if (Math.random() < 0.10) {

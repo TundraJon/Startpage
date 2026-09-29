@@ -1454,6 +1454,17 @@ The item from the Build Queue, built and verified.
 - [x] **Verified via Playwright:** copying a tile from Weather leaves the original untouched in Weather (confirmed via both DOM and storage) and adds a new, independent copy to Home with a different id but identical name/url; the confirmation message renders and the bar auto-closes; the button is correctly disabled when selecting a tile already inside Home. Full existing regression suite (drag reorder, backup export/import, tile dialog add/edit, tile search, tile-wrap fix, Settings layout, Help Overlay accuracy, first-run Full/Lite picker + Reset flow) re-run clean, zero page errors.
 - [x] Cache-bust bumped: `script.js?v=61→62`.
 
+## Build Log 83 (completed)
+
+### Category-open auto-scroll under Home; tile delete confirmation names the category
+
+Both items from the Build Queue, built and verified together.
+
+- [x] **Opening a category now scrolls it up just under Home.** `.category-header` (`styles.css`) got `scroll-margin-top: calc(var(--pinned-header-height, 0px) + var(--home-header-height, 0px))`, reusing the same live-tracked custom properties that already position Home's own fixed header. `openCategoryPath(id)` (`script.js`) now calls `entry.header.scrollIntoView({ behavior: 'smooth', block: 'start' })` after rendering — `wireCategoryHeaders` stores each category's `.category-header` element directly in the `categoryToggles` map for this. Applies to every tap on a category/subcategory header.
+- [x] **Tile delete confirmation now names the category.** The select-action-bar's 🗑️ Delete handler (`script.js`) resolves `selectMode.categoryId` to its display name (`Home`, or the category's real name from `categoryTree`) and appends `" from {CategoryName}"` to both the single-tile and batch-delete confirmation text.
+- [x] **Verified via Playwright:** opening a category far down the page (Travel, Games) lands its header within a few pixels of the exact fixed-header offset, confirmed both by geometry math and visually via screenshot. Delete confirmations read correctly for a single Weather tile ("...from Weather"), a 2-tile batch from Weather ("...from Weather"), and a Home tile ("...from Home"). Full existing regression suite (drag reorder, backup export/import, tile dialog add/edit, tile search, tile-wrap fix, Settings layout, Help Overlay accuracy, first-run Full/Lite picker + Reset flow, Copy to Home) re-run clean, zero page errors. One stale test script (`verify_copy_to_home.js`'s own Home-tile-select step) initially read a false failure purely from its own hardcoded coordinates going stale under the new auto-scroll — confirmed as a test artifact, not an app bug, by re-running the same check with a proper scroll-into-view first.
+- [x] Cache-bust bumped: `styles.css?v=56→57`, `script.js?v=62→63`.
+
 ## Build Queue
 
 _Empty — no items awaiting authorization._
