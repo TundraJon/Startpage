@@ -793,6 +793,34 @@
     return 'https://www.google.com/s2/favicons?sz=64&domain=' + encodeURIComponent(domain);
   }
 
+  // Favicon source tiers, tried in order against the same <img> element — Google first (fast,
+  // usually right), then two other aggregator services for the sites Google draws a blank on,
+  // then a direct guess at the domain's own /favicon.ico as a last real attempt before giving up
+  // on a real icon entirely. One function per tier (not a flat array of URL strings) since Google
+  // alone needs the placeholder check below applied to its result.
+  function faviconTierUrls(domain) {
+    return [
+      faviconUrlForDomain(domain),
+      'https://icons.duckduckgo.com/ip3/' + encodeURIComponent(domain) + '.ico',
+      'https://favicon.im/' + encodeURIComponent(domain),
+      'https://' + domain + '/favicon.ico',
+    ];
+  }
+
+  // Hosted separately from the app (not inlined/embedded into index.html or script.js), per the
+  // user, specifically so it can be swapped later with a plain file push to the repo — no code
+  // change or redeploy needed.
+  const FAVICON_FINAL_FALLBACK_URL = 'https://raw.githubusercontent.com/TundraJon/Startpage/main/favicon-fallback.png';
+
+  // Google's s2 endpoint doesn't 404 when it has nothing real for a domain — it silently returns
+  // a generic placeholder image instead (confirmed by the user against real sites), which a plain
+  // 'load' event can't tell apart from a genuine tiny favicon on its own. Same heuristic already
+  // validated in the standalone favicon-finder.html diagnostic tool: a "16px or smaller" range
+  // check, not an exact-16 match, since the placeholder's exact rendered size can vary slightly.
+  function looksLikeGooglePlaceholder(img) {
+    return img.naturalWidth > 0 && img.naturalWidth <= 16 && img.naturalHeight <= 16;
+  }
+
   function normalizeTileUrl(raw) {
     const trimmed = raw.trim();
     if (!trimmed) return null;
@@ -806,18 +834,47 @@
 
   // Builds the favicon <img> for a tile — factored out of buildTileElement so Edit Tile's URL
   // change (updateTileUrl below) can retry a fresh favicon against the new domain the same way,
-  // rather than duplicating the fallback-to-.tile-fallback logic in two places.
+  // rather than duplicating the fallback logic in two places. Walks faviconTierUrls in order; once
+  // every real source has failed, falls back to a generic icon (FAVICON_FINAL_FALLBACK_URL) rather
+  // than the old text-only .tile-fallback treatment — that text-only styling stays in the
+  // codebase as a deeper safety net, only reached if even the generic-icon URL itself fails.
   function createTileFaviconImg(tileEl, url) {
     const img = document.createElement('img');
     img.alt = '';
     img.loading = 'lazy';
-    img.src = faviconUrlForDomain(new URL(url).hostname);
-    img.addEventListener('error', () => {
-      img.remove();
-      tileEl.classList.add('tile-fallback');
-      const span = tileEl.querySelector('span');
-      if (span) span.classList.remove('tile-name-wrap');
+    const domain = new URL(url).hostname;
+    const tiers = faviconTierUrls(domain);
+    let tier = 0;
+
+    function tryTier() {
+      if (tier >= tiers.length) {
+        img.src = FAVICON_FINAL_FALLBACK_URL;
+        return;
+      }
+      img.src = tiers[tier];
+    }
+
+    img.addEventListener('load', () => {
+      if (tier === 0 && looksLikeGooglePlaceholder(img)) {
+        tier++;
+        tryTier();
+      }
     });
+    img.addEventListener('error', () => {
+      if (img.src === FAVICON_FINAL_FALLBACK_URL) {
+        // Even the generic fallback icon itself failed to load (network hiccup, URL moved, etc.) —
+        // the true last resort, unchanged from the original pre-chain behavior.
+        img.remove();
+        tileEl.classList.add('tile-fallback');
+        const span = tileEl.querySelector('span');
+        if (span) span.classList.remove('tile-name-wrap');
+        return;
+      }
+      tier++;
+      tryTier();
+    });
+
+    tryTier();
     return img;
   }
 
