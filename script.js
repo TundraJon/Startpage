@@ -319,15 +319,21 @@
     updateSelectActionBar();
   }
 
-  function openCategoryPath(id) {
+  function openCategoryPath(id, opts) {
     openPath = categoryAncestorChain(id);
     leafLinksCollapsed = false;
     renderOpenPath();
     // Slides the just-opened category up so its own header lands right under Home instead of
     // wherever it happened to sit on the page, per the user — .category-header's scroll-margin-top
-    // (styles.css) accounts for the fixed pinned-header + Home-header stack above it.
-    const entry = categoryToggles.get(id);
-    if (entry) entry.header.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // (styles.css) accounts for the fixed pinned-header + Home-header stack above it. Skippable
+    // (opts.skipScroll) for callers about to run their own, more specific scroll a frame later —
+    // selectTileSearchResult below is the one case, since two competing smooth-scroll animations
+    // racing on the same scroll container was landing on the wrong final position, worse the
+    // further the starting scroll position was from the target.
+    if (!opts || !opts.skipScroll) {
+      const entry = categoryToggles.get(id);
+      if (entry) entry.header.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   // Tile search: a 🔎 popup with a live autocomplete dropdown, kept deliberately separate from
@@ -408,7 +414,7 @@
   // scrollTargetBelowPopup uses elsewhere, for the same reason).
   function selectTileSearchResult(entry) {
     closeTileSearch();
-    if (entry.categoryId !== 'home') openCategoryPath(entry.categoryId);
+    if (entry.categoryId !== 'home') openCategoryPath(entry.categoryId, { skipScroll: true });
     requestAnimationFrame(() => {
       entry.tileEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
       entry.tileEl.classList.remove('tile-search-glow');
@@ -802,7 +808,7 @@
     return [
       faviconUrlForDomain(domain),
       'https://icons.duckduckgo.com/ip3/' + encodeURIComponent(domain) + '.ico',
-      'https://favicon.im/' + encodeURIComponent(domain),
+      'https://favicon.im/' + encodeURIComponent(domain) + '?throw-error-on-404=true',
       'https://' + domain + '/favicon.ico',
     ];
   }

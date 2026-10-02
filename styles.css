@@ -1116,11 +1116,12 @@ main {
    no JS recompute needed. When Home's color is "None" (the property is unset entirely, not set to
    anything), the fallback is a genuine neon blue rather than --home-header-bg's own muted default,
    per the user — that muted default is Home's header's fallback, not something the glow should
-   inherit. Four pulses across the same 3.5s (bright at 12.5/37.5/62.5/87.5%, dim at
-   0/25/50/75/100%) — the eye needs more chances to catch it in the same window, per the user. */
+   inherit. Eight pulses across the same 3.5s (bright at the midpoint of each 12.5%-wide segment,
+   dim at every 12.5% boundary) — still more chances for the eye to catch it in the same window,
+   per the user. */
 @keyframes tile-search-glow {
-  0%, 25%, 50%, 75%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--home-color-bg, #00e5ff) 0%, transparent); }
-  12.5%, 37.5%, 62.5%, 87.5% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--home-color-bg, #00e5ff) 90%, transparent); }
+  0%, 12.5%, 25%, 37.5%, 50%, 62.5%, 75%, 87.5%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--home-color-bg, #00e5ff) 0%, transparent); }
+  6.25%, 18.75%, 31.25%, 43.75%, 56.25%, 68.75%, 81.25%, 93.75% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--home-color-bg, #00e5ff) 90%, transparent); }
 }
 
 .tile-search-glow {
