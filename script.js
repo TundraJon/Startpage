@@ -800,15 +800,18 @@
   }
 
   // Favicon source tiers, tried in order against the same <img> element — Google first (fast,
-  // usually right), then two other aggregator services for the sites Google draws a blank on,
-  // then a direct guess at the domain's own /favicon.ico as a last real attempt before giving up
-  // on a real icon entirely. One function per tier (not a flat array of URL strings) since Google
-  // alone needs the placeholder check below applied to its result.
+  // usually right), then favicon.im (its throw-error-on-404 param makes it report failure
+  // cleanly, no placeholder-masking), then DuckDuckGo last among the real sources since its
+  // "not found" placeholder can't be reliably told apart from a real icon (see
+  // looksLikeDuckDuckGoPlaceholder below) — demoted here so it's only ever reached once favicon.im
+  // has already genuinely failed, then a direct guess at the domain's own /favicon.ico as a last
+  // real attempt before giving up on a real icon entirely. One function per tier (not a flat array
+  // of URL strings) since Google and DuckDuckGo each need their own placeholder check applied.
   function faviconTierUrls(domain) {
     return [
       faviconUrlForDomain(domain),
-      'https://icons.duckduckgo.com/ip3/' + encodeURIComponent(domain) + '.ico',
       'https://favicon.im/' + encodeURIComponent(domain) + '?throw-error-on-404=true',
+      'https://icons.duckduckgo.com/ip3/' + encodeURIComponent(domain) + '.ico',
       'https://' + domain + '/favicon.ico',
     ];
   }
@@ -825,6 +828,20 @@
   // check, not an exact-16 match, since the placeholder's exact rendered size can vary slightly.
   function looksLikeGooglePlaceholder(img) {
     return img.naturalWidth > 0 && img.naturalWidth <= 16 && img.naturalHeight <= 16;
+  }
+
+  // DuckDuckGo's own "not found" placeholder is a fixed image, always exactly 48×48 (confirmed by
+  // the user against real sites) — and unlike Google, DuckDuckGo returns it with a genuine HTTP
+  // 404, but an <img> only cares whether the body decodes as an image, so 'load' fires anyway.
+  // No real-status or pixel-hash check is possible here: confirmed against live domains via
+  // favicon-finder.html that DuckDuckGo sends no CORS headers, so fetch()-based status checks and
+  // canvas-based pixel comparisons are both blocked. An exact 48×48 match is the closest signal
+  // actually available. Not foolproof — a genuine 48×48 DuckDuckGo icon gets wrongly skipped too —
+  // but DuckDuckGo only runs as a last-resort tier now (after Google and favicon.im above), so a
+  // wrong skip just loses a possibly-good icon and falls through to the domain tier, never to a
+  // broken state.
+  function looksLikeDuckDuckGoPlaceholder(img) {
+    return img.naturalWidth === 48 && img.naturalHeight === 48;
   }
 
   function normalizeTileUrl(raw) {
@@ -862,6 +879,9 @@
 
     img.addEventListener('load', () => {
       if (tier === 0 && looksLikeGooglePlaceholder(img)) {
+        tier++;
+        tryTier();
+      } else if (tier === 2 && looksLikeDuckDuckGoPlaceholder(img)) {
         tier++;
         tryTier();
       }

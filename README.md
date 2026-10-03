@@ -1489,9 +1489,20 @@ All three items from the Build Queue, built and verified together.
 - [x] **Verified via Playwright:** favicon.im's URL confirmed to include the new parameter. The exact reported bug reproduced and fixed — scrolled to the bottom of a mostly-collapsed category list, searched for a tile in a category near the top (Donjon, under Games), and confirmed it now lands fully within the viewport (previously this scenario would leave it above the fold). The normal direct-header-click scroll-to-category behavior (Build 83) re-confirmed unchanged. Glow keyframes confirmed as 9 dim points / 8 bright points with the animation duration still exactly `3.5s`. Full existing regression suite (drag reorder, backup export/import, tile dialog add/edit, tile search, tile-wrap fix, Settings layout, Help Overlay accuracy, first-run Full/Lite picker + Reset flow, Copy to Home) re-run clean, zero page errors.
 - [x] Cache-bust bumped: `styles.css?v=57→58`, `script.js?v=64→65`.
 
+## Build Log 86 (completed)
+
+### DuckDuckGo favicon tier reordered behind favicon.im, plus an exact-48×48 skip check
+
+The item from the Build Queue, built and verified. Full backstory (why a real-status check, a byte-count check, and a canvas pixel-hash check were all tried and confirmed dead — each hitting the identical CORS wall against live domains from the user's own phone) is preserved in this entry's prior Build Queue history above; what follows is what actually shipped.
+
+- [x] **`faviconTierUrls` (script.js) reordered:** Google → favicon.im → DuckDuckGo → domain (was Google → DuckDuckGo → favicon.im → domain). favicon.im is promoted ahead of DuckDuckGo because it can prove its own failure cleanly (a genuine `<img>` `error` event, via `?throw-error-on-404=true` since Build 85) — DuckDuckGo cannot, so it's demoted to only run once favicon.im has already genuinely failed.
+- [x] **`looksLikeDuckDuckGoPlaceholder(img)` added (script.js):** DuckDuckGo's own "not found" placeholder is a fixed image, always exactly 48×48. In `createTileFaviconImg`'s `load` handler, DuckDuckGo's new tier position (index 2) now checks for an exact 48×48 match and skips to the domain tier if so — any other dimension is accepted as a real icon. Not foolproof (a genuine 48×48 DuckDuckGo icon would be wrongly skipped), but since DuckDuckGo only runs as a last resort now, a wrong skip just loses a possibly-good icon and falls through to domain-direct, then the generic fallback — never to a broken state.
+- [x] Cache-bust bumped: `script.js?v=65→66`.
+- [x] **Verified via Playwright**, using an isolated test harness copying the exact shipped tier-array and skip-check logic (driving the full app's category/tile-creation UI wasn't needed since the chain logic is self-contained) against mocked routes for three scenarios: (1) Google placeholder + favicon.im real icon → correctly settles on favicon.im (tier 1), DuckDuckGo never even requested; (2) Google placeholder + favicon.im genuine 404 + DuckDuckGo's exact 48×48 placeholder → correctly skips DuckDuckGo and advances toward the domain tier (confirmed via request log — DuckDuckGo requested and tier advanced past it); (3) same but DuckDuckGo returns a real 32×32 icon (not 48×48) → correctly accepted, chain settles on DuckDuckGo (tier 2), not skipped. The domain/fallback tiers in scenario 2 couldn't be observed resolving further in this sandbox, for the same two already-documented, unrelated environment limitations from Build 84/85: Playwright/Chromium never lets `page.route()` intercept any request whose path literally ends in `favicon.ico`, and this sandbox has a total outbound network block — neither is a defect in the shipped logic.
+
 ## Build Queue
 
-_Empty — no items awaiting authorization._
+_Empty — nothing queued right now._
 
 ## Build Planner
 
