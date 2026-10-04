@@ -735,7 +735,7 @@
     t('grvr-anotherbrokenegg', 'Another Broken Egg Cafe', 'https://anotherbrokenegg.com'),
     div('grvr-div-coffee', 'Coffee Shops'),
     t('grvr-justlove', 'Just Love Coffee Cafe', 'https://justlovecoffeecafe.com'),
-    t('grvr-foxtail', 'Foxtail Coffee', 'https://foxtailcoffee.co'),
+    t('grvr-foxtail', 'Foxtail Coffee', 'https://foxtailcoffee.com'),
     t('grvr-lecafedeparis', 'Le Café de Paris', 'https://lecafedeparis.us'),
     t('grvr-blackrabbit', 'The Black Rabbit', 'https://theblackrabbitclermont.com'),
     t('grvr-sevenmade', 'SevenMade', 'https://sevenmade.com'),

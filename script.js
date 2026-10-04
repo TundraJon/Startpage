@@ -865,9 +865,15 @@
     const img = document.createElement('img');
     img.alt = '';
     img.loading = 'lazy';
+    // Hidden until a tier actually settles (see the 'load' handler's final branch below) — tiers
+    // that get detected as placeholders and skipped still decode and paint successfully for a
+    // moment first, so without this an intermediate placeholder (Google's, DuckDuckGo's) would
+    // flash on screen before the chain moves past it.
+    img.style.visibility = 'hidden';
     const domain = new URL(url).hostname;
     const tiers = faviconTierUrls(domain);
     let tier = 0;
+    let hasRetried = false;
 
     function tryTier() {
       if (tier >= tiers.length) {
@@ -884,12 +890,26 @@
       } else if (tier === 2 && looksLikeDuckDuckGoPlaceholder(img)) {
         tier++;
         tryTier();
+      } else {
+        img.style.visibility = 'visible';
       }
     });
     img.addEventListener('error', () => {
       if (img.src === FAVICON_FINAL_FALLBACK_URL) {
-        // Even the generic fallback icon itself failed to load (network hiccup, URL moved, etc.) —
-        // the true last resort, unchanged from the original pre-chain behavior.
+        // Even the generic fallback failing usually means a burst of simultaneous requests (every
+        // tile in a just-opened category firing its own chain at once) transiently knocked out
+        // this one tile's whole chain, not that every source is genuinely down — a plain page
+        // refresh reliably fixes it (confirmed by the user), so retry the whole chain once,
+        // automatically, after a short pause for the burst to clear, before truly giving up.
+        if (!hasRetried) {
+          hasRetried = true;
+          setTimeout(() => {
+            tier = 0;
+            tryTier();
+          }, 500);
+          return;
+        }
+        // True last resort, unchanged from the original pre-chain behavior.
         img.remove();
         tileEl.classList.add('tile-fallback');
         const span = tileEl.querySelector('span');
@@ -3833,19 +3853,8 @@
     'Full Moon': '🌕', 'Waning Gibbous': '🌖', 'Last Quarter': '🌗', 'Waning Crescent': '🌘',
   };
 
-  // --- Testing panel state (temporary dev tool, not part of the real app) ---
-  // Declared here (early, before renderWeatherExtras()'s first synchronous call just below needs
-  // getEffectiveConditionCode()) rather than down by the rest of the testing-panel code — the
-  // same temporal-dead-zone hazard noted below for weatherLiveConditions applies here too.
-  const weatherTestState = {
-    timeOverrideSec: null,
-    cloudOverridePct: null,
-    textStroke: false,
-    conditionSkins: new Set(),
-    conditionCodeOverride: null,
-  };
   function getEffectiveConditionCode() {
-    return weatherTestState.conditionCodeOverride !== null ? weatherTestState.conditionCodeOverride : weatherState.conditionCode;
+    return weatherState.conditionCode;
   }
 
   // Single source of truth for every WeatherAPI condition code: its display text, its icon, and
@@ -4383,19 +4392,15 @@
   // textual declarations further down) is safe.
   const weatherLiveConditions = new Set(animKeysFor(mapConditionCode(weatherState.conditionCode)));
   function getEffectiveConditionSkins() {
-    return weatherTestState.conditionSkins.size > 0 ? weatherTestState.conditionSkins : weatherLiveConditions;
+    return weatherLiveConditions;
   }
 
   function getEffectiveSkyTime() {
-    if (weatherTestState.timeOverrideSec === null) return new Date();
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    d.setSeconds(weatherTestState.timeOverrideSec);
-    return d;
+    return new Date();
   }
 
   function getEffectiveCloudPct() {
-    return weatherTestState.cloudOverridePct !== null ? weatherTestState.cloudOverridePct : weatherState.cloudPct;
+    return weatherState.cloudPct;
   }
 
   const WX_TEXT_LIGHT = '#000000';
@@ -4509,23 +4514,6 @@
     return daytime ? cloudPct * 0.75 / 100 : cloudPct / 100;
   }
 
-  function updateCloudTestingReadout(cloudTint, opacityFraction) {
-    const readout = document.getElementById('test-cloud-readout');
-    const swatch = document.getElementById('test-cloud-swatch');
-    const hexEl = document.getElementById('test-cloud-hex');
-    if (!readout) return;
-    if (!cloudTint) {
-      readout.textContent = 'Branch: — · Brightness: — of sky · Opacity: —';
-      swatch.style.background = 'transparent';
-      hexEl.textContent = '—';
-      return;
-    }
-    const hex = rgbToHex(cloudTint.rgb);
-    readout.textContent = `Branch: ${cloudTint.daytime ? 'Day' : 'Night'} · Brightness: ${Math.round(cloudTint.multiplier * 100)}% of sky · Opacity: ${Math.round(opacityFraction * 100)}%`;
-    swatch.style.background = hex;
-    hexEl.textContent = hex;
-  }
-
   function randomizeCloud(cloud) {
     const topPct = Math.random() * 66;
     const f = topPct / 66;
@@ -4579,8 +4567,6 @@
   });
 
   // --- Live Condition Skin: precipitation/effect layers (rain, snow, hail, lightning, stars, rays, fog) ---
-  // Not blocked on the WeatherAPI connection: driven entirely by the "Preview Condition Skins" testing
-  // panel picker (weatherTestState.conditionSkins), since there's no live condition data yet.
   const precipCanvas = document.createElement('canvas');
   precipCanvas.className = 'weather-skin-precip';
   const precipCtx = precipCanvas.getContext('2d');
@@ -4940,7 +4926,6 @@
   function renderWeatherSkin() {
     const hasFlourish = weatherSettings.sunGradient || weatherSettings.liveSkin;
     weatherWidgetEl.classList.toggle('no-white-bg', hasFlourish);
-    weatherWidgetEl.classList.toggle('test-text-stroke', weatherTestState.textStroke);
 
     // Day/night is a base fact independent of the gradient toggle: with the toggle on, the full
     // multi-stop sunrise/sunset transition applies; with it off but Live Skin on, a flat
@@ -5014,13 +4999,11 @@
       }
 
       if (!flashDiv.parentNode) weatherSkin.appendChild(flashDiv);
-      updateCloudTestingReadout(cloudTint, cloudOverlayOpacity(cloudPct, cloudTint.daytime));
     } else {
       starsCanvas.remove();
       precipCanvas.remove();
       flashDiv.remove();
       weatherSkin.querySelectorAll('.wx-skin-cloud').forEach((el) => el.remove());
-      updateCloudTestingReadout(null, 0);
     }
 
     if (hasFlourish) {
@@ -5041,203 +5024,6 @@
     }
   }
   renderWeatherSkin();
-
-  // --- Testing panel wiring ---
-  (function setupTestingPanel() {
-    const overlay = document.getElementById('testing-panel-overlay');
-    const trigger = document.getElementById('testing-panel-trigger');
-    const closeBtn = document.getElementById('testing-panel-close');
-    const timeEnabled = document.getElementById('test-time-enabled');
-    const timeInput = document.getElementById('test-time-input');
-    const cloudSlider = document.getElementById('test-cloud-slider');
-    const cloudValue = document.getElementById('test-cloud-value');
-    const textStrokeToggle = document.getElementById('test-textstroke-toggle');
-    const conditionSkinRadios = document.querySelectorAll('.test-condition-skin');
-    const conditionSkinLiveRadio = document.querySelector('.test-condition-skin[value="live"]');
-    const dayBaseSlider = document.getElementById('test-cloud-daybase-slider');
-    const dayBaseValue = document.getElementById('test-cloud-daybase-value');
-    const nightBaseSlider = document.getElementById('test-cloud-nightbase-slider');
-    const nightBaseValue = document.getElementById('test-cloud-nightbase-value');
-    const lightRainSlider = document.getElementById('test-cloud-lightrain-slider');
-    const lightRainValue = document.getElementById('test-cloud-lightrain-value');
-    const heavyRainSlider = document.getElementById('test-cloud-heavyrain-slider');
-    const heavyRainValue = document.getElementById('test-cloud-heavyrain-value');
-    const thunderstormSlider = document.getElementById('test-cloud-thunderstorm-slider');
-    const thunderstormValue = document.getElementById('test-cloud-thunderstorm-value');
-    const nightGraySlider = document.getElementById('test-cloud-nightgray-slider');
-    const nightGrayValue = document.getElementById('test-cloud-nightgray-value');
-    const fogOpacitySlider = document.getElementById('test-fog-opacity-slider');
-    const fogOpacityValue = document.getElementById('test-fog-opacity-value');
-    const fogCountSlider = document.getElementById('test-fog-count-slider');
-    const fogCountValue = document.getElementById('test-fog-count-value');
-    const fogSizeSlider = document.getElementById('test-fog-size-slider');
-    const fogSizeValue = document.getElementById('test-fog-size-value');
-    const fogSpeedSlider = document.getElementById('test-fog-speed-slider');
-    const fogSpeedValue = document.getElementById('test-fog-speed-value');
-    const hailGravitySlider = document.getElementById('test-hail-gravity-slider');
-    const hailGravityValue = document.getElementById('test-hail-gravity-value');
-    const lightningRerollSlider = document.getElementById('test-lightning-reroll-slider');
-    const lightningRerollValue = document.getElementById('test-lightning-reroll-value');
-    const resetBtn = document.getElementById('test-reset-btn');
-
-    function timeStringToSeconds(str) {
-      const [h, m] = str.split(':').map(Number);
-      return h * 3600 + m * 60;
-    }
-    function secondsToTimeString(sec) {
-      const h = Math.floor(sec / 3600);
-      const m = Math.floor((sec % 3600) / 60);
-      return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
-    }
-
-    trigger.addEventListener('click', () => { overlay.hidden = false; renderWeatherDebugPanel(); });
-    closeBtn.addEventListener('click', () => { overlay.hidden = true; });
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.hidden = true; });
-
-    timeEnabled.addEventListener('change', () => {
-      weatherTestState.timeOverrideSec = timeEnabled.checked ? timeStringToSeconds(timeInput.value) : null;
-      renderWeatherSkin();
-    });
-    timeInput.addEventListener('input', () => {
-      if (timeEnabled.checked) {
-        weatherTestState.timeOverrideSec = timeStringToSeconds(timeInput.value);
-        renderWeatherSkin();
-      }
-    });
-
-    cloudSlider.addEventListener('input', () => {
-      weatherTestState.cloudOverridePct = Number(cloudSlider.value);
-      cloudValue.textContent = cloudSlider.value + '%';
-      renderWeatherSkin();
-    });
-
-    textStrokeToggle.addEventListener('change', () => {
-      weatherTestState.textStroke = textStrokeToggle.checked;
-      renderWeatherSkin();
-    });
-
-    conditionSkinRadios.forEach((radio) => {
-      radio.addEventListener('change', () => {
-        if (!radio.checked) return;
-        if (radio.value === 'live') {
-          weatherTestState.conditionCodeOverride = null;
-          weatherTestState.conditionSkins = new Set();
-        } else {
-          const code = Number(radio.value);
-          const entry = WX_CONDITIONS[code];
-          weatherTestState.conditionCodeOverride = code;
-          weatherTestState.conditionSkins = new Set(entry ? animKeysFor(entry.anim) : []);
-        }
-        renderWeatherExtras();
-        renderWeatherSkin();
-        updateClock(); // moon-dial clock's weather badge should reflect the override immediately
-      });
-    });
-
-    function bindCloudTunable(slider, valueEl, key) {
-      slider.addEventListener('input', () => {
-        WX_CLOUD_TUNABLES[key] = Number(slider.value);
-        valueEl.textContent = slider.value + '%';
-        renderWeatherSkin();
-      });
-    }
-    bindCloudTunable(dayBaseSlider, dayBaseValue, 'dayBasePct');
-    bindCloudTunable(nightBaseSlider, nightBaseValue, 'nightBasePct');
-    bindCloudTunable(lightRainSlider, lightRainValue, 'lightRainPct');
-    bindCloudTunable(heavyRainSlider, heavyRainValue, 'heavyRainPct');
-    bindCloudTunable(thunderstormSlider, thunderstormValue, 'thunderstormPct');
-    bindCloudTunable(nightGraySlider, nightGrayValue, 'nightGrayBlendPct');
-
-    fogOpacitySlider.addEventListener('input', () => {
-      WX_FOG_TUNABLES.opacityPct = Number(fogOpacitySlider.value);
-      fogOpacityValue.textContent = fogOpacitySlider.value + '%';
-    });
-    fogCountSlider.addEventListener('input', () => {
-      WX_FOG_TUNABLES.blobCount = Number(fogCountSlider.value);
-      fogCountValue.textContent = fogCountSlider.value;
-      lastParticleKey = ''; // force a rebuild so the new blob count actually takes effect
-    });
-    fogSizeSlider.addEventListener('input', () => {
-      WX_FOG_TUNABLES.sizePct = Number(fogSizeSlider.value);
-      fogSizeValue.textContent = fogSizeSlider.value + '%';
-    });
-    fogSpeedSlider.addEventListener('input', () => {
-      WX_FOG_TUNABLES.speedMult = Number(fogSpeedSlider.value);
-      fogSpeedValue.textContent = fogSpeedSlider.value + 'x';
-    });
-    hailGravitySlider.addEventListener('input', () => {
-      WX_HAIL_TUNABLES.gravity = Number(hailGravitySlider.value);
-      hailGravityValue.textContent = hailGravitySlider.value;
-    });
-    lightningRerollSlider.addEventListener('input', () => {
-      WX_LIGHTNING_TUNABLES.rerollFrames = Number(lightningRerollSlider.value);
-      lightningRerollValue.textContent = lightningRerollSlider.value;
-    });
-
-    const weatherDebugOutput = document.getElementById('test-weather-debug-output');
-    const weatherDebugCopyBtn = document.getElementById('test-weather-debug-copy-btn');
-    weatherDebugCopyBtn.addEventListener('click', async () => {
-      const text = formatWeatherDebugText();
-      try {
-        await navigator.clipboard.writeText(text);
-        weatherDebugCopyBtn.textContent = 'Copied!';
-      } catch (e) {
-        // Clipboard API unavailable/denied — fall back to selecting the textarea for a manual
-        // long-press-select-all-copy.
-        weatherDebugOutput.focus();
-        weatherDebugOutput.select();
-        weatherDebugCopyBtn.textContent = 'Select the text above to copy';
-      }
-      setTimeout(() => { weatherDebugCopyBtn.textContent = 'Copy diagnostics'; }, 2000);
-    });
-
-    const weatherDebugClearBtn = document.getElementById('test-weather-debug-clear-btn');
-    weatherDebugClearBtn.addEventListener('click', () => {
-      weatherDebugOutput.value = '';
-    });
-
-    resetBtn.addEventListener('click', () => {
-      weatherTestState.timeOverrideSec = null;
-      weatherTestState.cloudOverridePct = null;
-      weatherTestState.textStroke = false;
-      weatherTestState.conditionSkins = new Set();
-      weatherTestState.conditionCodeOverride = null;
-      timeEnabled.checked = false;
-      timeInput.value = secondsToTimeString(SUNSET_SEC);
-      cloudSlider.value = 20;
-      cloudValue.textContent = '20%';
-      textStrokeToggle.checked = false;
-      conditionSkinLiveRadio.checked = true;
-      WX_CLOUD_TUNABLES.dayBasePct = 40;
-      WX_CLOUD_TUNABLES.nightBasePct = 300;
-      WX_CLOUD_TUNABLES.lightRainPct = 10;
-      WX_CLOUD_TUNABLES.heavyRainPct = 20;
-      WX_CLOUD_TUNABLES.thunderstormPct = 40;
-      WX_CLOUD_TUNABLES.nightGrayBlendPct = 75;
-      dayBaseSlider.value = 40; dayBaseValue.textContent = '40%';
-      nightBaseSlider.value = 300; nightBaseValue.textContent = '300%';
-      lightRainSlider.value = 10; lightRainValue.textContent = '10%';
-      heavyRainSlider.value = 20; heavyRainValue.textContent = '20%';
-      thunderstormSlider.value = 40; thunderstormValue.textContent = '40%';
-      nightGraySlider.value = 75; nightGrayValue.textContent = '75%';
-      WX_FOG_TUNABLES.opacityPct = 45;
-      WX_FOG_TUNABLES.blobCount = 5;
-      WX_FOG_TUNABLES.sizePct = 40;
-      WX_FOG_TUNABLES.speedMult = 3;
-      fogOpacitySlider.value = 45; fogOpacityValue.textContent = '45%';
-      fogCountSlider.value = 5; fogCountValue.textContent = '5';
-      fogSizeSlider.value = 40; fogSizeValue.textContent = '40%';
-      fogSpeedSlider.value = 3; fogSpeedValue.textContent = '3x';
-      WX_HAIL_TUNABLES.gravity = 0.5;
-      hailGravitySlider.value = 0.5; hailGravityValue.textContent = '0.5';
-      WX_LIGHTNING_TUNABLES.rerollFrames = 3;
-      lightningRerollSlider.value = 3; lightningRerollValue.textContent = '3';
-      lastParticleKey = '';
-      renderWeatherExtras();
-      renderWeatherSkin();
-      updateClock();
-    });
-  })();
 
   // --- Severe weather alert ticker ---
   const WEATHER_ALERT_KEY = 'weatherAlertState';
@@ -5305,55 +5091,6 @@
   // times out. Fed to the real WeatherAPI fetch, so the location shown is Orlando's actual live
   // weather, not placeholder text.
   const FALLBACK_COORDS = { lat: 28.5383, lon: -81.3792 };
-
-  // --- Temporary Live Weather diagnostics (Testing Panel) ---
-  // Tracks what actually happened on the last loadLiveWeather() call, since real live-data bugs
-  // (e.g. moon phase silently never updating) have no visible error anywhere otherwise, and the
-  // user has no dev tools access on mobile to inspect this directly. Remove once resolved.
-  const weatherDebugState = {
-    coords: null,
-    keyPresent: false,
-    keyMasked: '(none)',
-    cachePresent: false,
-    cacheAgeMin: null,
-    cacheStale: null,
-    outcome: 'not-yet-loaded',
-    errorMessage: null,
-    rawData: null,
-  };
-  function maskApiKey(key) {
-    if (!key) return '(none)';
-    if (key.length <= 8) return '*'.repeat(key.length);
-    return key.slice(0, 4) + '...' + key.slice(-4);
-  }
-  function formatWeatherDebugText() {
-    const d = weatherDebugState;
-    const fday = d.rawData && d.rawData.forecast && d.rawData.forecast.forecastday && d.rawData.forecast.forecastday[0];
-    const astro = fday && fday.astro;
-    const condition = d.rawData && d.rawData.current && d.rawData.current.condition;
-    return [
-      '--- Live Weather Diagnostics ---',
-      'Key present: ' + (d.keyPresent ? 'yes (' + d.keyMasked + ')' : 'no'),
-      'Coords used: ' + (d.coords ? `${d.coords.lat}, ${d.coords.lon}` : '(not yet fetched)'),
-      'Cache present: ' + (d.cachePresent ? 'yes' : 'no'),
-      d.cachePresent ? 'Cache age: ' + d.cacheAgeMin + ' min (' + (d.cacheStale ? 'stale' : 'fresh') + ')' : null,
-      'Last outcome: ' + d.outcome,
-      'Last error: ' + (d.errorMessage || '(none)'),
-      '',
-      '--- Raw astro ---',
-      astro ? JSON.stringify(astro, null, 2) : '(none)',
-      '',
-      '--- Raw condition ---',
-      condition ? JSON.stringify(condition, null, 2) : '(none)',
-      '',
-      '--- Full raw response ---',
-      d.rawData ? JSON.stringify(d.rawData, null, 2) : '(none)',
-    ].filter((line) => line !== null).join('\n');
-  }
-  function renderWeatherDebugPanel() {
-    const out = document.getElementById('test-weather-debug-output');
-    if (out) out.value = formatWeatherDebugText();
-  }
 
   // Live Condition Skin animation for a WeatherAPI code now comes straight from WX_CONDITIONS
   // (the single source of truth declared earlier, alongside the icon map) instead of a separate
@@ -5482,29 +5219,17 @@
 
   async function loadLiveWeather(force) {
     const key = localStorage.getItem(WEATHERAPI_KEY_STORAGE);
-    weatherDebugState.keyPresent = !!key;
-    weatherDebugState.keyMasked = maskApiKey(key);
     if (!key) {
-      weatherDebugState.outcome = 'no-key';
-      renderWeatherDebugPanel();
       return;
     }
     let cache = null;
     try { cache = JSON.parse(localStorage.getItem(WEATHER_CACHE_KEY) || 'null'); } catch (e) { cache = null; }
     const isStale = !cache || (Date.now() - cache.fetchedAt) >= WEATHER_STALE_MS;
-    weatherDebugState.cachePresent = !!cache;
-    weatherDebugState.cacheAgeMin = cache ? Math.round((Date.now() - cache.fetchedAt) / 60000) : null;
-    weatherDebugState.cacheStale = cache ? isStale : null;
     if (!force && cache && !isStale) {
-      weatherDebugState.outcome = 'served-cache-fresh';
-      weatherDebugState.errorMessage = null;
-      weatherDebugState.rawData = cache.data;
       applyLiveWeatherDataIfNew(cache.data, cache.fetchedAt);
-      renderWeatherDebugPanel();
       return;
     }
     const coords = await getCoords();
-    weatherDebugState.coords = coords;
     try {
       // days=2 (not 1): the Hourly Forecast panel needs the next 12 hours from "now" at any time
       // of day — with only today's 24 hours, fewer than 12 would remain late in the day.
@@ -5514,23 +5239,13 @@
       const data = await res.json();
       const fetchedAt = Date.now();
       localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ fetchedAt, data }));
-      weatherDebugState.outcome = 'fetched-fresh';
-      weatherDebugState.errorMessage = null;
-      weatherDebugState.rawData = data;
       applyLiveWeatherDataIfNew(data, fetchedAt);
     } catch (e) {
       console.error('Weather fetch failed:', e);
-      weatherDebugState.errorMessage = e.message || String(e);
       if (cache) {
-        weatherDebugState.outcome = 'fallback-stale-cache';
-        weatherDebugState.rawData = cache.data;
         applyLiveWeatherDataIfNew(cache.data, cache.fetchedAt);
-      } else {
-        weatherDebugState.outcome = 'error-no-cache';
-        weatherDebugState.rawData = null;
       }
     }
-    renderWeatherDebugPanel();
   }
 
   function refreshLiveWeather(force) {
@@ -5546,7 +5261,7 @@
   // all declared later in the weather section — calling this any earlier would throw a
   // temporal-dead-zone error the moment a returning user had that style saved from a previous
   // session with mode:'analog', crashing the whole script silently (the same class of bug this
-  // codebase has hit before with weatherTestState/weatherLiveConditions).
+  // codebase has hit before with weatherLiveConditions).
   applyClockDisplayMode();
   updateClock();
   scheduleNextClockTick();
