@@ -608,7 +608,7 @@
     t('orl-ksc', 'Kennedy Space Center', 'https://www.kennedyspacecenter.com'),
     t('orl-funspot', 'Fun Spot', 'https://fun-spot.com'),
     t('orl-medievaltimes', 'Medieval Times', 'https://www.medievaltimes.com/orlando'),
-    t('orl-footgolf', "FootGolf at Disney's Oak Trail", 'https://www.footgolforlando.com'),
+    t('orl-footgolf', "FootGolf at Disney's Oak Trail", 'https://www.golfwdw.com/footgolf'),
     t('orl-orlandoeye', 'The Wheel at ICON Park', 'https://iconparkorlando.com/'),
     t('orl-bluemangroup', 'Blue Man Group', 'https://www.blueman.com/orlando'),
     t('orl-icebar', 'ICEBAR Orlando', 'https://icebarorlando.com'),

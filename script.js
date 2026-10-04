@@ -1225,13 +1225,23 @@
   // visible immediately below the popup, the same way the popup's own position is now fixed
   // relative to the search bar. No-ops when there's no single target to show (targetEl omitted,
   // e.g. Add Tile/Add Category/Settings/Help, or a multi-select delete confirm).
+  //
+  // Also clears homeHeaderEl (Home's own title bar, also position: fixed — see its CSS comment)
+  // when it extends lower than the popup: Home stays pinned at the top of the screen even while
+  // scrolled into a different category further down the page, so a popup's own bottom edge alone
+  // isn't necessarily the lowest fixed chrome the target needs to clear. Reusing the popup's
+  // bottom when it's already the taller of the two (the common case) rather than always adding
+  // Home's height on top of it.
   function scrollTargetBelowPopup(panelEl, targetEl) {
     if (!targetEl) return;
     requestAnimationFrame(() => {
-      const panelBottom = panelEl.getBoundingClientRect().bottom;
+      let clearBelow = panelEl.getBoundingClientRect().bottom;
+      if (homeHeaderEl) {
+        clearBelow = Math.max(clearBelow, homeHeaderEl.getBoundingClientRect().bottom);
+      }
       const targetTop = targetEl.getBoundingClientRect().top;
       const gap = 12;
-      window.scrollBy({ top: targetTop - panelBottom - gap, behavior: 'auto' });
+      window.scrollBy({ top: targetTop - clearBelow - gap, behavior: 'auto' });
     });
   }
 
@@ -4405,8 +4415,18 @@
 
   const WX_TEXT_LIGHT = '#000000';
   const WX_TEXT_DARK = '#808080';
-  const WX_TEXT_THRESHOLD_MARGIN = 0.05;
-  const WX_TEXT_LUMINANCE_THRESHOLD = relativeLuminance(hexToRgb(WX_TEXT_DARK)) - WX_TEXT_THRESHOLD_MARGIN;
+  // The crossover background luminance where black text's WCAG contrast ratio first exceeds
+  // gray's, derived directly from the contrast formula rather than an arbitrary margin below
+  // gray's own luminance (the previous approach: gray's luminance minus a flat 0.05, which was
+  // too conservative — it kept gray in use well past the point where black already read better).
+  // WCAG contrast ratio is (lighter + 0.05) / (darker + 0.05). For a background luminance L
+  // darker than gray's own, that's contrast(black, L) = (L + 0.05) / 0.05 (black is always the
+  // darker of the two) and contrast(gray, L) = (grayLum + 0.05) / (L + 0.05) (gray is the lighter
+  // of the two here). Setting them equal and solving for L: (L + 0.05)² = 0.05 × (grayLum + 0.05),
+  // so L = √(0.05 × (grayLum + 0.05)) − 0.05. Below this L, gray has the better contrast ratio;
+  // above it, black does — so this is the objectively correct switchover point, not a tuned guess.
+  const WX_TEXT_GRAY_LUMINANCE = relativeLuminance(hexToRgb(WX_TEXT_DARK));
+  const WX_TEXT_LUMINANCE_THRESHOLD = Math.sqrt(0.05 * (WX_TEXT_GRAY_LUMINANCE + 0.05)) - 0.05;
   const WX_CLOUD_OFFSCREEN_BUFFER_PX = 4;
 
   // Star colors: mostly white/near-white, a minority visibly tinted. Weighted pick at creation.
