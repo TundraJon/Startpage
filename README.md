@@ -1528,6 +1528,18 @@ All three items from the Build Queue, built and verified together.
 - [x] Cache-bust bumped: `starter-content.js?v=3→4`, `script.js?v=67→68`.
 - [x] **Verified via Playwright**, phone-width viewport, full live app (not an isolated harness, since this needed the real category/tile/popup DOM): seeded the FootGolf tile with a test blurb via localStorage (starter content has no blurb field to seed directly), opened the Orlando category, confirmed the fixed URL landed in storage, tapped the info icon, confirmed the blurb text rendered, closed it, and confirmed the tile's top edge (324.2px) now sits below the fixed Home header's bottom edge (312.0px) — not covered. Separately confirmed this fix was actually load-bearing, not coincidental: with the popup still open, its own panel bottom measured 197.8px against the Home header's 312.0px bottom — a 114px gap the old panel-only logic would have left uncovered, reproducing the exact reported bug. For the contrast fix, extracted and ran the literal shipped `hexToRgb`/`relativeLuminance`/threshold lines straight out of `script.js` (not a hand-retyped copy) and confirmed the computed threshold matches the independently-derived value (0.0652953815453809) exactly. Full regression pass (Help Overlay open/close, zero JS errors) re-run clean.
 
+## Build Log 89 (completed)
+
+### 44 stale starter-content URLs corrected, Flag Coffee Corner removed
+
+Both items from the Build Queue, built and verified together — the full result of the user's two-pass audit using `favicon-audit.html` (the standalone batch-checking tool built this session) against all 622 starter tiles.
+
+- [x] **44 tile URLs corrected in `starter-content.js`**, each applied as a targeted single-line replace keyed by tile ID (not a blind find-replace), verified line-by-line before writing: the old URL had to appear exactly once on that exact tile's line or the whole script would abort without touching the file. All 44 matched cleanly on the first pass — see the Build Queue history above (now folded into this entry) for the full old→new table, including the Privateer Press scheme/capitalization normalization and the genuine `grvr-rootbranch`/`grvr-rootbranch2` duplicate (two real listings of the same restaurant under Breakfast and Dinner groupings, both fixed identically).
+- [x] **Flag Coffee Corner removed** — `grvr-flagcoffee` deleted from `starter-content.js` entirely (permanently closed, not a URL fix).
+- [x] Cache-bust bumped: `starter-content.js?v=4→5`.
+- [x] **Verified:** a syntax check plus a direct tile-count check (`window.STARTER_CONTENT.full.tiles`, counting non-divider entries) confirmed exactly 621 tiles remain (622 − 1 removed), with no accidental duplicate deletions or corruption elsewhere in the file. Loaded the live app via Playwright, picked the Full starter pack, and confirmed live: "Flag Coffee Corner" no longer appears anywhere on the page, and Sodie Doces' stored URL reads `https://sodiedocesusa.com/` — zero JS errors.
+- [x] **Scope note carried over from the Build Queue:** like every prior starter-content fix this session, this only affects new users / factory resets going forward — it does not retroactively touch tiles already seeded into anyone's existing localStorage, URL corrections or the Flag Coffee Corner removal alike.
+
 ## Build Queue
 
 _Empty — nothing queued right now._
