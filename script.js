@@ -439,6 +439,226 @@
   });
   tileSearchInput.addEventListener('input', () => renderTileSearchResults(tileSearchInput.value));
 
+  // --- Reports: a single sortable table across every real tile in every category ---
+  // DOM-driven for which tiles exist (via categoryGrids, same no-orphans principle as
+  // buildTileSearchIndex above), with a storage lookup per category for each tile's actual usage
+  // stats — the DOM elements themselves only carry dataset.tileId/blurb/brazil, not
+  // createdAt/lastUsedAt/useCount. Rebuilt fresh every time the popup opens, same as tile search.
+  // categoryGrids/loadCategoryTiles/categoryTree are declared later in this file but never called
+  // until a user actually opens Reports, long after the whole script has finished running — same
+  // forward-reference pattern already used by categoryAncestorChain/buildTileSearchIndex above.
+  const reportsOverlay = document.getElementById('reports-overlay');
+  const reportsClose = document.getElementById('reports-close');
+  const reportsTbody = document.getElementById('reports-tbody');
+  const reportsSortDescEl = document.getElementById('reports-sort-desc');
+  const reportsLimitSelect = document.getElementById('reports-limit-select');
+
+  function reportsDefaultSortState() {
+    // "What have I forgotten about" — longest-since-used first, tiebroken by least-used. Not an
+    // arbitrary combination; chosen specifically as the generally-useful starting view.
+    return [{ field: 'lastUsed', dir: 'asc' }, { field: 'useCount', dir: 'asc' }];
+  }
+  let reportsSortState = reportsDefaultSortState();
+  let reportsRows = [];
+
+  function reportsCategoryPathFor(categoryId) {
+    if (categoryId === 'home') return 'Home';
+    return categoryAncestorChain(categoryId).map((id) => (categoryTree[id] ? categoryTree[id].name : id)).join(' › ');
+  }
+
+  function collectReportRows() {
+    const rows = [];
+    categoryGrids.forEach((grid, categoryId) => {
+      const tileRecords = loadCategoryTiles(categoryId);
+      const byId = new Map(tileRecords.map((t) => [t.id, t]));
+      Array.from(grid.children).filter((c) => c.classList.contains('tile')).forEach((tileEl) => {
+        const record = byId.get(tileEl.dataset.tileId);
+        if (!record) return; // shouldn't happen, but never let a DOM/storage mismatch crash the report
+        rows.push({
+          id: record.id,
+          name: record.name,
+          categoryId,
+          categoryPath: reportsCategoryPathFor(categoryId),
+          createdAt: record.createdAt,
+          lastUsedAt: record.lastUsedAt,
+          useCount: record.useCount || 0,
+          tileEl,
+        });
+      });
+    });
+    return rows;
+  }
+
+  // "Age" is a duration (time elapsed), not a raw timestamp, so ascending = smallest duration =
+  // youngest first, descending = largest duration = oldest first — the inverse of comparing
+  // createdAt directly. "Last Used" and "Use Count" are compared as plain values, where ascending
+  // already means "longest ago"/"fewest uses" with no inversion needed. A null lastUsedAt (never
+  // used) is always the stalest possible value in either direction — substituting -Infinity makes
+  // it sort as "longest ago" under ascending AND still "longest ago" (sorts last) under descending,
+  // rather than needing separate handling per direction.
+  function reportsCompareField(a, b, field) {
+    switch (field) {
+      case 'name': return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      case 'category': return a.categoryPath.localeCompare(b.categoryPath, undefined, { sensitivity: 'base' });
+      case 'age': return b.createdAt - a.createdAt;
+      case 'lastUsed': {
+        const av = a.lastUsedAt === null ? -Infinity : a.lastUsedAt;
+        const bv = b.lastUsedAt === null ? -Infinity : b.lastUsedAt;
+        return av - bv;
+      }
+      case 'useCount': return a.useCount - b.useCount;
+      default: return 0;
+    }
+  }
+
+  function reportsCompareRows(a, b) {
+    for (let i = 0; i < reportsSortState.length; i++) {
+      const { field, dir } = reportsSortState[i];
+      let cmp = reportsCompareField(a, b, field);
+      if (dir === 'desc') cmp = -cmp;
+      if (cmp !== 0) return cmp;
+    }
+    return 0;
+  }
+
+  // Each sortable column keeps its own persistent Off -> Ascending -> Descending -> Off cycle,
+  // independent of every other column and NOT reset by being bumped to a lower rank. Tapping a
+  // column advances only its own state by one step; whenever that lands on Ascending or
+  // Descending it immediately becomes the primary sort (rank 0), bumping everything else back one
+  // rank with their own directions untouched. Landing on Off just removes it, and the rest shift
+  // up to fill the gap — no separate "revert to a remembered state" logic needed, since that falls
+  // naturally out of each column's direction never being touched by any OTHER column's tap.
+  function reportsCycleColumn(field) {
+    const idx = reportsSortState.findIndex((s) => s.field === field);
+    if (idx === -1) {
+      reportsSortState.unshift({ field, dir: 'asc' });
+    } else if (idx === 0) {
+      if (reportsSortState[0].dir === 'asc') {
+        reportsSortState[0].dir = 'desc';
+      } else {
+        reportsSortState.shift();
+      }
+    } else {
+      const entry = reportsSortState[idx];
+      reportsSortState.splice(idx, 1);
+      if (entry.dir === 'asc') {
+        entry.dir = 'desc';
+        reportsSortState.unshift(entry);
+      }
+      // entry.dir was 'desc' -> its next state is Off, already achieved by the splice above.
+    }
+    renderReportsTable();
+  }
+
+  const REPORTS_SORT_LABELS = {
+    name: { asc: 'Name A→Z', desc: 'Name Z→A' },
+    category: { asc: 'Category A→Z', desc: 'Category Z→A' },
+    age: { asc: 'Newest', desc: 'Oldest' },
+    lastUsed: { asc: 'Longest Unused', desc: 'Recently Used' },
+    useCount: { asc: 'Least Used', desc: 'Most Used' },
+  };
+
+  function reportsRelativeTime(ms) {
+    const days = Math.floor(ms / 86400000);
+    if (days < 1) return 'Today';
+    if (days === 1) return '1 day';
+    if (days < 30) return days + ' days';
+    const months = Math.floor(days / 30);
+    if (months < 12) return months + (months === 1 ? ' month' : ' months');
+    const years = Math.floor(days / 365);
+    return years + (years === 1 ? ' year' : ' years');
+  }
+
+  // Jumps to the tile itself rather than just closing the report — a report is something to act
+  // on, not just read. Exact same pattern as selectTileSearchResult: close, open the tile's
+  // category (skipping its own scroll since we're about to do a more specific one), then once the
+  // browser's had a frame to lay out the now-visible content, scroll to and glow the tile.
+  function reportsGoToTile(row) {
+    closeReports();
+    if (row.categoryId !== 'home') openCategoryPath(row.categoryId, { skipScroll: true });
+    requestAnimationFrame(() => {
+      row.tileEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.tileEl.classList.remove('tile-search-glow');
+      void row.tileEl.offsetWidth; // force reflow so re-adding the class restarts the animation
+      row.tileEl.classList.add('tile-search-glow');
+      row.tileEl.addEventListener('animationend', () => row.tileEl.classList.remove('tile-search-glow'), { once: true });
+    });
+  }
+
+  function renderReportsTable() {
+    const sorted = reportsRows.slice().sort(reportsCompareRows);
+    const limitVal = reportsLimitSelect.value;
+    const limited = limitVal === 'all' ? sorted : sorted.slice(0, Number(limitVal));
+
+    reportsSortDescEl.textContent = reportsSortState.length
+      ? 'Sorted by: ' + reportsSortState.map((s) => REPORTS_SORT_LABELS[s.field][s.dir]).join(' → ')
+      : 'Not sorted — tap a column header to sort.';
+
+    document.querySelectorAll('#reports-table th.reports-col-sort').forEach((th) => {
+      const field = th.dataset.field;
+      const idx = reportsSortState.findIndex((s) => s.field === field);
+      const indicator = th.querySelector('.reports-sort-indicator');
+      if (idx === -1) {
+        indicator.innerHTML = '<span class="reports-sort-dash">–</span>';
+      } else {
+        const arrow = reportsSortState[idx].dir === 'asc' ? '▲' : '▼';
+        indicator.innerHTML = arrow + '<sup>' + (idx + 1) + '</sup>';
+      }
+    });
+
+    reportsTbody.innerHTML = '';
+    limited.forEach((row) => {
+      const tr = document.createElement('tr');
+      tr.className = 'reports-row';
+      const liveImg = row.tileEl.querySelector('img');
+      const iconSrc = liveImg ? liveImg.src : '';
+      const lastUsedLabel = row.lastUsedAt === null ? 'Never' : reportsRelativeTime(Date.now() - row.lastUsedAt) + ' ago';
+      const tdIcon = document.createElement('td');
+      tdIcon.className = 'reports-col-icon';
+      if (iconSrc) {
+        const img = document.createElement('img');
+        img.src = iconSrc;
+        img.alt = '';
+        tdIcon.appendChild(img);
+      }
+      const tdName = document.createElement('td');
+      tdName.textContent = row.name;
+      const tdCategory = document.createElement('td');
+      tdCategory.className = 'reports-cat-path';
+      tdCategory.textContent = row.categoryPath;
+      const tdAge = document.createElement('td');
+      tdAge.textContent = reportsRelativeTime(Date.now() - row.createdAt);
+      const tdLastUsed = document.createElement('td');
+      tdLastUsed.textContent = lastUsedLabel;
+      const tdUseCount = document.createElement('td');
+      tdUseCount.textContent = String(row.useCount);
+      tr.append(tdIcon, tdName, tdCategory, tdAge, tdLastUsed, tdUseCount);
+      tr.addEventListener('click', () => reportsGoToTile(row));
+      reportsTbody.appendChild(tr);
+    });
+  }
+
+  function openReports() {
+    closeSettings();
+    reportsRows = collectReportRows();
+    reportsSortState = reportsDefaultSortState();
+    reportsLimitSelect.value = '25';
+    renderReportsTable();
+    reportsOverlay.hidden = false;
+  }
+  function closeReports() {
+    reportsOverlay.hidden = true;
+  }
+  document.getElementById('reports-btn').addEventListener('click', openReports);
+  reportsClose.addEventListener('click', closeReports);
+  reportsOverlay.addEventListener('click', (e) => {
+    if (e.target === reportsOverlay) closeReports();
+  });
+  reportsLimitSelect.addEventListener('change', renderReportsTable);
+  document.querySelectorAll('#reports-table th.reports-col-sort').forEach((th) => {
+    th.addEventListener('click', () => reportsCycleColumn(th.dataset.field));
+  });
+
   // Every category on the current path has its own collapse button now, outdented to match its
   // own indent depth. Tapping a non-leaf ancestor's button truncates the path back to just before
   // it, closing it and everything open beneath it in one tap. Tapping the leaf's button keeps the

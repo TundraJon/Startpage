@@ -1159,6 +1159,95 @@ main {
   user-select: none;
 }
 
+/* Reports — wider than the default .help-panel (480px) since a 5-sortable-column table needs the
+   room; still capped rather than full-width so it doesn't look stretched on a wide screen. */
+#reports-overlay .help-panel {
+  max-width: 640px;
+}
+
+.reports-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 4px;
+  font-size: 0.85rem;
+}
+
+.reports-sort-desc {
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  margin: 2px 0 10px;
+}
+
+.reports-table-wrap {
+  overflow-x: auto;
+}
+
+.reports-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.reports-table th,
+.reports-table td {
+  padding: 5px 6px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+
+.reports-table th {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.reports-col-sort {
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.reports-sort-indicator {
+  margin-left: 2px;
+  display: inline-block;
+}
+
+.reports-sort-indicator sup {
+  font-size: 0.68em;
+  margin-left: 1px;
+}
+
+.reports-sort-dash {
+  color: var(--fg-muted);
+}
+
+.reports-col-icon {
+  width: 22px;
+}
+
+.reports-col-icon img {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.reports-cat-path {
+  font-size: 0.72rem;
+  color: var(--fg-muted);
+  white-space: normal;
+  word-break: break-word;
+  max-width: 140px;
+}
+
+.reports-row {
+  cursor: pointer;
+}
+
+.reports-row:active {
+  background: var(--bg);
+}
+
 /* Help Overlay content (Build 75) — a linked table of contents plus 16 stacked sections inside
    the already-scrollable .help-panel. Border-between-sections mirrors the same
    last-child/first-child pattern already used for Settings' own list (#settings-list
