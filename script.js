@@ -504,6 +504,7 @@
       case 'lastUsed': {
         const av = a.lastUsedAt === null ? -Infinity : a.lastUsedAt;
         const bv = b.lastUsedAt === null ? -Infinity : b.lastUsedAt;
+        if (av === bv) return 0;
         return av - bv;
       }
       case 'useCount': return a.useCount - b.useCount;
