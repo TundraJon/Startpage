@@ -1573,7 +1573,17 @@ User-reported from the live site right after Build 90 shipped: sorting by Last U
 
 ## Build Queue
 
-_Empty — nothing queued right now._
+### Feature: Reports batch delete
+
+Design settled with the user (promoted from the Build Planner's "aid in removal of unused tiles" item, explicitly deferred out of the original Reports build). Not yet authorized to build.
+
+- **Selection UI:** a checkbox column, leftmost (before the icon column), on every Reports row. Tapping the checkbox toggles that row's selection; tapping elsewhere on the row still navigates to the tile (existing row-tap behavior, unchanged) — no separate "select mode" toggle needed, the two coexist via a `stopPropagation` on the checkbox's own click.
+- **Select All:** a checkbox in the table header selects/deselects every row **currently rendered** (i.e. respecting the active row-limit setting — 10/25/50/100/All) — not every row matching the sort regardless of limit. What's on screen is what gets selected.
+- **Delete bar:** the instant 1+ rows are checked, an action bar appears showing "N selected" and a Delete button — visually modeled on the existing `.select-action-bar`/`selectActionBar` used by the main grid's tile Select Mode, just scoped to the Reports popup instead of one category's grid.
+- **Confirmation:** reuses the existing `openTileConfirm('Are you REALLY sure? 😳', ...)` pattern that `deleteSelected()` (main grid Select Mode) already uses — same destructive-action weight as everywhere else in the app, no new dialog component.
+- **Delete mechanics:** cross-category, unlike the main grid's Select Mode (which is scoped to one `grid`/`categoryId` at a time via the existing `selectMode` object — not reusable as-is here). A new routine groups the selected tile IDs by `categoryId`, then per affected category: `loadCategoryTiles` → filter out the deleted IDs → `saveCategoryTiles`, and removes each tile's DOM node from its `categoryGrids` entry so the main page stays in sync even for a collapsed/off-screen category.
+- **After delete:** Reports stays open. `reportsRows`/`renderReportsTable` re-run — deleted rows disappear, remaining rows re-sort in place, selection clears. Matches how the rest of Reports already behaves (live, in-place re-render on every interaction) rather than closing the popup.
+- **Edge case:** changing the row-limit dropdown or tapping a column header to re-sort while rows are checked clears the current selection — simplest rule, avoids tracking "ghost" selections for rows that scrolled out of the current view/limit.
 
 ## Build Planner
 
