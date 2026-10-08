@@ -1575,6 +1575,17 @@ User-reported from the live site right after Build 90 shipped: sorting by Last U
 
 _Empty — nothing queued right now._
 
+## Build Log 96 (completed)
+
+### Home Screen icons (Apple + Android) and a real favicon.ico
+
+Follow-up to Build 95, prompted by the user asking two sharp questions: would the favicon show up if the page were saved to a phone's home screen (no — that's a separate lookup from `<link rel="icon">`), and does this app's own site pass the same `/favicon.ico`-at-domain-root check its own tile-icon-fetching chain (`faviconTierUrls`, `script.js`) expects of every other site it fetches icons for (no — only `favicon.png` existed, so our own domain's literal `/favicon.ico` 404'd).
+
+- [x] **`favicon.ico`** generated from the same source PNG (Pillow, multi-resolution 16/32/48px) and added at the repo root — the literal file our own favicon-fetching chain's domain-direct tier expects from any site, including (hypothetically) this one. Declared as a second `<link rel="icon" href="favicon.ico?v=1">`, alongside the existing PNG one.
+- [x] **`apple-touch-icon.png`** (180×180, flattened onto a white background since iOS can render transparency as black) generated and declared via `<link rel="apple-touch-icon">` — this is what iOS Safari's Add to Home Screen actually looks for; it never reads `<link rel="icon">` at all.
+- [x] **`manifest.json`** added (`icon-192.png` and `icon-512.png`, also generated from the source image) and declared via `<link rel="manifest">` plus a `theme-color` meta tag — this is what Android Chrome's Add to Home Screen looks for. **Known limitation:** the manifest's `name`/`short_name` are static ("Home," matching the default page title) since a manifest is a plain file, not something per-user `localStorage` Site Name customization can reach — a custom Site Name still updates the browser tab/title, just not the home-screen label.
+- [x] **Verified via Playwright:** all six new/changed requests (`favicon.png`, `favicon.ico` both with and without the cache-bust query string, `apple-touch-icon.png`, `manifest.json`, `icon-192.png`, `icon-512.png`) return 200 with correct content types; `manifest.json` parses as valid JSON with the expected icon entries; all four `<link>` tags present in `<head>` with correct `rel`/`href`; generated icon files visually confirmed undistorted against the source image; zero JS errors.
+
 ## Build Log 95 (completed)
 
 ### Favicon added (Build Planner item 1, resolved)
