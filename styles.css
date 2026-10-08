@@ -1232,6 +1232,45 @@ main {
   display: block;
 }
 
+.reports-col-check {
+  width: 26px;
+}
+
+.reports-selectall-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0;
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  background: var(--surface);
+  color: var(--fg);
+}
+
+.reports-selectall-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.reports-row-check {
+  width: 16px;
+  height: 16px;
+}
+
+/* Fixed to the viewport bottom like the main grid's .select-action-bar it's modeled on, rather
+   than scroll-anchored inside the (internally scrolling) Reports panel -- same bottom-bar anchor
+   point used everywhere else in the app a selection toolbar appears. Needs its own z-index since
+   .select-action-bar's own 100 sits below .help-overlay's 200, which would otherwise leave it
+   stuck behind the Reports popup's dimmed backdrop and unclickable. */
+.reports-delete-bar {
+  z-index: 210;
+}
+
 .reports-cat-path {
   font-size: 0.72rem;
   color: var(--fg-muted);

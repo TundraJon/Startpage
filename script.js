@@ -452,6 +452,12 @@
   const reportsTbody = document.getElementById('reports-tbody');
   const reportsSortDescEl = document.getElementById('reports-sort-desc');
   const reportsLimitSelect = document.getElementById('reports-limit-select');
+  const reportsSelectAllBtn = document.getElementById('reports-selectall-btn');
+  const reportsDeleteBar = document.getElementById('reports-delete-bar');
+  const reportsDeleteStatus = document.getElementById('reports-delete-status');
+  const reportsDeleteBtn = document.getElementById('reports-delete-btn');
+  const REPORTS_SELECTALL_MAX = 50; // above this many visible rows, Select All is disabled -- rows must be checked individually
+  let reportsSelectedIds = new Set();
 
   function reportsDefaultSortState() {
     // "What have I forgotten about" — longest-since-used first, tiebroken by least-used. Not an
@@ -548,6 +554,10 @@
       }
       // entry.dir was 'desc' -> its next state is Off, already achieved by the splice above.
     }
+    // Re-sorting changes which rows are "currently visible" at any given position, so a held
+    // selection could silently point at different rows than the ones the user actually checked --
+    // simplest rule is just to clear it rather than track "ghost" selections across a re-sort.
+    reportsSelectedIds.clear();
     renderReportsTable();
   }
 
@@ -586,10 +596,16 @@
     });
   }
 
-  function renderReportsTable() {
+  // Shared by renderReportsTable (what to draw) and the Select All button (what "all" currently
+  // means) so the two can never disagree about which rows are "currently visible."
+  function reportsVisibleRowsNow() {
     const sorted = reportsRows.slice().sort(reportsCompareRows);
     const limitVal = reportsLimitSelect.value;
-    const limited = limitVal === 'all' ? sorted : sorted.slice(0, Number(limitVal));
+    return limitVal === 'all' ? sorted : sorted.slice(0, Number(limitVal));
+  }
+
+  function renderReportsTable() {
+    const limited = reportsVisibleRowsNow();
 
     reportsSortDescEl.textContent = reportsSortState.length
       ? 'Sorted by: ' + reportsSortState.map((s) => REPORTS_SORT_LABELS[s.field][s.dir]).join(' → ')
@@ -614,6 +630,21 @@
       const liveImg = row.tileEl.querySelector('img');
       const iconSrc = liveImg ? liveImg.src : '';
       const lastUsedLabel = row.lastUsedAt === null ? 'Never' : reportsRelativeTime(Date.now() - row.lastUsedAt) + ' ago';
+      const tdCheck = document.createElement('td');
+      tdCheck.className = 'reports-col-check';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'reports-row-check';
+      checkbox.checked = reportsSelectedIds.has(row.id);
+      // Stops the row's own click (which navigates) from also firing when the checkbox itself is
+      // tapped -- the two coexist on the same row without a separate "select mode" toggle.
+      checkbox.addEventListener('click', (e) => e.stopPropagation());
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) reportsSelectedIds.add(row.id);
+        else reportsSelectedIds.delete(row.id);
+        updateReportsSelectionUI();
+      });
+      tdCheck.appendChild(checkbox);
       const tdIcon = document.createElement('td');
       tdIcon.className = 'reports-col-icon';
       if (iconSrc) {
@@ -633,17 +664,89 @@
       tdLastUsed.textContent = lastUsedLabel;
       const tdUseCount = document.createElement('td');
       tdUseCount.textContent = String(row.useCount);
-      tr.append(tdIcon, tdName, tdCategory, tdAge, tdLastUsed, tdUseCount);
+      tr.append(tdCheck, tdIcon, tdName, tdCategory, tdAge, tdLastUsed, tdUseCount);
       tr.addEventListener('click', () => reportsGoToTile(row));
       reportsTbody.appendChild(tr);
     });
+
+    updateReportsSelectionUI(limited);
   }
+
+  // Keeps the Select All/Clear button and the delete bar in sync with reportsSelectedIds --
+  // called after every checkbox toggle (cheap, no table rebuild) and once at the end of a full
+  // renderReportsTable (which already has `limited` on hand; everyone else recomputes it).
+  function updateReportsSelectionUI(limited) {
+    if (!limited) limited = reportsVisibleRowsNow();
+    const n = reportsSelectedIds.size;
+    reportsDeleteBar.hidden = n === 0;
+    reportsDeleteStatus.textContent = n + ' selected';
+    const allVisibleSelected = limited.length > 0 && limited.every((r) => reportsSelectedIds.has(r.id));
+    reportsSelectAllBtn.textContent = allVisibleSelected ? '🆑' : '🅰️';
+    reportsSelectAllBtn.setAttribute('aria-label', allVisibleSelected ? 'Clear selection' : 'Select all');
+    reportsSelectAllBtn.disabled = limited.length === 0 || (!allVisibleSelected && limited.length > REPORTS_SELECTALL_MAX);
+  }
+
+  reportsSelectAllBtn.addEventListener('click', () => {
+    const limited = reportsVisibleRowsNow();
+    const allVisibleSelected = limited.length > 0 && limited.every((r) => reportsSelectedIds.has(r.id));
+    if (allVisibleSelected) {
+      reportsSelectedIds.clear();
+    } else {
+      limited.forEach((r) => reportsSelectedIds.add(r.id));
+    }
+    renderReportsTable();
+  });
+
+  // Cross-category, unlike the main grid's Select Mode delete (scoped to one grid/categoryId at a
+  // time via the live `selectMode` object) -- Reports rows can span every category at once, so
+  // this groups the selected tile ids by categoryId first, then applies one filter+save per
+  // affected category, same load/filter/save shape deleteSelected already uses per-category.
+  function deleteReportsSelected(selectedRows) {
+    const idsByCategory = new Map();
+    selectedRows.forEach((row) => {
+      if (!idsByCategory.has(row.categoryId)) idsByCategory.set(row.categoryId, []);
+      idsByCategory.get(row.categoryId).push(row.id);
+    });
+    idsByCategory.forEach((tileIds, categoryId) => {
+      const idSet = new Set(tileIds);
+      const remaining = loadCategoryTiles(categoryId).filter((t) => !idSet.has(t.id));
+      saveCategoryTiles(categoryId, remaining);
+      const grid = categoryGrids.get(categoryId);
+      if (!grid) return; // shouldn't happen -- every reportsRows entry came from a live categoryGrids entry
+      tileIds.forEach((tileId) => {
+        const el = grid.querySelector('[data-tile-id="' + CSS.escape(tileId) + '"]');
+        if (el) el.remove();
+      });
+    });
+    reportsSelectedIds.clear();
+    reportsRows = collectReportRows();
+    renderReportsTable();
+  }
+
+  reportsDeleteBtn.addEventListener('click', () => {
+    // Filters the currently-SORTED view, not raw reportsRows -- so the names listed in the confirm
+    // dialog appear in the same order the user just saw and checked them in, not collection order.
+    const selectedRows = reportsVisibleRowsNow().filter((r) => reportsSelectedIds.has(r.id));
+    const n = selectedRows.length;
+    if (n === 0) return;
+    const names = selectedRows.map((r) => r.name);
+    const shownNames = names.slice(0, 15).join(', ') + (n > 15 ? ', and ' + (n - 15) + ' more' : '');
+    const text = 'Delete ' + n + (n === 1 ? ' tile' : ' tiles') + '?';
+    const opts = { counts: shownNames };
+    if (n >= REPORTS_SELECTALL_MAX) {
+      opts.counts = 'You are about to delete ' + n + ' tiles: ' + shownNames;
+      opts.requireTypedYes = true;
+      opts.showBackupNudge = true;
+    }
+    openTileConfirm(text, () => deleteReportsSelected(selectedRows), opts);
+  });
 
   function openReports() {
     closeSettings();
     reportsRows = collectReportRows();
     reportsSortState = reportsDefaultSortState();
     reportsLimitSelect.value = '25';
+    reportsSelectedIds.clear();
     renderReportsTable();
     reportsOverlay.hidden = false;
   }
@@ -655,7 +758,12 @@
   reportsOverlay.addEventListener('click', (e) => {
     if (e.target === reportsOverlay) closeReports();
   });
-  reportsLimitSelect.addEventListener('change', renderReportsTable);
+  reportsLimitSelect.addEventListener('change', () => {
+    // Same reasoning as reportsCycleColumn -- changing the limit changes what's visible, so any
+    // held selection is cleared rather than silently carried over to a different set of rows.
+    reportsSelectedIds.clear();
+    renderReportsTable();
+  });
   document.querySelectorAll('#reports-table th.reports-col-sort').forEach((th) => {
     th.addEventListener('click', () => reportsCycleColumn(th.dataset.field));
   });

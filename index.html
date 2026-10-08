@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home</title>
-<link rel="stylesheet" href="styles.css?v=60">
+<link rel="stylesheet" href="styles.css?v=61">
 </head>
 <body>
 
@@ -659,6 +659,7 @@
       <table class="reports-table" id="reports-table">
         <thead>
           <tr>
+            <th class="reports-col-check"><button type="button" class="reports-selectall-btn" id="reports-selectall-btn" aria-label="Select all">🅰️</button></th>
             <th class="reports-col-icon"></th>
             <th class="reports-col-sort" data-field="name">Name<span class="reports-sort-indicator"></span></th>
             <th class="reports-col-sort" data-field="category">Category<span class="reports-sort-indicator"></span></th>
@@ -669,6 +670,12 @@
         </thead>
         <tbody id="reports-tbody"></tbody>
       </table>
+    </div>
+    <div class="select-action-bar reports-delete-bar" id="reports-delete-bar" hidden>
+      <span class="select-action-status" id="reports-delete-status">0 selected</span>
+      <div class="select-action-icons">
+        <button type="button" class="select-action-icon-btn select-action-delete" id="reports-delete-btn" aria-label="Delete">🗑️</button>
+      </div>
     </div>
   </div>
 </div>
@@ -708,6 +715,6 @@
 </div>
 
 <script src="starter-content.js?v=5"></script>
-<script src="script.js?v=70"></script>
+<script src="script.js?v=71"></script>
 </body>
 </html>
