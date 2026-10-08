@@ -1596,6 +1596,13 @@ The full design from the Build Queue, built and verified — cross-category dele
 - [x] **Bug found and fixed during verification:** the confirm dialog's name list was built by filtering `reportsRows` directly, which preserves raw DOM/category collection order, not the table's current sort order — so the names shown could appear in a different order than the rows the user actually saw and checked. Fixed by filtering `reportsVisibleRowsNow()` (the sorted view) instead.
 - [x] **Verified via Playwright**, full live app, 621-tile Full starter pack: checkbox selection confirmed not to trigger row-tap-navigate; Select All/Clear swap confirmed at both ends (0→25 selected and back to 0) with correct status text; Select All confirmed disabled at limit=100 and re-enabled at limit=25, and confirmed still *enabled* at exactly 50 (the threshold is "more than 50," not "50 or more"); sort-tap and limit-change both confirmed to clear an active selection. Delete mechanics verified end to end for a 3-tile batch (dialog lists exact names, no typed gate, deletion actually removes the tiles from both the live DOM and storage, Reports stays open and re-renders) and for a 50-tile batch (impact line, typed-gate correctly blocks until exactly "Yes" is typed — case-insensitive, rejects "delete" — backup nudge shown, deletion succeeds once confirmed). Re-ran the full prior Reports regression suite (tap-cycle worked example, Settings-closes-on-open, row-tap-navigate, Quick Tour's 17-section consistency check) clean, zero JS errors throughout.
 
+## Build Log 94 (completed)
+
+### Quick Tour: document Reports batch delete (Build 93)
+
+- [x] **Section 11's list extended** with how to select rows (the checkbox column), the 🅰️→🆑 Select All/Clear swap and its 50-row cap, and the scaled confirmation (plain delete under 50 tiles; typed "Yes" + a one-tap backup offer at 50+, same pattern as Factory Reset).
+- [x] **Verified via Playwright**: all 17 sections still numerically consistent (position/id/heading all agree) after the edit, TOC links still resolve, zero JS errors.
+
 ## Build Log 92 (completed)
 
 ### Quick Tour updated for Reports, plus a pre-existing Copy to Home gap
@@ -1615,8 +1622,3 @@ _Backlog of active items to get to eventually — not being actively worked on. 
 
 - [ ] No `<link rel="icon">` is declared in `index.html` and no `favicon.ico` file exists in the repo, so browsers automatically request `/favicon.ico` on every load and it 404s. Purely cosmetic (console/server-log noise only), unrelated to any widget functionality. Low priority — planned for the final build stage.
 
-### Planner 2. Consumers of tile usage statistics: unused-tile cleanup
-
-Usage data (`createdAt`/`lastUsedAt`/`useCount` per tile) already exists and is live. "Sort category by..." (Alphabetical / Most Used / Last Used, in the Edit Category dialog — `sortCategoryAlphaBtn`/`sortCategoryMostUsedBtn`/`sortCategoryLastUsedBtn`, `script.js`) was already built and shipped in an earlier build — this Planner entry previously still listed it as an open, undesigned item, which was stale; corrected per the user catching it. "Reports" (the other item previously listed here) has since been designed and promoted to the Build Queue above. Only unused-tile cleanup remains here, genuinely unbuilt.
-
-- [ ] **Aid in removal of unused tiles** — surface tiles that are stale (e.g. `useCount === 0`, or `lastUsedAt` older than some threshold) so they're easy to find and clean up, rather than requiring the user to notice them on their own. Likely pairs naturally with the Reports view (now in the Build Queue) as its entry point, e.g. linking from its "Never Used" section. **Open question:** does removal reuse the existing single-tile Delete (tile menu) one at a time from that list, or does this need batch delete added to multi-select (which today only supports Move, not Delete, for a selected group)? Not decided — worth revisiting once Reports itself ships.
