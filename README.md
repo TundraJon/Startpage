@@ -1575,6 +1575,16 @@ User-reported from the live site right after Build 90 shipped: sorting by Last U
 
 _Empty — nothing queued right now._
 
+## Build Log 95 (completed)
+
+### Favicon added (Build Planner item 1, resolved)
+
+The user supplied a 128×128 PNG icon (a tag-cloud graphic: "category," "related," "keyword," "links," "cloud" clustered around a cloud shape) and asked for it to be used as the site's favicon — closing out the last remaining Build Planner item.
+
+- [x] **`favicon.png`** (the supplied 128×128 PNG) added to the repo root.
+- [x] **`<link rel="icon" type="image/png" href="favicon.png?v=1">`** added to `index.html`'s `<head>`, same cache-busting query-param convention as `styles.css`/`script.js`.
+- [x] **Verified via Playwright:** only one favicon-related network request now fires (the declared `favicon.png?v=1`, 200 OK, `image/png`) — no more automatic, unavoidable `/favicon.ico` 404 request.
+
 ## Build Log 93 (completed)
 
 ### Reports batch delete
@@ -1618,7 +1628,5 @@ The user asked to bring the Quick Tour (Help Overlay, `index.html`) up to date w
 
 _Backlog of active items to get to eventually — not being actively worked on. Promote to the Build Queue when ready to start. Resolved/built/dropped/superseded items are not kept here — see Build Log entries for that history._
 
-### Planner 1. Add a favicon
-
-- [ ] No `<link rel="icon">` is declared in `index.html` and no `favicon.ico` file exists in the repo, so browsers automatically request `/favicon.ico` on every load and it 404s. Purely cosmetic (console/server-log noise only), unrelated to any widget functionality. Low priority — planned for the final build stage.
+_Empty — nothing backlogged right now._
 
